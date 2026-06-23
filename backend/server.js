@@ -3,6 +3,7 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const dotenv = require('dotenv');
+const crypto = require('crypto');
 
 // Load environment variables
 dotenv.config();
@@ -482,6 +483,89 @@ app.post('/api/seating/generate', async (req, res) => {
     logActivity('exam', 'Seating Generated', `Generated seating plan for ${exam.name} in ${hall.name}. Seated ${totalStudentsSeated} students.`);
 
     res.json(plan);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// HELPER: Hash Password
+const hashPassword = (password) => {
+  const salt = 'examflow_secret_salt_123';
+  return crypto.createHash('sha256').update(password + salt).digest('hex');
+};
+
+// 7. Authentication APIs
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username, email, password } = req.body;
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'Username, email, and password are required.' });
+    }
+
+    // Check if user already exists
+    const existingUserByEmail = await Models.User.findOne({ email });
+    if (existingUserByEmail) {
+      return res.status(400).json({ error: 'User with this email already exists.' });
+    }
+
+    const existingUserByUsername = await Models.User.findOne({ username });
+    if (existingUserByUsername) {
+      return res.status(400).json({ error: 'User with this username already exists.' });
+    }
+
+    const hashedPassword = hashPassword(password);
+    const newUser = await Models.User.create({
+      username,
+      email,
+      password: hashedPassword
+    });
+
+    logActivity('user', 'User Registered', `New administrator profile '${username}' was created.`);
+
+    res.status(201).json({
+      success: true,
+      message: 'Registration successful. You can now login.',
+      user: {
+        username: newUser.username,
+        email: newUser.email
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { emailOrUsername, password } = req.body;
+    if (!emailOrUsername || !password) {
+      return res.status(400).json({ error: 'Username/Email and password are required.' });
+    }
+
+    // Attempt to find by email first, then username
+    let user = await Models.User.findOne({ email: emailOrUsername });
+    if (!user) {
+      user = await Models.User.findOne({ username: emailOrUsername });
+    }
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid username/email or password.' });
+    }
+
+    const hashedPassword = hashPassword(password);
+    if (user.password !== hashedPassword) {
+      return res.status(401).json({ error: 'Invalid username/email or password.' });
+    }
+
+    logActivity('user', 'User Logged In', `User '${user.username}' logged in successfully.`);
+
+    res.json({
+      success: true,
+      user: {
+        username: user.username,
+        email: user.email
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

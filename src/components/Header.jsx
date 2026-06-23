@@ -1,7 +1,12 @@
 import React from 'react';
 import { Search, Bell, HelpCircle } from 'lucide-react';
 
-function Header({ searchQuery, setSearchQuery, academicYear = "2024-25" }) {
+function Header({ searchQuery, setSearchQuery, academicYear = "2024-25", user }) {
+  const getInitials = () => {
+    if (!user || !user.username) return 'AD';
+    return user.username.substring(0, 2).toUpperCase();
+  };
+
   return (
     <header className="header">
       <div className="header-search">
@@ -25,8 +30,8 @@ function Header({ searchQuery, setSearchQuery, academicYear = "2024-25" }) {
           <HelpCircle size={20} />
         </button>
         
-        <div className="header-profile-pic" title="Administrator Profile">
-          AD
+        <div className="header-profile-pic" title={`${user?.username || 'Administrator'} Profile`}>
+          {getInitials()}
         </div>
       </div>
     </header>

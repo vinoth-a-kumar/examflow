@@ -8,11 +8,45 @@ import ExamManagementView from './views/ExamManagementView';
 import SeatingPlanView from './views/SeatingPlanView';
 import SettingsView from './views/SettingsView';
 import ProfileView from './views/ProfileView';
+import LoginView from './views/LoginView';
+import RegisterView from './views/RegisterView';
 
 function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Auth & Theme States
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('examflow-user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+  const [showRegister, setShowRegister] = useState(false);
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('examflow-theme') || 'light';
+  });
+
+  // Sync theme class on body
+  useEffect(() => {
+    document.body.classList.remove('theme-light', 'theme-dark', 'theme-sunset');
+    document.body.classList.add(`theme-${theme}`);
+  }, [theme]);
+
+  const handleThemeChange = (newTheme) => {
+    setTheme(newTheme);
+    localStorage.setItem('examflow-theme', newTheme);
+  };
+
+  const handleLogin = (userData) => {
+    setUser(userData);
+    localStorage.setItem('examflow-user', JSON.stringify(userData));
+    setCurrentTab('dashboard');
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('examflow-user');
+  };
+
   // Data States
   const [stats, setStats] = useState({});
   const [activities, setActivities] = useState([]);
@@ -238,6 +272,8 @@ function App() {
             dbStatus={dbConnection} 
             onClearAll={handleClearAll}
             refreshData={fetchAllData}
+            currentTheme={theme}
+            onChangeTheme={handleThemeChange}
           />
         );
       case 'profile':
@@ -273,14 +309,41 @@ function App() {
     );
   }
 
+  if (!user) {
+    if (showRegister) {
+      return (
+        <RegisterView 
+          onRegisterSuccess={() => setShowRegister(false)} 
+          onToggleView={() => setShowRegister(false)} 
+        />
+      );
+    } else {
+      return (
+        <LoginView 
+          onLoginSuccess={handleLogin} 
+          onToggleView={() => setShowRegister(true)} 
+        />
+      );
+    }
+  }
+
   return (
     <div className="app-container">
       {/* Sidebar Navigation */}
-      <Sidebar currentTab={currentTab} setCurrentTab={setCurrentTab} />
+      <Sidebar 
+        currentTab={currentTab} 
+        setCurrentTab={setCurrentTab} 
+        user={user}
+        onLogout={handleLogout}
+      />
 
       {/* Main View Area */}
       <main className="main-content">
-        <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+        <Header 
+          searchQuery={searchQuery} 
+          setSearchQuery={setSearchQuery} 
+          user={user}
+        />
         {renderView()}
       </main>
     </div>

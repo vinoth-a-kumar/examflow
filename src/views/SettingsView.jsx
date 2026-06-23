@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, Trash2, Database, ShieldAlert, CheckCircle2 } from 'lucide-react';
 
-function SettingsView({ dbStatus, onClearAll, refreshData }) {
+function SettingsView({ dbStatus, onClearAll, refreshData, currentTheme, onChangeTheme }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateMsg, setGenerateMsg] = useState('');
 
@@ -170,6 +170,89 @@ function SettingsView({ dbStatus, onClearAll, refreshData }) {
                 <CheckCircle2 size={12} /> {generateMsg}
               </span>
             )}
+          </div>
+        </div>
+
+        {/* Theme Customization card */}
+        <div className="card-container">
+          <div className="card-title-bar">
+            <h3>Theme Customization</h3>
+          </div>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+            Choose a visual appearance for your administration control dashboard.
+          </p>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '8px' }}>
+            {/* Light Theme */}
+            <button
+              onClick={() => onChangeTheme('light')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '16px',
+                border: currentTheme === 'light' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: '#ffffff',
+                cursor: 'pointer',
+                flex: '1',
+                minWidth: '140px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#f5f7fb', border: '1px solid #e6ecf5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: '#2563eb' }} />
+              </div>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>Modern Slate</span>
+            </button>
+
+            {/* Dark Theme */}
+            <button
+              onClick={() => onChangeTheme('dark')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '16px',
+                border: currentTheme === 'dark' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: '#151f32',
+                cursor: 'pointer',
+                flex: '1',
+                minWidth: '140px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#0b0f19', border: '1px solid #1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: '#38bdf8' }} />
+              </div>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#94a3b8' }}>Midnight Obsidian</span>
+            </button>
+
+            {/* Sunset Theme */}
+            <button
+              onClick={() => onChangeTheme('sunset')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '16px',
+                border: currentTheme === 'sunset' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: '#1d1826',
+                cursor: 'pointer',
+                flex: '1',
+                minWidth: '140px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#120e16', border: '1px solid #2d243a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: '#f59e0b' }} />
+              </div>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#d6d3d1' }}>Sunset Gold</span>
+            </button>
           </div>
         </div>
 

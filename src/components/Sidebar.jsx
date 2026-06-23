@@ -10,7 +10,7 @@ import {
   LogOut 
 } from 'lucide-react';
 
-function Sidebar({ currentTab, setCurrentTab }) {
+function Sidebar({ currentTab, setCurrentTab, user, onLogout }) {
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
     { id: 'upload', name: 'Upload Data', icon: Upload },
@@ -25,7 +25,9 @@ function Sidebar({ currentTab, setCurrentTab }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
         <div className="sidebar-logo">
           <h1>ExamFlow AI</h1>
-          <span>Admin Control Center</span>
+          <span style={{ textTransform: 'none', fontSize: '11px', color: 'var(--text-secondary)' }}>
+            {user ? `@${user.username}` : 'Admin Control Center'}
+          </span>
         </div>
 
         <nav className="sidebar-menu">
@@ -59,8 +61,8 @@ function Sidebar({ currentTab, setCurrentTab }) {
           className="sidebar-item"
           style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left' }}
           onClick={() => {
-            if(window.confirm("Are you sure you want to logout?")) {
-              alert("Logged out successfully.");
+            if (window.confirm("Are you sure you want to logout?")) {
+              onLogout();
             }
           }}
         >
