@@ -8,7 +8,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 
-function UploadDataView({ students, uploads, onUpload, onClear, refreshData }) {
+function UploadDataView({ students, uploads, onUpload, onClear, refreshData, onClearUploadHistory }) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -18,6 +18,35 @@ function UploadDataView({ students, uploads, onUpload, onClear, refreshData }) {
   const [deptFilter, setDeptFilter] = useState('ALL');
   
   const fileInputRef = useRef(null);
+
+  // Get table headers dynamically based on uploaded CSV columns
+  const tableHeaders = React.useMemo(() => {
+    if (students.length > 0 && students[0].csvData) {
+      return Object.keys(students[0].csvData);
+    }
+    return ['Register No', 'Name', 'Department', 'Batch'];
+  }, [students]);
+
+  // Helper to extract cell values matching dynamic headers with fallback
+  const getCellValue = (student, header) => {
+    if (student.csvData && student.csvData[header] !== undefined) {
+      return student.csvData[header];
+    }
+    const headerLower = header.toLowerCase();
+    if (headerLower.includes('reg') || headerLower.includes('roll') || headerLower.includes('number') || headerLower.includes('id')) {
+      return student.registerNo;
+    }
+    if (headerLower.includes('name') || headerLower.includes('student')) {
+      return student.name;
+    }
+    if (headerLower.includes('dept') || headerLower.includes('depart') || headerLower.includes('branch') || headerLower.includes('course') || headerLower.includes('subject')) {
+      return student.department;
+    }
+    if (headerLower.includes('batch') || headerLower.includes('year')) {
+      return student.batch;
+    }
+    return student[header] || '';
+  };
 
   // Filter students based on search and department
   const filteredStudents = students.filter(s => {
@@ -316,28 +345,41 @@ function UploadDataView({ students, uploads, onUpload, onClear, refreshData }) {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Register No</th>
-                    <th>Name</th>
-                    <th>Department</th>
-                    <th>Batch</th>
+                    {tableHeaders.map((header) => (
+                      <th key={header}>{header}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filteredStudents.length === 0 ? (
                     <tr>
-                      <td colSpan="4" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
+                      <td colSpan={tableHeaders.length} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
                         {students.length === 0 ? "No student records uploaded yet." : "No records match search filters."}
                       </td>
                     </tr>
                   ) : (
                     filteredStudents.map((s) => (
                       <tr key={s._id || s.registerNo}>
-                        <td style={{ fontWeight: 600 }}>{s.registerNo}</td>
-                        <td>{s.name}</td>
-                        <td>
-                          <span className="status-pill info">{s.department}</span>
-                        </td>
-                        <td style={{ color: 'var(--text-secondary)' }}>{s.batch}</td>
+                        {tableHeaders.map((header, index) => {
+                          const value = getCellValue(s, header);
+                          const isFirst = index === 0;
+                          const headerLower = header.toLowerCase();
+                          const isDept = headerLower.includes('dept') || headerLower.includes('depart') || headerLower.includes('branch') || headerLower.includes('course') || headerLower.includes('subject');
+                          const isBatch = headerLower.includes('batch') || headerLower.includes('year');
+
+                          return (
+                            <td 
+                              key={header} 
+                              style={isFirst ? { fontWeight: 600 } : isBatch ? { color: 'var(--text-secondary)' } : {}}
+                            >
+                              {isDept ? (
+                                <span className="status-pill info">{value}</span>
+                              ) : (
+                                value
+                              )}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))
                   )}
@@ -353,8 +395,28 @@ function UploadDataView({ students, uploads, onUpload, onClear, refreshData }) {
 
         {/* Right Side: Upload History Panel */}
         <div className="card-container" style={{ height: 'fit-content' }}>
-          <div className="card-title-bar">
+          <div className="card-title-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3>Upload History</h3>
+            {uploads && uploads.length > 0 && (
+              <button 
+                onClick={onClearUploadHistory}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--color-error)',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseOver={(e) => e.target.style.backgroundColor = 'var(--color-error-bg)'}
+                onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+              >
+                Clear History
+              </button>
+            )}
           </div>
 
           <div className="activity-list">

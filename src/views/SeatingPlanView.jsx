@@ -19,21 +19,8 @@ function SeatingPlanView({ exams, halls }) {
   // Get halls that are assigned to the selected exam
   const examHalls = halls.filter(h => selectedExam?.assignedHalls?.includes(h.name));
 
-  // Reset hall selection if it is no longer valid for the selected exam
-  useEffect(() => {
-    if (examHalls.length > 0) {
-      // Auto-select first hall if none selected or if selected hall is not in the list
-      const isValid = examHalls.some(h => h._id === selectedHallId);
-      if (!isValid) {
-        setSelectedHallId(examHalls[0]._id);
-      }
-    } else {
-      setSelectedHallId('');
-    }
-    setSeatingPlan(null);
-    setErrorMsg('');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedExamId]);
+  const selectedHall = halls.find(h => h._id === selectedHallId);
+  const colsCount = selectedHall ? selectedHall.columns : 4;
 
   const fetchSeatingPlan = async () => {
     if (!selectedExamId || !selectedHallId) return;
@@ -57,6 +44,33 @@ function SeatingPlanView({ exams, halls }) {
       setLoading(false);
     }
   };
+
+  // Reset hall selection if it is no longer valid for the selected exam
+  useEffect(() => {
+    if (examHalls.length > 0) {
+      // Auto-select first hall if none selected or if selected hall is not in the list
+      const isValid = examHalls.some(h => h._id === selectedHallId);
+      if (!isValid) {
+        setSelectedHallId(examHalls[0]._id);
+      }
+    } else {
+      setSelectedHallId('');
+    }
+    setSeatingPlan(null);
+    setErrorMsg('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedExamId]);
+
+  // Automatically fetch seating plan when exam or hall selection changes
+  useEffect(() => {
+    if (selectedExamId && selectedHallId) {
+      fetchSeatingPlan();
+    } else {
+      setSeatingPlan(null);
+      setErrorMsg('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedExamId, selectedHallId]);
 
   const handleGenerate = async () => {
     if (!selectedExamId || !selectedHallId) {
@@ -93,7 +107,12 @@ function SeatingPlanView({ exams, halls }) {
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    try {
+      await fetch('http://localhost:5000/api/printouts/increment', { method: 'POST' });
+    } catch (err) {
+      console.error("Failed to increment print count", err);
+    }
     window.print();
   };
 
@@ -152,6 +171,26 @@ function SeatingPlanView({ exams, halls }) {
           <Search size={16} />
           <span>Search Seating</span>
         </button>
+
+        {seatingPlan && (
+          <button 
+            className="btn-secondary" 
+            onClick={handleGenerate}
+            disabled={!selectedExamId || !selectedHallId || loading}
+            style={{ 
+              height: '42px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              backgroundColor: 'var(--color-primary-light)',
+              color: 'var(--color-primary)',
+              borderColor: 'var(--color-primary)'
+            }}
+          >
+            <Sparkles size={16} />
+            <span>Regenerate Seating</span>
+          </button>
+        )}
       </div>
 
       {/* Loading Indicator */}
@@ -235,13 +274,48 @@ function SeatingPlanView({ exams, halls }) {
             </div>
           </div>
 
+          {/* Balance/Unseated Students Alert */}
+          {seatingPlan.unseatedStudents && seatingPlan.unseatedStudents.length > 0 && (
+            <div className="card-container" style={{ borderColor: 'var(--color-error)', backgroundColor: 'var(--color-error-bg)', gap: '12px' }}>
+              <h4 style={{ color: 'var(--color-error)', fontWeight: 700, fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Info size={20} />
+                <span>Balance Students ({seatingPlan.unseatedStudents.length} Not Seated due to capacity)</span>
+              </h4>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                The following students could not be allocated a seat because the hall capacity was exceeded:
+              </p>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                {seatingPlan.unseatedStudents.map(student => (
+                  <span 
+                    key={student.registerNo} 
+                    style={{ 
+                      fontSize: '11px', 
+                      backgroundColor: 'var(--bg-card)', 
+                      border: '1px solid var(--border-color)', 
+                      color: 'var(--text-primary)', 
+                      padding: '4px 8px', 
+                      borderRadius: '4px',
+                      fontWeight: 600
+                    }}
+                    title={student.name}
+                  >
+                    {student.registerNo} ({student.department})
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Seating Arrangement Layout Grid */}
           <div className="card-container">
             <div className="card-title-bar">
               <h3>{seatingPlan.hallName} - Seating Arrangement</h3>
             </div>
             
-            <div className="seating-layout-grid">
+            <div 
+              className="seating-layout-grid" 
+              style={{ gridTemplateColumns: `repeat(${colsCount}, minmax(180px, 1fr))` }}
+            >
               {seatingPlan.seatingGrid.map((bench) => (
                 <div className="bench-card" key={bench.benchCode}>
                   <span className="bench-code">{bench.benchCode}</span>

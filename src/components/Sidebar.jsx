@@ -5,12 +5,10 @@ import {
   Building2, 
   CalendarDays, 
   Grid3X3, 
-  Settings, 
-  User, 
-  LogOut 
+  Settings
 } from 'lucide-react';
 
-function Sidebar({ currentTab, setCurrentTab, user, onLogout }) {
+function Sidebar({ currentTab, setCurrentTab, user }) {
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
     { id: 'upload', name: 'Upload Data', icon: Upload },
@@ -46,29 +44,6 @@ function Sidebar({ currentTab, setCurrentTab, user, onLogout }) {
             );
           })}
         </nav>
-      </div>
-
-      <div className="sidebar-footer">
-        <button
-          className={`sidebar-item ${currentTab === 'profile' ? 'active' : ''}`}
-          style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left' }}
-          onClick={() => setCurrentTab('profile')}
-        >
-          <User size={20} />
-          <span>Profile</span>
-        </button>
-        <button
-          className="sidebar-item"
-          style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left' }}
-          onClick={() => {
-            if (window.confirm("Are you sure you want to logout?")) {
-              onLogout();
-            }
-          }}
-        >
-          <LogOut size={20} />
-          <span>Logout</span>
-        </button>
       </div>
     </aside>
   );

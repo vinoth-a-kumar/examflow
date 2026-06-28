@@ -81,7 +81,8 @@ const parseSeatingPlan = (row) => {
   return {
     ...row,
     seatingGrid: row.seatingGrid ? JSON.parse(row.seatingGrid) : [],
-    attendanceRoster: row.attendanceRoster ? JSON.parse(row.attendanceRoster) : []
+    attendanceRoster: row.attendanceRoster ? JSON.parse(row.attendanceRoster) : [],
+    unseatedStudents: row.unseatedStudents ? JSON.parse(row.unseatedStudents) : []
   };
 };
 
@@ -146,7 +147,9 @@ async function createTables() {
       \`registerNo\` VARCHAR(255) UNIQUE NOT NULL,
       \`name\` VARCHAR(255) NOT NULL,
       \`department\` VARCHAR(255) NOT NULL,
-      \`batch\` VARCHAR(255) DEFAULT '2024-25'
+      \`batch\` VARCHAR(255) DEFAULT '2024-25',
+      \`csvData\` LONGTEXT,
+      \`idx\` INT AUTO_INCREMENT UNIQUE
     )
   `);
 
@@ -186,12 +189,32 @@ async function createTables() {
       \`hallName\` VARCHAR(255) NOT NULL,
       \`seatingGrid\` LONGTEXT NOT NULL,
       \`attendanceRoster\` LONGTEXT NOT NULL,
+      \`unseatedStudents\` LONGTEXT,
       \`totalBenches\` INT,
       \`totalStudents\` INT,
       \`emptySeats\` INT,
       \`generatedAt\` DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Migrate existing databases
+  try {
+    await pool.query(`ALTER TABLE seating_plans ADD COLUMN \`unseatedStudents\` LONGTEXT`);
+  } catch (err) {
+    // Ignore error if column already exists
+  }
+
+  try {
+    await pool.query(`ALTER TABLE students ADD COLUMN \`csvData\` LONGTEXT`);
+  } catch (err) {
+    // Ignore error if column already exists
+  }
+
+  try {
+    await pool.query(`ALTER TABLE students ADD COLUMN \`idx\` INT AUTO_INCREMENT UNIQUE`);
+  } catch (err) {
+    // Ignore error if column already exists
+  }
 
   // upload_history
   await pool.query(`
@@ -214,7 +237,11 @@ const Models = {
     find: async (query = {}) => {
       if (isMysqlConnected) {
         const { clause, values } = buildWhere(query);
-        return await runQuery(`SELECT * FROM students${clause}`, values);
+        const rows = await runQuery(`SELECT * FROM students${clause} ORDER BY idx ASC`, values);
+        return rows.map(r => ({
+          ...r,
+          csvData: r.csvData ? JSON.parse(r.csvData) : null
+        }));
       }
       // Fallback
       let data = readJson('students');
@@ -226,7 +253,13 @@ const Models = {
       if (isMysqlConnected) {
         const { clause, values } = buildWhere(query);
         const rows = await runQuery(`SELECT * FROM students${clause} LIMIT 1`, values);
-        return rows[0] || null;
+        if (rows[0]) {
+          return {
+            ...rows[0],
+            csvData: rows[0].csvData ? JSON.parse(rows[0].csvData) : null
+          };
+        }
+        return null;
       }
       // Fallback
       const data = readJson('students');
@@ -246,8 +279,8 @@ const Models = {
           if (!existing) {
             const _id = generateId();
             await runQuery(
-              `INSERT INTO students (\`_id\`, \`registerNo\`, \`name\`, \`department\`, \`batch\`) VALUES (?, ?, ?, ?, ?)`,
-              [_id, item.registerNo, item.name, item.department, item.batch || '2024-25']
+              `INSERT INTO students (\`_id\`, \`registerNo\`, \`name\`, \`department\`, \`batch\`, \`csvData\`) VALUES (?, ?, ?, ?, ?, ?)`,
+              [_id, item.registerNo, item.name, item.department, item.batch || '2024-25', JSON.stringify(item.csvData || null)]
             );
             added.push({ _id, ...item, batch: item.batch || '2024-25' });
           }
@@ -271,6 +304,10 @@ const Models = {
     },
     deleteMany: async (query = {}) => {
       if (isMysqlConnected) {
+        if (Object.keys(query).length === 0) {
+          await runQuery(`TRUNCATE TABLE students`);
+          return { deletedCount: 0 };
+        }
         const { clause, values } = buildWhere(query);
         const res = await runQuery(`DELETE FROM students${clause}`, values);
         return { deletedCount: res.affectedRows };
@@ -343,6 +380,24 @@ const Models = {
       writeJson('halls', data);
       return newItem;
     },
+    findByIdAndUpdate: async (id, doc) => {
+      if (isMysqlConnected) {
+        await runQuery(
+          `UPDATE halls SET \`name\` = ?, \`rows\` = ?, \`columns\` = ?, \`capacity\` = ?, \`benches\` = ? WHERE \`_id\` = ?`,
+          [doc.name, doc.rows, doc.columns, doc.capacity, doc.benches, id]
+        );
+        return { _id: id, ...doc };
+      }
+      // Fallback
+      const data = readJson('halls');
+      const idx = data.findIndex(h => h._id === id);
+      if (idx !== -1) {
+        data[idx] = { ...data[idx], ...doc };
+        writeJson('halls', data);
+        return data[idx];
+      }
+      return null;
+    },
     findByIdAndDelete: async (id) => {
       if (isMysqlConnected) {
         const rows = await runQuery(`SELECT * FROM halls WHERE \`_id\` = ? LIMIT 1`, [id]);
@@ -413,6 +468,32 @@ const Models = {
       writeJson('exams', data);
       return newItem;
     },
+    findByIdAndUpdate: async (id, doc) => {
+      if (isMysqlConnected) {
+        await runQuery(
+          `UPDATE exams SET \`name\` = ?, \`departments\` = ?, \`date\` = ?, \`session\` = ?, \`studentsCount\` = ?, \`assignedHalls\` = ? WHERE \`_id\` = ?`,
+          [
+            doc.name,
+            JSON.stringify(doc.departments || []),
+            doc.date,
+            doc.session,
+            doc.studentsCount || 0,
+            JSON.stringify(doc.assignedHalls || []),
+            id
+          ]
+        );
+        return { _id: id, ...doc };
+      }
+      // Fallback
+      const data = readJson('exams');
+      const idx = data.findIndex(e => e._id === id);
+      if (idx !== -1) {
+        data[idx] = { ...data[idx], ...doc };
+        writeJson('exams', data);
+        return data[idx];
+      }
+      return null;
+    },
     findByIdAndDelete: async (id) => {
       if (isMysqlConnected) {
         const rows = await runQuery(`SELECT * FROM exams WHERE \`_id\` = ? LIMIT 1`, [id]);
@@ -475,7 +556,7 @@ const Models = {
         const _id = generateId();
         const generatedAt = new Date();
         await runQuery(
-          `INSERT INTO seating_plans (\`_id\`, \`examId\`, \`examName\`, \`hallId\`, \`hallName\`, \`seatingGrid\`, \`attendanceRoster\`, \`totalBenches\`, \`totalStudents\`, \`emptySeats\`, \`generatedAt\`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO seating_plans (\`_id\`, \`examId\`, \`examName\`, \`hallId\`, \`hallName\`, \`seatingGrid\`, \`attendanceRoster\`, \`unseatedStudents\`, \`totalBenches\`, \`totalStudents\`, \`emptySeats\`, \`generatedAt\`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             _id,
             doc.examId,
@@ -484,6 +565,7 @@ const Models = {
             doc.hallName,
             JSON.stringify(doc.seatingGrid),
             JSON.stringify(doc.attendanceRoster),
+            JSON.stringify(doc.unseatedStudents || []),
             doc.totalBenches,
             doc.totalStudents,
             doc.emptySeats,
