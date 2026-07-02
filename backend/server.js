@@ -9,6 +9,8 @@ const crypto = require('crypto');
 // Load environment variables
 dotenv.config();
 
+const XLSX = require('xlsx');
+
 const { Models, dbStatus } = require('./db');
 
 const app = express();
@@ -18,11 +20,24 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// Set up Multer for CSV uploads (using memory storage)
+// Set up Multer for CSV/Excel uploads (using memory storage)
 const storage = multer.memoryStorage();
 const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 } // 50MB max limit
 });
+
+// Helper: Convert a file buffer (CSV or Excel) to CSV text string
+function bufferToCsvText(buffer, originalname) {
+  // Excel magic bytes: XLSX starts with PK (0x50 0x4B), XLS starts with 0xD0 0xCF
+  const isExcel = originalname && (/\.(xlsx|xls)$/i.test(originalname));
+  if (isExcel) {
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    return XLSX.utils.sheet_to_csv(sheet);
+  }
+  return buffer.toString('utf8');
+}
 
 // Helper: Check if a line is likely to be a header row
 function hasHeaders(firstLine) {
@@ -38,6 +53,40 @@ function hasHeaders(firstLine) {
 }
 
 // Helper: Parse CSV text into array of objects
+// Helper: proper RFC-4180 CSV line splitter (handles Excel double-quoted fields)
+function splitCsvLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { // escaped quote ""
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
 function parseCSV(csvText) {
   const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   if (lines.length === 0) return [];
@@ -48,24 +97,21 @@ function parseCSV(csvText) {
   const firstLine = lines[0];
 
   if (hasHeaders(firstLine)) {
-    headers = firstLine.split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+    headers = splitCsvLine(firstLine).map(h => h.replace(/^["']|["']$/g, '').trim());
   } else {
-    // Fallback headers
     headers = ['Register No', 'Name', 'Department'];
     startIdx = 0;
   }
-  
+
   // Find column indexes
-  let regIndex = headers.findIndex(h => /reg|roll|number|id/i.test(h));
+  let regIndex  = headers.findIndex(h => /reg|roll|number|id/i.test(h));
   let nameIndex = headers.findIndex(h => /name|student/i.test(h));
   let deptIndex = headers.findIndex(h => /dept|depart|branch|course/i.test(h));
-  if (deptIndex === -1) {
-    deptIndex = headers.findIndex(h => /subject/i.test(h));
-  }
+  if (deptIndex === -1) deptIndex = headers.findIndex(h => /subject/i.test(h));
   let batchIndex = headers.findIndex(h => /batch|year/i.test(h));
 
   // Fallbacks if not detected by regex
-  if (regIndex === -1) regIndex = 0;
+  if (regIndex  === -1) regIndex  = 0;
   if (nameIndex === -1) nameIndex = 1;
   if (deptIndex === -1) deptIndex = 2;
 
@@ -74,28 +120,13 @@ function parseCSV(csvText) {
     const line = lines[i].trim();
     if (!line) continue;
 
-    // Handle comma inside quotes (simple CSV parse)
-    let parts = [];
-    let insideQuote = false;
-    let currentPart = '';
-    
-    for (let char of line) {
-      if (char === '"' || char === "'") {
-        insideQuote = !insideQuote;
-      } else if (char === ',' && !insideQuote) {
-        parts.push(currentPart.trim().replace(/^["']|["']$/g, ''));
-        currentPart = '';
-      } else {
-        currentPart += char;
-      }
-    }
-    parts.push(currentPart.trim().replace(/^["']|["']$/g, ''));
+    const parts = splitCsvLine(line);
 
     if (parts.length > Math.max(regIndex, nameIndex, deptIndex)) {
       const registerNo = parts[regIndex];
-      const name = parts[nameIndex];
+      const name       = parts[nameIndex];
       const department = parts[deptIndex];
-      const batch = batchIndex !== -1 ? parts[batchIndex] : '2024-25';
+      const batch      = batchIndex !== -1 ? parts[batchIndex] : '2024-25';
 
       // Keep dynamic original headers and data mapping
       const csvData = {};
@@ -117,6 +148,15 @@ function parseCSV(csvText) {
   return records;
 }
 
+// Helper: Extract subject code from student csvData
+function getStudentSubCode(student) {
+  if (!student.csvData) return null;
+  // Try common field names for subject code
+  const possibleKeys = Object.keys(student.csvData);
+  const subCodeKey = possibleKeys.find(k => /sub.*code|subject.*code|sub_code|subcode/i.test(k));
+  if (subCodeKey) return student.csvData[subCodeKey] || null;
+  return null;
+}
 // Helper: System logs for dashboard recent activities
 // In a full app this might be in DB, we will use a JSON file or memory array that is persisted in memory/DB
 let recentActivities = [
@@ -271,11 +311,11 @@ app.post('/api/students/upload', upload.single('file'), async (req, res) => {
   try {
     let csvText = '';
     if (req.file) {
-      csvText = req.file.buffer.toString('utf8');
+      csvText = bufferToCsvText(req.file.buffer, req.file.originalname);
     } else if (req.body.csvText) {
       csvText = req.body.csvText;
     } else {
-      throw new Error('No CSV file or text provided.');
+      throw new Error('No file or text provided.');
     }
 
     const students = parseCSV(csvText);
@@ -402,6 +442,133 @@ app.put('/api/halls/:id', async (req, res) => {
   }
 });
 
+app.post('/api/halls/clear', async (req, res) => {
+  try {
+    await Models.Hall.deleteMany({});
+    logActivity('hall', 'Halls Database Cleared', 'All hall records have been deleted.');
+    res.json({ success: true, message: 'All hall records cleared.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Hall CSV Upload
+app.post('/api/halls/upload', upload.single('file'), async (req, res) => {
+  const filename = req.file ? req.file.originalname : 'manual_entry.csv';
+  try {
+    let csvText = '';
+    if (req.file) {
+      csvText = bufferToCsvText(req.file.buffer, req.file.originalname);
+    } else if (req.body.csvText) {
+      csvText = req.body.csvText;
+    } else {
+      throw new Error('No file or text provided.');
+    }
+
+    // Parse CSV into hall records
+    const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) throw new Error('CSV is empty.');
+
+    // Detect header row using proper RFC-4180 splitter
+    const firstLine = lines[0];
+    const firstParts = splitCsvLine(firstLine).map(p => p.replace(/^["']|["']$/g, '').trim());
+    
+    // Check if the second and third columns of the first line are numeric
+    const isNumeric = (str) => {
+      if (typeof str !== 'string') return false;
+      return !isNaN(str) && !isNaN(parseFloat(str));
+    };
+    const isSecondPartNumeric = firstParts[1] && isNumeric(firstParts[1]);
+    const isThirdPartNumeric = firstParts[2] && isNumeric(firstParts[2]);
+
+    const hasHeader = firstParts.some(p => /hall|name|room|block|bench|seat|row|col/i.test(p)) || 
+                      (firstParts.length >= 3 && (!isSecondPartNumeric || !isThirdPartNumeric));
+
+    let headers, startIdx;
+    if (hasHeader) {
+      headers = firstParts;
+      startIdx = 1;
+    } else {
+      headers = ['Hall Name', 'Rows', 'Columns'];
+      startIdx = 0;
+    }
+    const nameIdx = headers.findIndex(h => /hall|name|room|block|h\s*no/i.test(h));
+    const rowsIdx = headers.findIndex(h => /row|set/i.test(h) && !/seat|capacity/i.test(h));
+    const colsIdx = headers.findIndex(h => /col/i.test(h) && !/alloc|allot/i.test(h));
+    const capacityIdx = headers.findIndex(h => /seat|capacity/i.test(h));
+
+    const nameIndex = nameIdx !== -1 ? nameIdx : 0;
+    const rowsIndex = rowsIdx !== -1 ? rowsIdx : 1;
+    const colsIndex = colsIdx !== -1 ? colsIdx : 2;
+    const capacityIndex = capacityIdx !== -1 ? capacityIdx : -1;
+
+    const hallRecords = [];
+    for (let i = startIdx; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      const parts = splitCsvLine(line);
+      const name = parts[nameIndex];
+      let rows = parseInt(parts[rowsIndex]);
+      let columns = colsIdx !== -1 ? parseInt(parts[colsIndex]) : 1;
+      let capacity = capacityIndex !== -1 ? parseInt(parts[capacityIndex]) : NaN;
+
+      if (!name || name.toUpperCase() === 'T' || name.toLowerCase().includes('total')) continue;
+
+      if (isNaN(rows) || rows <= 0) {
+        if (!isNaN(capacity) && capacity > 0) {
+          const benches = Math.round(capacity / 2);
+          if (columns > 0) {
+            rows = Math.round(benches / columns);
+          } else {
+            rows = benches;
+            columns = 1;
+          }
+        } else {
+          rows = 8;
+          columns = 5;
+        }
+      }
+
+      if (isNaN(columns) || columns <= 0) {
+        columns = 1;
+      }
+
+      if (isNaN(capacity) || capacity <= 0) {
+        capacity = rows * columns * 2;
+      }
+      // Build csvData: map every original CSV header to its value
+      const csvData = {};
+      headers.forEach((header, index) => {
+        csvData[header] = parts[index] || '';
+      });
+
+      hallRecords.push({ name, rows, columns, csvData, capacity });
+    }
+
+    if (hallRecords.length === 0) {
+      throw new Error('No valid hall records found. CSV must have columns: Hall Name, Rows, Columns.');
+    }
+
+    let insertedCount = 0;
+    for (const h of hallRecords) {
+      const benches = h.rows * h.columns;
+      await Models.Hall.create({ name: h.name, rows: h.rows, columns: h.columns, benches, capacity: h.capacity, csvData: h.csvData });
+      insertedCount++;
+    }
+
+    logActivity('hall', 'Halls Uploaded via CSV', `${filename} imported ${insertedCount} hall records.`);
+
+    res.json({
+      success: true,
+      message: `Successfully imported ${insertedCount} hall record(s) from CSV.`,
+      count: insertedCount
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
 // 5. Exam Management
 app.get('/api/exams', async (req, res) => {
   try {
@@ -411,7 +578,8 @@ app.get('/api/exams', async (req, res) => {
     const allHalls = await Models.Hall.find();
 
     const examsWithCounts = exams.map(e => {
-      const examDepts = e.departments.map(d => d.toUpperCase());
+      const examSubCodes = (e.subjectCodes || []).map(c => c.toUpperCase());
+      const examDepts = (e.departments || []).map(d => d.toUpperCase());
       const dateStr = e.date.split('T')[0];
 
       // Other exams at the same date and session
@@ -433,9 +601,17 @@ app.get('/api/exams', async (req, res) => {
         }
       });
 
-      // Total students belonging to departments who are not seated in other exams
-      const deptStudents = allStudents.filter(s => examDepts.includes(s.department.toUpperCase()));
-      const participatingStudents = deptStudents.filter(s => !seatedInOtherExams.has(s.registerNo));
+      // Filter students by subject codes if available, fallback to departments
+      let relevantStudents;
+      if (examSubCodes.length > 0) {
+        relevantStudents = allStudents.filter(s => {
+          const subCode = getStudentSubCode(s);
+          return subCode && examSubCodes.includes(subCode.toUpperCase());
+        });
+      } else {
+        relevantStudents = allStudents.filter(s => examDepts.includes(s.department.toUpperCase()));
+      }
+      const participatingStudents = relevantStudents.filter(s => !seatedInOtherExams.has(s.registerNo));
       const studentsCount = participatingStudents.length;
 
       // Seated students in own plans of this exam
@@ -482,9 +658,12 @@ app.get('/api/exams', async (req, res) => {
 
 app.post('/api/exams', async (req, res) => {
   try {
-    const { name, departments, date, session, assignedHalls } = req.body;
-    if (!name || !departments || !date || !session) {
-      return res.status(400).json({ error: 'Name, departments, date, and session are required.' });
+    const { name, departments, subjectCodes, date, session, assignedHalls, seatsPerBench } = req.body;
+    if (!name || !date || !session) {
+      return res.status(400).json({ error: 'Name, date, and session are required.' });
+    }
+    if ((!subjectCodes || subjectCodes.length === 0) && (!departments || departments.length === 0)) {
+      return res.status(400).json({ error: 'Please select at least one subject code.' });
     }
 
     // Check if any of the assigned halls are fully occupied on the same date and session
@@ -510,19 +689,32 @@ app.post('/api/exams', async (req, res) => {
       return res.status(400).json({ error: 'One or more assigned halls are fully occupied on this date and session.' });
     }
 
-    // Calculate how many students belong to the selected departments
+    // Calculate how many students match selected subject codes (or fallback to departments)
     const students = await Models.Student.find();
-    const relevantStudents = students.filter(s => 
-      departments.map(d => d.toUpperCase()).includes(s.department.toUpperCase())
-    );
+    const upperSubCodes = (subjectCodes || []).map(c => c.toUpperCase());
+    const upperDepts = (departments || []).map(d => d.toUpperCase());
+    
+    let relevantStudents;
+    if (upperSubCodes.length > 0) {
+      relevantStudents = students.filter(s => {
+        const subCode = getStudentSubCode(s);
+        return subCode && upperSubCodes.includes(subCode.toUpperCase());
+      });
+    } else {
+      relevantStudents = students.filter(s => 
+        upperDepts.includes(s.department.toUpperCase())
+      );
+    }
 
     const newExam = await Models.Exam.create({
       name,
-      departments: departments.map(d => d.toUpperCase()),
+      departments: upperDepts,
+      subjectCodes: upperSubCodes,
       date,
       session,
       studentsCount: relevantStudents.length,
       assignedHalls: assignedHalls || [],
+      seatsPerBench: parseInt(seatsPerBench) || 2,
       status: 'Scheduled'
     });
 
@@ -550,9 +742,12 @@ app.delete('/api/exams/:id', async (req, res) => {
 
 app.put('/api/exams/:id', async (req, res) => {
   try {
-    const { name, departments, date, session, assignedHalls } = req.body;
-    if (!name || !departments || !date || !session) {
-      return res.status(400).json({ error: 'Name, departments, date, and session are required.' });
+    const { name, departments, subjectCodes, date, session, assignedHalls, seatsPerBench } = req.body;
+    if (!name || !date || !session) {
+      return res.status(400).json({ error: 'Name, date, and session are required.' });
+    }
+    if ((!subjectCodes || subjectCodes.length === 0) && (!departments || departments.length === 0)) {
+      return res.status(400).json({ error: 'Please select at least one subject code.' });
     }
 
     // Check if any of the assigned halls are fully occupied on the same date and session (excluding current exam)
@@ -578,26 +773,39 @@ app.put('/api/exams/:id', async (req, res) => {
       return res.status(400).json({ error: 'One or more assigned halls are fully occupied on this date and session.' });
     }
 
-    // Calculate how many students belong to the selected departments
+    // Calculate how many students match selected subject codes (or fallback to departments)
     const students = await Models.Student.find();
-    const relevantStudents = students.filter(s => 
-      departments.map(d => d.toUpperCase()).includes(s.department.toUpperCase())
-    );
+    const upperSubCodes = (subjectCodes || []).map(c => c.toUpperCase());
+    const upperDepts = (departments || []).map(d => d.toUpperCase());
+    
+    let relevantStudents;
+    if (upperSubCodes.length > 0) {
+      relevantStudents = students.filter(s => {
+        const subCode = getStudentSubCode(s);
+        return subCode && upperSubCodes.includes(subCode.toUpperCase());
+      });
+    } else {
+      relevantStudents = students.filter(s => 
+        upperDepts.includes(s.department.toUpperCase())
+      );
+    }
 
     const updated = await Models.Exam.findByIdAndUpdate(req.params.id, {
       name,
-      departments: departments.map(d => d.toUpperCase()),
+      departments: upperDepts,
+      subjectCodes: upperSubCodes,
       date,
       session,
       studentsCount: relevantStudents.length,
-      assignedHalls: assignedHalls || []
+      assignedHalls: assignedHalls || [],
+      seatsPerBench: parseInt(seatsPerBench) || 2
     });
 
     if (!updated) {
       return res.status(404).json({ error: 'Exam not found.' });
     }
 
-    // If date or session or departments or halls changed, delete existing seating plans for this exam so they must be regenerated
+    // If date or session or subject codes or halls changed, delete existing seating plans for this exam so they must be regenerated
     await Models.SeatingPlan.deleteMany({ examId: req.params.id });
 
     logActivity('exam', 'Exam Updated', `${name} configuration was updated.`);
@@ -724,6 +932,67 @@ app.get('/api/students/remaining', async (req, res) => {
   }
 });
 
+// Get all unique subject codes from student records
+app.get('/api/students/subject-codes', async (req, res) => {
+  try {
+    const allStudents = await Models.Student.find();
+    const subCodeSet = new Set();
+    allStudents.forEach(s => {
+      const code = getStudentSubCode(s);
+      if (code) subCodeSet.add(code.toUpperCase());
+    });
+    res.json([...subCodeSet].sort());
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get remaining (unseated) student counts per subject code for a given date/session
+app.get('/api/students/remaining-by-subject', async (req, res) => {
+  try {
+    const { date, session } = req.query;
+    if (!date || !session) {
+      return res.status(400).json({ error: 'date and session are required.' });
+    }
+    
+    const allExams = await Models.Exam.find();
+    const targetDate = date.split('T')[0];
+    let examsAtSameTime = allExams.filter(e => 
+      e.date.split('T')[0] === targetDate && e.session === session
+    );
+    if (req.query.excludeExamId) {
+      examsAtSameTime = examsAtSameTime.filter(e => e._id !== req.query.excludeExamId);
+    }
+    const examIds = examsAtSameTime.map(e => e._id);
+    
+    const allPlans = await Models.SeatingPlan.find();
+    const plansAtSameTime = allPlans.filter(p => examIds.includes(p.examId));
+    
+    const seatedStudentRegNos = new Set();
+    plansAtSameTime.forEach(plan => {
+      plan.attendanceRoster.forEach(student => {
+        seatedStudentRegNos.add(student.registerNo);
+      });
+    });
+
+    const allStudents = await Models.Student.find();
+    
+    // Count remaining students per subject code
+    const remainingCounts = {};
+    allStudents.forEach(s => {
+      const subCode = getStudentSubCode(s);
+      if (subCode && !seatedStudentRegNos.has(s.registerNo)) {
+        const code = subCode.toUpperCase();
+        remainingCounts[code] = (remainingCounts[code] || 0) + 1;
+      }
+    });
+
+    res.json(remainingCounts);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/halls/availability', async (req, res) => {
   try {
     const { date, session } = req.query;
@@ -837,11 +1106,18 @@ app.get('/api/seating/:examId/:hallId', async (req, res) => {
       });
       
       const allStudents = await Models.Student.find();
-      const examDepts = exam.departments.map(d => d.toUpperCase());
+      const examSubCodes = (exam.subjectCodes || []).map(c => c.toUpperCase());
+      const examDepts = (exam.departments || []).map(d => d.toUpperCase());
       
       const unseated = allStudents
         .filter(s => {
-          if (!examDepts.includes(s.department.toUpperCase())) return false;
+          // Filter by subject codes if available, else departments
+          if (examSubCodes.length > 0) {
+            const subCode = getStudentSubCode(s);
+            if (!subCode || !examSubCodes.includes(subCode.toUpperCase())) return false;
+          } else {
+            if (!examDepts.includes(s.department.toUpperCase())) return false;
+          }
           if (seatedStudentRegNos.has(s.registerNo)) return false;
           return true;
         })
@@ -888,9 +1164,10 @@ app.post('/api/seating/generate', async (req, res) => {
       return res.status(404).json({ error: 'Exam or Hall not found.' });
     }
 
-    // Get students for exam's departments
+    // Get students for exam's subject codes (or departments as fallback)
     const allStudents = await Models.Student.find();
-    const examDepts = exam.departments.map(d => d.toUpperCase());
+    const examSubCodes = (exam.subjectCodes || []).map(c => c.toUpperCase());
+    const examDepts = (exam.departments || []).map(d => d.toUpperCase());
     
     // Find all exams scheduled for the same date and session
     const allExams = await Models.Exam.find();
@@ -923,9 +1200,15 @@ app.post('/api/seating/generate', async (req, res) => {
       allHalls.find(h => h.name === hallName || h._id === hallName)
     ).filter(Boolean);
 
-    // Initial student pool for this exam (departments of the exam, minus anyone seated in OTHER exams)
+    // Initial student pool for this exam (by subject codes or departments, minus anyone seated in OTHER exams)
+    // Sort by department first (for department-wise ordering), then by register number
     let currentPool = allStudents.filter(s => {
-      if (!examDepts.includes(s.department.toUpperCase())) return false;
+      if (examSubCodes.length > 0) {
+        const subCode = getStudentSubCode(s);
+        if (!subCode || !examSubCodes.includes(subCode.toUpperCase())) return false;
+      } else {
+        if (!examDepts.includes(s.department.toUpperCase())) return false;
+      }
       if (seatedStudentRegNos.has(s.registerNo)) return false;
       return true;
     }).sort((a, b) => a.registerNo.localeCompare(b.registerNo));
@@ -937,11 +1220,40 @@ app.post('/api/seating/generate', async (req, res) => {
 
     const initialPoolForUnseated = [...currentPool];
 
+    // Group students by subject codes (preserving the selected order/click priority)
+    let activePools = [];
+    if (examSubCodes.length > 0) {
+      activePools = examSubCodes.map(code => ({
+        code: code.toUpperCase(),
+        students: currentPool.filter(s => {
+          const subCode = getStudentSubCode(s);
+          return subCode && subCode.toUpperCase() === code.toUpperCase();
+        })
+      })).filter(p => p.students.length > 0);
+    } else {
+      // Fallback to departments if no subject codes (using selection priority order of departments)
+      activePools = examDepts.map(dept => ({
+        code: dept.toUpperCase(),
+        students: currentPool.filter(s => s.department.toUpperCase() === dept.toUpperCase())
+      })).filter(p => p.students.length > 0);
+    }
+
+    // Helper to pick next student
+    function getNextStudent(excludeCodes = []) {
+      const pool = activePools.find(p => p.students.length > 0 && !excludeCodes.includes(p.code));
+      if (pool) {
+        const student = pool.students.shift();
+        return { student, code: pool.code };
+      }
+      return null;
+    }
+
     // Allocate halls sequentially in their designated sequence
     for (const h of assignedHallsInOrder) {
       const rowsCount = h.rows;
       const colsCount = h.columns;
-      const totalSeats = rowsCount * colsCount * 2;
+      const seatsPerBench = exam.seatsPerBench || 2;
+      const totalSeats = rowsCount * colsCount * seatsPerBench;
 
       // Existing plans for other exams in this same hall
       const otherPlansForThisHall = plansAtSameTime.filter(p => p.examId !== examId && (p.hallId === h._id || p.hallName === h.name));
@@ -951,6 +1263,7 @@ app.post('/api/seating/generate', async (req, res) => {
           p.seatingGrid.forEach(g => {
             if (g.seat1) occupiedSeatsInThisHall[`${g.benchCode}_seat1`] = g.seat1;
             if (g.seat2) occupiedSeatsInThisHall[`${g.benchCode}_seat2`] = g.seat2;
+            if (g.seat3) occupiedSeatsInThisHall[`${g.benchCode}_seat3`] = g.seat3;
           });
         }
       });
@@ -967,183 +1280,128 @@ app.post('/api/seating/generate', async (req, res) => {
             row: rowLetter,
             col: c,
             seat1: occupiedSeatsInThisHall[`${benchCode}_seat1`] || null,
-            seat2: occupiedSeatsInThisHall[`${benchCode}_seat2`] || null
+            seat2: occupiedSeatsInThisHall[`${benchCode}_seat2`] || null,
+            seat3: seatsPerBench === 3 ? (occupiedSeatsInThisHall[`${benchCode}_seat3`] || null) : undefined
           };
           if (!gridMap[benchCode].seat1) availableSeats++;
           if (!gridMap[benchCode].seat2) availableSeats++;
+          if (seatsPerBench === 3 && !gridMap[benchCode].seat3) availableSeats++;
         }
       }
 
-      // Group remaining pool by department
-      const studentsByDept = {};
-      examDepts.forEach(dept => {
-        studentsByDept[dept] = currentPool.filter(s => s.department.toUpperCase() === dept);
-      });
-
-      // Filter active departments preserving exam selection priority
-      let activeDepts = examDepts.filter(dept => studentsByDept[dept] && studentsByDept[dept].length > 0);
+      // Construct list of benches in column-by-column order
+      const benchesList = [];
+      for (let c = 1; c <= colsCount; c++) {
+        for (let r = 0; r < rowsCount; r++) {
+          const rowLetter = String.fromCharCode(65 + r);
+          const benchCode = `${rowLetter}${c}`;
+          benchesList.push(gridMap[benchCode]);
+        }
+      }
 
       const localRoster = [];
       let totalSeatedInThisHall = 0;
 
-      if (activeDepts.length === 1) {
-        // Single department: split evenly
-        const dept = activeDepts[0];
-        const list = studentsByDept[dept];
-        let seat1Pool = [];
-        let seat2Pool = [];
-
-        list.forEach((student, index) => {
-          if (index % 2 === 0) {
-            seat1Pool.push(student);
-          } else {
-            seat2Pool.push(student);
+      // Phase 1: Fill all empty seat1 (Left) seats in the hall first
+      for (const bench of benchesList) {
+        if (!bench.seat1) {
+          const res = getNextStudent([]);
+          if (res) {
+            bench.seat1 = res.student;
+            totalSeatedInThisHall++;
+            localRoster.push({
+              registerNo: res.student.registerNo,
+              name: res.student.name,
+              department: res.student.department,
+              subjectCode: getStudentSubCode(res.student) || '',
+              bench: bench.benchCode,
+              seat: 'Left'
+            });
           }
-        });
+        }
+      }
 
-        let studentIndex1 = 0;
-        let studentIndex2 = 0;
+      // Phase 2: Fill all empty seat2 (Middle if 3 seats, Right if 2 seats) in the hall next
+      for (const bench of benchesList) {
+        let sub1 = null;
+        if (bench.seat1) {
+          sub1 = getStudentSubCode(bench.seat1) || bench.seat1.department;
+          if (sub1) sub1 = sub1.toUpperCase();
+        }
 
-        for (let c = 1; c <= colsCount; c++) {
-          for (let r = 0; r < rowsCount; r++) {
-            const rowLetter = String.fromCharCode(65 + r);
-            const benchCode = `${rowLetter}${c}`;
-            const bench = gridMap[benchCode];
-
-            if (!bench.seat1 && studentIndex1 < seat1Pool.length) {
-              const seat1Student = seat1Pool[studentIndex1++];
-              bench.seat1 = seat1Student;
+        if (seatsPerBench === 2) {
+          if (!bench.seat2) {
+            // Try to get a student from a different pool for interleaving
+            let res = getNextStudent(sub1 ? [sub1] : []);
+            if (!res) {
+              // Fallback to same pool if only 1 is left and we need to fill the Right seats
+              res = getNextStudent([]);
+            }
+            if (res) {
+              bench.seat2 = res.student;
               totalSeatedInThisHall++;
               localRoster.push({
-                registerNo: seat1Student.registerNo,
-                name: seat1Student.name,
-                department: seat1Student.department,
-                bench: benchCode,
-                seat: 'Left'
+                registerNo: res.student.registerNo,
+                name: res.student.name,
+                department: res.student.department,
+                subjectCode: getStudentSubCode(res.student) || '',
+                bench: bench.benchCode,
+                seat: 'Right'
               });
             }
-
-            if (!bench.seat2 && studentIndex2 < seat2Pool.length) {
-              const seat2Student = seat2Pool[studentIndex2++];
-              bench.seat2 = seat2Student;
+          }
+        } else if (seatsPerBench === 3) {
+          if (!bench.seat2) {
+            // Exclude sub1 (adjacent duplicate prevention)
+            const res = getNextStudent(sub1 ? [sub1] : []);
+            if (res) {
+              bench.seat2 = res.student;
               totalSeatedInThisHall++;
               localRoster.push({
-                registerNo: seat2Student.registerNo,
-                name: seat2Student.name,
-                department: seat2Student.department,
-                bench: benchCode,
+                registerNo: res.student.registerNo,
+                name: res.student.name,
+                department: res.student.department,
+                subjectCode: getStudentSubCode(res.student) || '',
+                bench: bench.benchCode,
+                seat: 'Middle'
+              });
+            }
+          }
+        }
+      }
+
+      // Phase 3: Fill all empty seat3 (Right) if 3 seats
+      if (seatsPerBench === 3) {
+        for (const bench of benchesList) {
+          if (!bench.seat3) {
+            let sub2 = null;
+            if (bench.seat2) {
+              sub2 = getStudentSubCode(bench.seat2) || bench.seat2.department;
+              if (sub2) sub2 = sub2.toUpperCase();
+            }
+            // Exclude sub2 (adjacent duplicate prevention)
+            const res = getNextStudent(sub2 ? [sub2] : []);
+            if (res) {
+              bench.seat3 = res.student;
+              totalSeatedInThisHall++;
+              localRoster.push({
+                registerNo: res.student.registerNo,
+                name: res.student.name,
+                department: res.student.department,
+                subjectCode: getStudentSubCode(res.student) || '',
+                bench: bench.benchCode,
                 seat: 'Right'
               });
             }
           }
         }
-      } else if (activeDepts.length > 1) {
-        // Proportionally allocate seats/quotas
-        const seatsToAllocate = {};
-        activeDepts.forEach(d => { seatsToAllocate[d] = 0; });
-
-        let remainingSeats = availableSeats;
-        let deptsToCheck = [...activeDepts];
-
-        while (remainingSeats > 0 && deptsToCheck.length > 0) {
-          const share = Math.floor(remainingSeats / deptsToCheck.length) || 1;
-          const nextDeptsToCheck = [];
-          let allocatedTotalThisRound = 0;
-
-          for (const dept of deptsToCheck) {
-            if (remainingSeats <= 0) break;
-            const availableStudents = studentsByDept[dept].length;
-            const currentAllocated = seatsToAllocate[dept];
-            const remainingStudentsForDept = availableStudents - currentAllocated;
-
-            if (remainingStudentsForDept <= 0) continue;
-
-            const allocatedThisRound = Math.min(share, remainingStudentsForDept, remainingSeats);
-            seatsToAllocate[dept] += allocatedThisRound;
-            remainingSeats -= allocatedThisRound;
-            allocatedTotalThisRound += allocatedThisRound;
-
-            if (seatsToAllocate[dept] < availableStudents) {
-              nextDeptsToCheck.push(dept);
-            }
-          }
-
-          if (allocatedTotalThisRound === 0) break;
-          deptsToCheck = nextDeptsToCheck;
-        }
-
-        const selectedStudentsByDept = {};
-        activeDepts.forEach(dept => {
-          selectedStudentsByDept[dept] = studentsByDept[dept].slice(0, seatsToAllocate[dept]);
-        });
-
-        const leftSeats = [];
-        const rightSeats = [];
-        for (let c = 1; c <= colsCount; c++) {
-          for (let r = 0; r < rowsCount; r++) {
-            const rowLetter = String.fromCharCode(65 + r);
-            const benchCode = `${rowLetter}${c}`;
-            const bench = gridMap[benchCode];
-            leftSeats.push({ bench, seatKey: 'seat1', side: 'Left' });
-            rightSeats.push({ bench, seatKey: 'seat2', side: 'Right' });
-          }
-        }
-
-        let currentDeptIdx = 0;
-        leftSeats.forEach(({ bench, seatKey, side }) => {
-          if (bench[seatKey]) return;
-          while (currentDeptIdx < activeDepts.length) {
-            const dept = activeDepts[currentDeptIdx];
-            const pool = selectedStudentsByDept[dept];
-            if (pool && pool.length > 0) {
-              const student = pool.shift();
-              bench[seatKey] = student;
-              localRoster.push({
-                registerNo: student.registerNo,
-                name: student.name,
-                department: student.department,
-                bench: bench.benchCode,
-                seat: side
-              });
-              totalSeatedInThisHall++;
-              break;
-            }
-            currentDeptIdx++;
-          }
-        });
-
-        rightSeats.forEach(({ bench, seatKey, side }) => {
-          if (bench[seatKey]) return;
-          const leftDept = bench.seat1 ? bench.seat1.department.toUpperCase() : null;
-
-          let attempts = 0;
-          let scanDeptIdx = 0;
-          while (attempts < activeDepts.length) {
-            const dept = activeDepts[scanDeptIdx];
-            const isDifferent = !leftDept || leftDept !== dept.toUpperCase();
-            const pool = selectedStudentsByDept[dept];
-            if (isDifferent && pool && pool.length > 0) {
-              const student = pool.shift();
-              bench[seatKey] = student;
-              localRoster.push({
-                registerNo: student.registerNo,
-                name: student.name,
-                department: student.department,
-                bench: bench.benchCode,
-                seat: side
-              });
-              totalSeatedInThisHall++;
-              break;
-            }
-            scanDeptIdx = (scanDeptIdx + 1) % activeDepts.length;
-            attempts++;
-          }
-        });
       }
 
-      // Filter seated students out of currentPool
-      const localSeatedRegNos = new Set(localRoster.map(r => r.registerNo));
-      currentPool = currentPool.filter(s => !localSeatedRegNos.has(s.registerNo));
+      // Reconstruct currentPool from remaining activePools students
+      currentPool = [];
+      activePools.forEach(p => {
+        currentPool.push(...p.students);
+      });
 
       // Construct grid in row-major order
       const localGrid = [];
@@ -1203,10 +1461,19 @@ app.post('/api/seating/generate', async (req, res) => {
           otherPlan.emptySeats = emptySeats;
         }
 
-        const otherExamDepts = otherExam.departments.map(d => d.toUpperCase());
+        const otherExamSubCodes = (otherExam.subjectCodes || []).map(c => c.toUpperCase());
+        const otherExamDepts = (otherExam.departments || []).map(d => d.toUpperCase());
         const newSeatedRegNos = new Set([...seatedStudentRegNos, ...attendanceRoster.map(r => r.registerNo)]);
         const updatedUnseated = allStudents
-          .filter(s => otherExamDepts.includes(s.department.toUpperCase()) && !newSeatedRegNos.has(s.registerNo))
+          .filter(s => {
+            if (otherExamSubCodes.length > 0) {
+              const subCode = getStudentSubCode(s);
+              if (!subCode || !otherExamSubCodes.includes(subCode.toUpperCase())) return false;
+            } else {
+              if (!otherExamDepts.includes(s.department.toUpperCase())) return false;
+            }
+            return !newSeatedRegNos.has(s.registerNo);
+          })
           .sort((a, b) => a.registerNo.localeCompare(b.registerNo));
         
         otherPlan.unseatedStudents = updatedUnseated;

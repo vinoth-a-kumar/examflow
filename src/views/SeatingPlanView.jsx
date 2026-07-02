@@ -314,21 +314,30 @@ function SeatingPlanView({ exams, halls }) {
             
             <div 
               className="seating-layout-grid" 
-              style={{ gridTemplateColumns: `repeat(${colsCount}, minmax(180px, 1fr))` }}
+              style={{ gridTemplateColumns: `repeat(${colsCount}, minmax(${seatingPlan?.seatingGrid?.[0]?.seat3 !== undefined ? '250px' : '180px'}, 1fr))` }}
             >
               {seatingPlan.seatingGrid.map((bench) => (
                 <div className="bench-card" key={bench.benchCode}>
                   <span className="bench-code">{bench.benchCode}</span>
                   
                   <div className="bench-seats">
-                    <div className={`bench-seat ${bench.seat1 ? 'seat-left' : 'empty'}`} title={bench.seat1 ? `${bench.seat1.name} (${bench.seat1.department})` : 'Empty'}>
+                    <div className={`bench-seat ${bench.seat1 ? 'seat-left' : 'empty'}`} title={bench.seat1 ? `${bench.seat1.name} (${bench.seat1.department}${bench.seat1.subjectCode ? ' - ' + bench.seat1.subjectCode : ''})` : 'Empty'}>
                       {bench.seat1 ? bench.seat1.registerNo : 'Empty'}
                     </div>
                     
                     <div className="bench-divider" />
+
+                    {bench.seat3 !== undefined && (
+                      <>
+                        <div className={`bench-seat ${bench.seat2 ? 'seat-middle' : 'empty'}`} title={bench.seat2 ? `${bench.seat2.name} (${bench.seat2.department}${bench.seat2.subjectCode ? ' - ' + bench.seat2.subjectCode : ''})` : 'Empty'}>
+                          {bench.seat2 ? bench.seat2.registerNo : 'Empty'}
+                        </div>
+                        <div className="bench-divider" />
+                      </>
+                    )}
                     
-                    <div className={`bench-seat ${bench.seat2 ? 'seat-right' : 'empty'}`} title={bench.seat2 ? `${bench.seat2.name} (${bench.seat2.department})` : 'Empty'}>
-                      {bench.seat2 ? bench.seat2.registerNo : 'Empty'}
+                    <div className={`bench-seat ${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? 'seat-right' : 'empty'}`} title={(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? `${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).name} (${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).department}${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).subjectCode ? ' - ' + (bench.seat3 !== undefined ? bench.seat3 : bench.seat2).subjectCode : ''})` : 'Empty'}>
+                      {(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? (bench.seat3 !== undefined ? bench.seat3 : bench.seat2).registerNo : 'Empty'}
                     </div>
                   </div>
                 </div>
@@ -358,6 +367,7 @@ function SeatingPlanView({ exams, halls }) {
                     <th>Register No</th>
                     <th>Name</th>
                     <th>Department</th>
+                    <th>Subject Code</th>
                     <th>Bench</th>
                     <th>Seat Position</th>
                   </tr>
@@ -365,7 +375,7 @@ function SeatingPlanView({ exams, halls }) {
                 <tbody>
                   {seatingPlan.attendanceRoster.length === 0 ? (
                     <tr>
-                      <td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px' }}>
+                      <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px' }}>
                         No student seats allocated in this hall.
                       </td>
                     </tr>
@@ -376,6 +386,11 @@ function SeatingPlanView({ exams, halls }) {
                         <td>{item.name}</td>
                         <td>
                           <span className="status-pill info">{item.department}</span>
+                        </td>
+                        <td>
+                          <span className="status-pill success" style={{ fontSize: '11px', padding: '2px 8px' }}>
+                            {item.subjectCode || '-'}
+                          </span>
                         </td>
                         <td style={{ fontWeight: 'bold' }}>{item.bench}</td>
                         <td>

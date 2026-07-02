@@ -1009,6 +1009,12 @@ body {
   border: 1px dashed rgba(59, 130, 246, 0.2);
 }
 
+.bench-seat.seat-middle {
+  background-color: rgba(245, 158, 11, 0.05);
+  color: #f59e0b;
+  border: 1px dashed rgba(245, 158, 11, 0.2);
+}
+
 .bench-seat.seat-right {
   background-color: rgba(16, 185, 129, 0.05);
   color: var(--color-success);
@@ -1027,7 +1033,6 @@ body {
   background-color: var(--border-color);
 }
 
-/* Animations */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

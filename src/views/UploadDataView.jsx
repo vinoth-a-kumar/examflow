@@ -76,10 +76,10 @@ function UploadDataView({ students, uploads, onUpload, onClear, refreshData, onC
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      if (file.name.endsWith('.csv')) {
+      if (file.name.endsWith('.csv') || file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
         setSelectedFile(file);
       } else {
-        alert("Only CSV files are supported for now.");
+        alert("Only CSV and Excel files (.csv, .xlsx, .xls) are supported.");
       }
     }
   };
@@ -215,7 +215,7 @@ function UploadDataView({ students, uploads, onUpload, onClear, refreshData, onC
                   ref={fileInputRef}
                   style={{ display: 'none' }}
                   onChange={handleFileChange}
-                  accept=".csv"
+                  accept=".csv,.xlsx,.xls"
                 />
 
                 <div className="uploader-icon">
@@ -239,7 +239,7 @@ function UploadDataView({ students, uploads, onUpload, onClear, refreshData, onC
                 </button>
 
                 <span className="uploader-file-info">
-                  Supported formats: CSV (Maximum file size: 50 MB)
+                  Supported formats: CSV, Excel (.xlsx, .xls) &nbsp;·&nbsp; Maximum file size: 50 MB
                 </span>
 
                 {selectedFile && (

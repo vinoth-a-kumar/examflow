@@ -22,7 +22,7 @@ function Sidebar({ currentTab, setCurrentTab, user }) {
     <aside className="sidebar">
       <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
         <div className="sidebar-logo">
-          <h1>ExamFlow AI</h1>
+          <h1>ExamFlow</h1>
           <span style={{ textTransform: 'none', fontSize: '11px', color: 'var(--text-secondary)' }}>
             {user ? `@${user.username}` : 'Admin Control Center'}
           </span>

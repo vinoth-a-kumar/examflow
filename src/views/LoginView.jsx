@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Lock, LogIn, AlertCircle } from 'lucide-react';
 
-function LoginView({ onLoginSuccess, onToggleView }) {
+function LoginView({ onLoginSuccess }) {
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -43,7 +43,7 @@ function LoginView({ onLoginSuccess, onToggleView }) {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          <div className="auth-logo">ExamFlow AI</div>
+          <div className="auth-logo">ExamFlow</div>
           <p className="auth-subtitle">Sign in to manage schedules & seating arrangements</p>
         </div>
 
@@ -97,12 +97,7 @@ function LoginView({ onLoginSuccess, onToggleView }) {
           </button>
         </form>
 
-        <p className="auth-footer-text">
-          Don't have an account?{' '}
-          <span className="auth-link" onClick={onToggleView}>
-            Register here
-          </span>
-        </p>
+
       </div>
       <style>{`
         .btn-spinner {

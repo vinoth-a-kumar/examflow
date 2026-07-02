@@ -9,7 +9,6 @@ import SeatingPlanView from './views/SeatingPlanView';
 import SettingsView from './views/SettingsView';
 import ProfileView from './views/ProfileView';
 import LoginView from './views/LoginView';
-import RegisterView from './views/RegisterView';
 
 function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
@@ -19,12 +18,12 @@ function App() {
   const [user, setUser] = useState(() => {
     const isBypassNetwork = ['localhost', '127.0.0.1', '10.106.232.208'].includes(window.location.hostname);
     if (isBypassNetwork) {
-      return { username: 'Admin', email: 'admin@examflow.ai' };
+      return { username: 'Admin', email: 'admin@examflow.com' };
     }
     const savedUser = localStorage.getItem('examflow-user');
     return savedUser ? JSON.parse(savedUser) : null;
   });
-  const [showRegister, setShowRegister] = useState(false);
+
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('examflow-theme') || 'light';
   });
@@ -49,7 +48,7 @@ function App() {
   const handleLogout = () => {
     const isBypassNetwork = ['localhost', '127.0.0.1', '10.106.232.208'].includes(window.location.hostname);
     if (isBypassNetwork) {
-      setUser({ username: 'Admin', email: 'admin@examflow.ai' });
+      setUser({ username: 'Admin', email: 'admin@examflow.com' });
     } else {
       setUser(null);
     }
@@ -145,6 +144,22 @@ function App() {
       } catch (err) {
         console.error(err);
         alert("Failed to clear student records.");
+      }
+    }
+  };
+
+  // Clear Halls
+  const handleClearHalls = async () => {
+    if (window.confirm("Are you sure you want to clear all hall records? This will also clear generated seating plans.")) {
+      try {
+        const resp = await fetch('http://localhost:5000/api/halls/clear', { method: 'POST' });
+        if (resp.ok) {
+          alert("Hall records cleared successfully.");
+          fetchAllData();
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Failed to clear hall records.");
       }
     }
   };
@@ -334,10 +349,11 @@ function App() {
         );
       case 'halls':
         return (
-          <HallManagementView 
+        <HallManagementView 
             halls={halls} 
-            onAddHall={handleAddHall} 
-            onDeleteHall={handleDeleteHall} 
+            onDeleteHall={handleDeleteHall}
+            refreshData={fetchAllData}
+            onClear={handleClearHalls}
           />
         );
       case 'exams':
@@ -390,28 +406,14 @@ function App() {
           animation: 'spin 1s linear infinite'
         }} />
         <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-        <h3 style={{ marginTop: '20px', color: 'var(--text-primary)', fontFamily: 'var(--font-display)', fontWeight: 700 }}>Loading ExamFlow AI</h3>
+        <h3 style={{ marginTop: '20px', color: 'var(--text-primary)', fontFamily: 'var(--font-display)', fontWeight: 700 }}>Loading ExamFlow</h3>
         <p style={{ marginTop: '8px', color: 'var(--text-secondary)', fontSize: '13px' }}>Establishing backend controller connection...</p>
       </div>
     );
   }
 
   if (!user) {
-    if (showRegister) {
-      return (
-        <RegisterView 
-          onRegisterSuccess={() => setShowRegister(false)} 
-          onToggleView={() => setShowRegister(false)} 
-        />
-      );
-    } else {
-      return (
-        <LoginView 
-          onLoginSuccess={handleLogin} 
-          onToggleView={() => setShowRegister(true)} 
-        />
-      );
-    }
+    return <LoginView onLoginSuccess={handleLogin} />;
   }
 
   return (

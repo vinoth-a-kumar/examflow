@@ -72,7 +72,9 @@ const parseExam = (row) => {
   return {
     ...row,
     departments: row.departments ? JSON.parse(row.departments) : [],
-    assignedHalls: row.assignedHalls ? JSON.parse(row.assignedHalls) : []
+    subjectCodes: row.subjectCodes ? JSON.parse(row.subjectCodes) : [],
+    assignedHalls: row.assignedHalls ? JSON.parse(row.assignedHalls) : [],
+    seatsPerBench: row.seatsPerBench || 2
   };
 };
 
@@ -145,8 +147,8 @@ async function createTables() {
     CREATE TABLE IF NOT EXISTS students (
       \`_id\` VARCHAR(255) PRIMARY KEY,
       \`registerNo\` VARCHAR(255) UNIQUE NOT NULL,
-      \`name\` VARCHAR(255) NOT NULL,
-      \`department\` VARCHAR(255) NOT NULL,
+      \`name\` TEXT NOT NULL,
+      \`department\` TEXT NOT NULL,
       \`batch\` VARCHAR(255) DEFAULT '2024-25',
       \`csvData\` LONGTEXT,
       \`idx\` INT AUTO_INCREMENT UNIQUE
@@ -161,7 +163,9 @@ async function createTables() {
       \`rows\` INT NOT NULL,
       \`columns\` INT NOT NULL,
       \`capacity\` INT NOT NULL,
-      \`benches\` INT NOT NULL
+      \`benches\` INT NOT NULL,
+      \`csvData\` LONGTEXT,
+      \`idx\` INT AUTO_INCREMENT UNIQUE
     )
   `);
 
@@ -171,13 +175,36 @@ async function createTables() {
       \`_id\` VARCHAR(255) PRIMARY KEY,
       \`name\` VARCHAR(255) NOT NULL,
       \`departments\` TEXT,
+      \`subjectCodes\` TEXT,
       \`date\` VARCHAR(255) NOT NULL,
       \`session\` VARCHAR(50) NOT NULL,
       \`studentsCount\` INT DEFAULT 0,
       \`status\` VARCHAR(50) DEFAULT 'Draft',
-      \`assignedHalls\` TEXT
+      \`assignedHalls\` TEXT,
+      \`seatsPerBench\` INT DEFAULT 2
     )
   `);
+
+  // Migration: add subjectCodes column if missing
+  try {
+    await pool.query(`ALTER TABLE exams ADD COLUMN \`subjectCodes\` TEXT`);
+  } catch (err) {
+    // Ignore error if column already exists
+  }
+
+  // Migration: add seatsPerBench column if missing
+  try {
+    await pool.query(`ALTER TABLE exams ADD COLUMN \`seatsPerBench\` INT DEFAULT 2`);
+  } catch (err) {
+    // Ignore error if column already exists
+  }
+
+  // Migration: add idx column if missing to halls
+  try {
+    await pool.query(`ALTER TABLE halls ADD COLUMN \`idx\` INT AUTO_INCREMENT UNIQUE`);
+  } catch (err) {
+    // Ignore error if column already exists
+  }
 
   // seating_plans
   await pool.query(`
@@ -214,6 +241,24 @@ async function createTables() {
     await pool.query(`ALTER TABLE students ADD COLUMN \`idx\` INT AUTO_INCREMENT UNIQUE`);
   } catch (err) {
     // Ignore error if column already exists
+  }
+
+  try {
+    await pool.query(`ALTER TABLE halls ADD COLUMN \`csvData\` LONGTEXT`);
+  } catch (err) {
+    // Ignore error if column already exists
+  }
+
+  // Widen columns that may overflow on large Excel imports
+  try {
+    await pool.query(`ALTER TABLE students MODIFY COLUMN \`name\` TEXT NOT NULL`);
+  } catch (err) {
+    // Ignore
+  }
+  try {
+    await pool.query(`ALTER TABLE students MODIFY COLUMN \`department\` TEXT NOT NULL`);
+  } catch (err) {
+    // Ignore
   }
 
   // upload_history
@@ -275,29 +320,27 @@ const Models = {
         const docs = Array.isArray(doc) ? doc : [doc];
         const added = [];
         for (let item of docs) {
-          const [existing] = await runQuery(`SELECT * FROM students WHERE registerNo = ? LIMIT 1`, [item.registerNo]);
-          if (!existing) {
-            const _id = generateId();
-            await runQuery(
-              `INSERT INTO students (\`_id\`, \`registerNo\`, \`name\`, \`department\`, \`batch\`, \`csvData\`) VALUES (?, ?, ?, ?, ?, ?)`,
-              [_id, item.registerNo, item.name, item.department, item.batch || '2024-25', JSON.stringify(item.csvData || null)]
-            );
-            added.push({ _id, ...item, batch: item.batch || '2024-25' });
-          }
+          // Delete existing student to update order/idx and avoid duplicates
+          await runQuery(`DELETE FROM students WHERE registerNo = ?`, [item.registerNo]);
+          const _id = generateId();
+          await runQuery(
+            `INSERT INTO students (\`_id\`, \`registerNo\`, \`name\`, \`department\`, \`batch\`, \`csvData\`) VALUES (?, ?, ?, ?, ?, ?)`,
+            [_id, item.registerNo, item.name, item.department, item.batch || '2024-25', JSON.stringify(item.csvData || null)]
+          );
+          added.push({ _id, ...item, batch: item.batch || '2024-25' });
         }
         return Array.isArray(doc) ? added : added[0];
       }
       // Fallback
       const docs = Array.isArray(doc) ? doc : [doc];
-      const data = readJson('students');
+      let data = readJson('students');
       const added = [];
       for (let item of docs) {
-        const exists = data.some(s => s.registerNo === item.registerNo);
-        if (!exists) {
-          const newItem = { _id: generateId(), ...item };
-          data.push(newItem);
-          added.push(newItem);
-        }
+        // Remove existing from JSON to update order
+        data = data.filter(s => s.registerNo !== item.registerNo);
+        const newItem = { _id: generateId(), ...item };
+        data.push(newItem);
+        added.push(newItem);
       }
       writeJson('students', data);
       return Array.isArray(doc) ? added : added[0];
@@ -350,7 +393,11 @@ const Models = {
     find: async (query = {}) => {
       if (isMysqlConnected) {
         const { clause, values } = buildWhere(query);
-        return await runQuery(`SELECT * FROM halls${clause}`, values);
+        const rows = await runQuery(`SELECT * FROM halls${clause} ORDER BY idx ASC`, values);
+        return rows.map(r => ({
+          ...r,
+          csvData: r.csvData ? JSON.parse(r.csvData) : null
+        }));
       }
       // Fallback
       return readJson('halls');
@@ -366,15 +413,18 @@ const Models = {
     },
     create: async (doc) => {
       if (isMysqlConnected) {
+        // Delete existing hall with same name to avoid duplicates and ensure correct order
+        await runQuery(`DELETE FROM halls WHERE name = ?`, [doc.name]);
         const _id = generateId();
         await runQuery(
-          `INSERT INTO halls (\`_id\`, \`name\`, \`rows\`, \`columns\`, \`capacity\`, \`benches\`) VALUES (?, ?, ?, ?, ?, ?)`,
-          [_id, doc.name, doc.rows, doc.columns, doc.capacity, doc.benches]
+          `INSERT INTO halls (\`_id\`, \`name\`, \`rows\`, \`columns\`, \`capacity\`, \`benches\`, \`csvData\`, \`idx\`) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`,
+          [_id, doc.name, doc.rows, doc.columns, doc.capacity, doc.benches, JSON.stringify(doc.csvData || null)]
         );
         return { _id, ...doc };
       }
       // Fallback
-      const data = readJson('halls');
+      let data = readJson('halls');
+      data = data.filter(h => h.name !== doc.name);
       const newItem = { _id: generateId(), ...doc };
       data.push(newItem);
       writeJson('halls', data);
@@ -412,6 +462,32 @@ const Models = {
       writeJson('halls', data);
       return item || null;
     },
+    deleteMany: async (query = {}) => {
+      if (isMysqlConnected) {
+        if (Object.keys(query).length === 0) {
+          await runQuery(`TRUNCATE TABLE halls`);
+          return { deletedCount: 0 };
+        }
+        const { clause, values } = buildWhere(query);
+        const res = await runQuery(`DELETE FROM halls${clause}`, values);
+        return { deletedCount: res.affectedRows };
+      }
+      // Fallback
+      if (Object.keys(query).length === 0) {
+        writeJson('halls', []);
+        return { deletedCount: 0 };
+      }
+      let data = readJson('halls');
+      const prevLen = data.length;
+      data = data.filter(h => {
+        for (let key in query) {
+          if (h[key] === query[key]) return false;
+        }
+        return true;
+      });
+      writeJson('halls', data);
+      return { deletedCount: prevLen - data.length };
+    },
     countDocuments: async () => {
       if (isMysqlConnected) {
         const rows = await runQuery(`SELECT COUNT(*) as count FROM halls`);
@@ -447,19 +523,21 @@ const Models = {
       if (isMysqlConnected) {
         const _id = generateId();
         await runQuery(
-          `INSERT INTO exams (\`_id\`, \`name\`, \`departments\`, \`date\`, \`session\`, \`studentsCount\`, \`status\`, \`assignedHalls\`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO exams (\`_id\`, \`name\`, \`departments\`, \`subjectCodes\`, \`date\`, \`session\`, \`studentsCount\`, \`status\`, \`assignedHalls\`, \`seatsPerBench\`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             _id,
             doc.name,
             JSON.stringify(doc.departments || []),
+            JSON.stringify(doc.subjectCodes || []),
             doc.date,
             doc.session,
             doc.studentsCount || 0,
             doc.status || 'Draft',
-            JSON.stringify(doc.assignedHalls || [])
+            JSON.stringify(doc.assignedHalls || []),
+            doc.seatsPerBench || 2
           ]
         );
-        return { _id, ...doc, departments: doc.departments || [], assignedHalls: doc.assignedHalls || [] };
+        return { _id, ...doc, departments: doc.departments || [], subjectCodes: doc.subjectCodes || [], assignedHalls: doc.assignedHalls || [], seatsPerBench: doc.seatsPerBench || 2 };
       }
       // Fallback
       const data = readJson('exams');
@@ -471,14 +549,16 @@ const Models = {
     findByIdAndUpdate: async (id, doc) => {
       if (isMysqlConnected) {
         await runQuery(
-          `UPDATE exams SET \`name\` = ?, \`departments\` = ?, \`date\` = ?, \`session\` = ?, \`studentsCount\` = ?, \`assignedHalls\` = ? WHERE \`_id\` = ?`,
+          `UPDATE exams SET \`name\` = ?, \`departments\` = ?, \`subjectCodes\` = ?, \`date\` = ?, \`session\` = ?, \`studentsCount\` = ?, \`assignedHalls\` = ?, \`seatsPerBench\` = ? WHERE \`_id\` = ?`,
           [
             doc.name,
             JSON.stringify(doc.departments || []),
+            JSON.stringify(doc.subjectCodes || []),
             doc.date,
             doc.session,
             doc.studentsCount || 0,
             JSON.stringify(doc.assignedHalls || []),
+            doc.seatsPerBench || 2,
             id
           ]
         );

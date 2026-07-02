@@ -41,7 +41,7 @@ function ProfileView() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>
               <Mail size={16} />
-              <span>admin@examflow.ai</span>
+              <span>admin@examflow.com</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>
               <Calendar size={16} />
@@ -64,7 +64,7 @@ function ProfileView() {
             
             <div className="form-group">
               <label>Email Address</label>
-              <input type="email" defaultValue="admin@examflow.ai" disabled />
+              <input type="email" defaultValue="admin@examflow.com" disabled />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color)', paddingTop: '20px', marginTop: '10px' }}>

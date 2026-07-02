@@ -15,10 +15,12 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
   const [examName, setExamName] = useState('');
   const [examDate, setExamDate] = useState('');
   const [session, setSession] = useState('FN');
-  const [selectedDepts, setSelectedDepts] = useState([]);
+  const [selectedSubjectCodes, setSelectedSubjectCodes] = useState([]);
   const [selectedHalls, setSelectedHalls] = useState([]);
   const [remainingCounts, setRemainingCounts] = useState({});
   const [hallAvailability, setHallAvailability] = useState({});
+  const [availableSubjectCodes, setAvailableSubjectCodes] = useState([]);
+  const [seatsPerBench, setSeatsPerBench] = useState(2);
 
   // Edit states
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -26,10 +28,27 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
   const [editExamName, setEditExamName] = useState('');
   const [editExamDate, setEditExamDate] = useState('');
   const [editSession, setEditSession] = useState('FN');
-  const [editSelectedDepts, setEditSelectedDepts] = useState([]);
+  const [editSelectedSubjectCodes, setEditSelectedSubjectCodes] = useState([]);
   const [editSelectedHalls, setEditSelectedHalls] = useState([]);
   const [editRemainingCounts, setEditRemainingCounts] = useState({});
   const [editHallAvailability, setEditHallAvailability] = useState({});
+  const [editSeatsPerBench, setEditSeatsPerBench] = useState(2);
+
+  // Fetch available subject codes from student records
+  useEffect(() => {
+    const fetchSubjectCodes = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/students/subject-codes');
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableSubjectCodes(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch subject codes", err);
+      }
+    };
+    fetchSubjectCodes();
+  }, [students]);
 
   useEffect(() => {
     if (!examDate) {
@@ -40,7 +59,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     
     const fetchRemaining = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/students/remaining?date=${examDate}&session=${session}`);
+        const response = await fetch(`http://localhost:5000/api/students/remaining-by-subject?date=${examDate}&session=${session}`);
         if (response.ok) {
           const data = await response.json();
           setRemainingCounts(data);
@@ -75,7 +94,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     
     const fetchEditRemaining = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/students/remaining?date=${editExamDate}&session=${editSession}&excludeExamId=${editingExam._id}`);
+        const response = await fetch(`http://localhost:5000/api/students/remaining-by-subject?date=${editExamDate}&session=${editSession}&excludeExamId=${editingExam._id}`);
         if (response.ok) {
           const data = await response.json();
           setEditRemainingCounts(data);
@@ -134,16 +153,11 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
   // Halls assigned across all exams
   const totalAssignedHalls = exams.reduce((sum, e) => sum + (e.assignedHalls?.length || 0), 0);
 
-  // Available departments from students database (fallback to defaults if database is empty)
-  const defaultDepts = ['CSE', 'IT', 'ECE', 'EEE', 'MECH', 'CIVIL', 'MBA', 'MCA'];
-  const databaseDepts = [...new Set(students.map(s => s.department.toUpperCase()))];
-  const availableDepts = databaseDepts.length > 0 ? databaseDepts : defaultDepts;
-
-  const handleDeptToggle = (dept) => {
-    if (selectedDepts.includes(dept)) {
-      setSelectedDepts(selectedDepts.filter(d => d !== dept));
+  const handleSubjectCodeToggle = (code) => {
+    if (selectedSubjectCodes.includes(code)) {
+      setSelectedSubjectCodes(selectedSubjectCodes.filter(c => c !== code));
     } else {
-      setSelectedDepts([...selectedDepts, dept]);
+      setSelectedSubjectCodes([...selectedSubjectCodes, code]);
     }
   };
 
@@ -165,8 +179,8 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
       alert("Exam Date is required.");
       return;
     }
-    if (selectedDepts.length === 0) {
-      alert("Please select at least one department.");
+    if (selectedSubjectCodes.length === 0) {
+      alert("Please select at least one subject code.");
       return;
     }
     if (selectedHalls.length === 0) {
@@ -176,26 +190,29 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
 
     onAddExam({
       name: examName,
-      departments: selectedDepts,
+      subjectCodes: selectedSubjectCodes,
+      departments: [],
       date: examDate,
       session: session,
-      assignedHalls: selectedHalls
+      assignedHalls: selectedHalls,
+      seatsPerBench: seatsPerBench
     });
 
     // Reset and close
     setExamName('');
     setExamDate('');
     setSession('FN');
-    setSelectedDepts([]);
+    setSelectedSubjectCodes([]);
     setSelectedHalls([]);
+    setSeatsPerBench(2);
     setModalOpen(false);
   };
 
-  const handleEditDeptToggle = (dept) => {
-    if (editSelectedDepts.includes(dept)) {
-      setEditSelectedDepts(editSelectedDepts.filter(d => d !== dept));
+  const handleEditSubjectCodeToggle = (code) => {
+    if (editSelectedSubjectCodes.includes(code)) {
+      setEditSelectedSubjectCodes(editSelectedSubjectCodes.filter(c => c !== code));
     } else {
-      setEditSelectedDepts([...editSelectedDepts, dept]);
+      setEditSelectedSubjectCodes([...editSelectedSubjectCodes, code]);
     }
   };
 
@@ -217,8 +234,8 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
       alert("Exam Date is required.");
       return;
     }
-    if (editSelectedDepts.length === 0) {
-      alert("Please select at least one department.");
+    if (editSelectedSubjectCodes.length === 0) {
+      alert("Please select at least one subject code.");
       return;
     }
     if (editSelectedHalls.length === 0) {
@@ -228,10 +245,12 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
 
     onUpdateExam(editingExam._id, {
       name: editExamName,
-      departments: editSelectedDepts,
+      subjectCodes: editSelectedSubjectCodes,
+      departments: [],
       date: editExamDate,
       session: editSession,
-      assignedHalls: editSelectedHalls
+      assignedHalls: editSelectedHalls,
+      seatsPerBench: editSeatsPerBench
     });
 
     // Reset and close
@@ -239,8 +258,9 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     setEditExamName('');
     setEditExamDate('');
     setEditSession('FN');
-    setEditSelectedDepts([]);
+    setEditSelectedSubjectCodes([]);
     setEditSelectedHalls([]);
+    setEditSeatsPerBench(2);
     setEditModalOpen(false);
   };
 
@@ -307,9 +327,10 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
             <thead>
               <tr>
                 <th>Exam Name</th>
-                <th>Department(s)</th>
+                <th>Subject Code(s)</th>
                 <th>Date</th>
                 <th>Session</th>
+                <th>Seats/Bench</th>
                 <th>Students Count</th>
                 <th>Assigned Halls</th>
                 <th>Status</th>
@@ -329,14 +350,19 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                     <td style={{ fontWeight: 600 }}>{e.name}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        {e.departments?.map((d) => (
-                          <span key={d} className="status-pill info" style={{ fontSize: '10px', padding: '2px 6px' }}>
-                            {d}
+                        {(e.subjectCodes && e.subjectCodes.length > 0 ? e.subjectCodes : e.departments)?.map((code) => (
+                          <span key={code} className="status-pill info" style={{ fontSize: '10px', padding: '2px 6px' }}>
+                            {code}
                           </span>
                         ))}
                       </div>
                     </td>
                     <td>{new Date(e.date).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                    <td>
+                      <span className="status-pill info" style={{ fontWeight: 600 }}>
+                        {e.seatsPerBench || 2} Seats
+                      </span>
+                    </td>
                     <td>
                       <span className="status-pill warning" style={{ fontWeight: 700 }}>
                         {e.session}
@@ -383,8 +409,9 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                             setEditExamName(e.name);
                             setEditExamDate(e.date.split('T')[0]);
                             setEditSession(e.session);
-                            setEditSelectedDepts(e.departments || []);
+                            setEditSelectedSubjectCodes(e.subjectCodes || e.departments || []);
                             setEditSelectedHalls(e.assignedHalls || []);
+                            setEditSeatsPerBench(e.seatsPerBench || 2);
                             setEditModalOpen(true);
                           }}
                           style={{ padding: '6px', borderRadius: '50%', boxShadow: 'none' }}
@@ -466,32 +493,53 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                 </div>
 
                 <div className="form-group">
-                  <label>Select Departments participating in this exam</label>
+                  <label htmlFor="seatsPerBench">Seats per Bench</label>
+                  <select 
+                    id="seatsPerBench" 
+                    value={seatsPerBench}
+                    onChange={(e) => setSeatsPerBench(parseInt(e.target.value))}
+                  >
+                    <option value={2}>2 Students per Bench (Left, Right)</option>
+                    <option value={3}>3 Students per Bench (Left, Middle, Right)</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Select Subject Codes for this exam</label>
                   <div className="checkbox-group">
-                    {availableDepts.map((dept) => {
-                      const count = examDate ? (remainingCounts[dept.toUpperCase()] || 0) : 1;
-                      const isDisabled = examDate && count === 0;
-                      return (
-                        <button
-                          type="button"
-                          key={dept}
-                          className={`checkbox-btn ${selectedDepts.includes(dept) ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
-                          onClick={() => handleDeptToggle(dept)}
-                          disabled={isDisabled}
-                          style={isDisabled ? { 
-                            opacity: 0.5, 
-                            cursor: 'not-allowed', 
-                            backgroundColor: 'var(--bg-app)', 
-                            borderColor: 'var(--border-color)',
-                            color: 'var(--text-muted)' 
-                          } : {}}
-                          title={isDisabled ? "No remaining students left in this department for this date/session" : ""}
-                        >
-                          {selectedDepts.includes(dept) && <Check size={12} style={{ marginRight: '4px', display: 'inline' }} />}
-                          {dept}
-                        </button>
-                      );
-                    })}
+                    {availableSubjectCodes.length === 0 ? (
+                      <p style={{ fontSize: '12px', color: 'var(--color-error)', fontWeight: 600 }}>
+                        No subject codes found. Please upload student rosters (with sub_code column) under Upload Data first!
+                      </p>
+                    ) : (
+                      availableSubjectCodes.map((code) => {
+                        const count = examDate ? (remainingCounts[code.toUpperCase()] || 0) : 1;
+                        const isDisabled = examDate && count === 0;
+                        return (
+                          <button
+                            type="button"
+                            key={code}
+                            className={`checkbox-btn ${selectedSubjectCodes.includes(code) ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
+                            onClick={() => handleSubjectCodeToggle(code)}
+                            disabled={isDisabled}
+                            style={isDisabled ? { 
+                              opacity: 0.5, 
+                              cursor: 'not-allowed', 
+                              backgroundColor: 'var(--bg-app)', 
+                              borderColor: 'var(--border-color)',
+                              color: 'var(--text-muted)' 
+                            } : {}}
+                            title={isDisabled ? "No remaining students left for this subject code on this date/session" : `${examDate ? count + ' students remaining' : ''}`}
+                          >
+                            {selectedSubjectCodes.includes(code) && <Check size={12} style={{ marginRight: '4px', display: 'inline' }} />}
+                            {code}
+                            {examDate && count > 0 && (
+                              <span style={{ fontSize: '10px', marginLeft: '4px', opacity: 0.7 }}>({count})</span>
+                            )}
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
 
@@ -604,32 +652,53 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                 </div>
 
                 <div className="form-group">
-                  <label>Select Departments participating in this exam</label>
+                  <label htmlFor="editSeatsPerBench">Seats per Bench</label>
+                  <select 
+                    id="editSeatsPerBench" 
+                    value={editSeatsPerBench}
+                    onChange={(e) => setEditSeatsPerBench(parseInt(e.target.value))}
+                  >
+                    <option value={2}>2 Students per Bench (Left, Right)</option>
+                    <option value={3}>3 Students per Bench (Left, Middle, Right)</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Select Subject Codes for this exam</label>
                   <div className="checkbox-group">
-                    {availableDepts.map((dept) => {
-                      const count = editExamDate ? (editRemainingCounts[dept.toUpperCase()] || 0) : 1;
-                      const isDisabled = editExamDate && count === 0;
-                      return (
-                        <button
-                          type="button"
-                          key={dept}
-                          className={`checkbox-btn ${editSelectedDepts.includes(dept) ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
-                          onClick={() => handleEditDeptToggle(dept)}
-                          disabled={isDisabled}
-                          style={isDisabled ? { 
-                            opacity: 0.5, 
-                            cursor: 'not-allowed', 
-                            backgroundColor: 'var(--bg-app)', 
-                            borderColor: 'var(--border-color)',
-                            color: 'var(--text-muted)' 
-                          } : {}}
-                          title={isDisabled ? "No remaining students left in this department for this date/session" : ""}
-                        >
-                          {editSelectedDepts.includes(dept) && <Check size={12} style={{ marginRight: '4px', display: 'inline' }} />}
-                          {dept}
-                        </button>
-                      );
-                    })}
+                    {availableSubjectCodes.length === 0 ? (
+                      <p style={{ fontSize: '12px', color: 'var(--color-error)', fontWeight: 600 }}>
+                        No subject codes found. Please upload student rosters (with sub_code column) under Upload Data first!
+                      </p>
+                    ) : (
+                      availableSubjectCodes.map((code) => {
+                        const count = editExamDate ? (editRemainingCounts[code.toUpperCase()] || 0) : 1;
+                        const isDisabled = editExamDate && count === 0;
+                        return (
+                          <button
+                            type="button"
+                            key={code}
+                            className={`checkbox-btn ${editSelectedSubjectCodes.includes(code) ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
+                            onClick={() => handleEditSubjectCodeToggle(code)}
+                            disabled={isDisabled}
+                            style={isDisabled ? { 
+                              opacity: 0.5, 
+                              cursor: 'not-allowed', 
+                              backgroundColor: 'var(--bg-app)', 
+                              borderColor: 'var(--border-color)',
+                              color: 'var(--text-muted)' 
+                            } : {}}
+                            title={isDisabled ? "No remaining students left for this subject code on this date/session" : `${editExamDate ? count + ' students remaining' : ''}`}
+                          >
+                            {editSelectedSubjectCodes.includes(code) && <Check size={12} style={{ marginRight: '4px', display: 'inline' }} />}
+                            {code}
+                            {editExamDate && count > 0 && (
+                              <span style={{ fontSize: '10px', marginLeft: '4px', opacity: 0.7 }}>({count})</span>
+                            )}
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
 
