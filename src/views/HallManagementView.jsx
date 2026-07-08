@@ -214,7 +214,7 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
                 onDragLeave={handleDrag}
                 onDrop={handleDrop}
                 onClick={onBrowseClick}
-                style={{ borderColor: dragActive ? 'var(--color-primary)' : 'rgba(59,130,246,0.4)' }}
+                style={{ borderColor: dragActive ? 'var(--color-primary)' : 'var(--color-primary-alpha-40)' }}
               >
                 <input
                   type="file"

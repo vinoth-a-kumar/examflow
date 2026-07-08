@@ -208,7 +208,7 @@ function UploadDataView({ students, uploads, onUpload, onClear, refreshData, onC
                 onDragLeave={handleDrag}
                 onDrop={handleDrop}
                 onClick={onButtonClick}
-                style={{ borderColor: dragActive ? 'var(--color-primary)' : 'rgba(59, 130, 246, 0.4)' }}
+                style={{ borderColor: dragActive ? 'var(--color-primary)' : 'var(--color-primary-alpha-40)' }}
               >
                 <input 
                   type="file" 

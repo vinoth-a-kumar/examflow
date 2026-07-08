@@ -214,6 +214,99 @@ app.get('/api/status', (req, res) => {
   res.json(dbStatus());
 });
 
+// 1.1 System Info (Settings About Section)
+app.get('/api/settings/system-info', async (req, res) => {
+  try {
+    let sizeBytes = 0;
+    const dataDir = path.join(__dirname, 'data');
+    if (fs.existsSync(dataDir)) {
+      const files = fs.readdirSync(dataDir);
+      files.forEach(file => {
+        const stats = fs.statSync(path.join(dataDir, file));
+        sizeBytes += stats.size;
+      });
+    }
+
+    const studentCount = (await Models.Student.find()).length;
+    const hallCount = (await Models.Hall.find()).length;
+    const examCount = (await Models.Exam.find()).length;
+    const planCount = (await Models.SeatingPlan.find()).length;
+    
+    const isConnected = dbStatus().connected;
+    if (isConnected) {
+      sizeBytes += (studentCount + hallCount + examCount + planCount) * 256; 
+    }
+
+    const storageUsedKb = (sizeBytes / 1024).toFixed(2);
+
+    res.json({
+      projectVersion: 'v1.2.0',
+      databaseStatus: isConnected ? 'Connected (MySQL)' : 'Local JSON Fallback',
+      storageUsed: `${storageUsedKb} KB`,
+      recordCounts: {
+        students: studentCount,
+        halls: hallCount,
+        exams: examCount,
+        plans: planCount
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching system info:", error);
+    res.status(500).json({ error: 'Failed to retrieve system info' });
+  }
+});
+
+// 1.2 Database Backup Export Endpoint
+app.get('/api/settings/backup', async (req, res) => {
+  try {
+    const students = await Models.Student.find();
+    const halls = await Models.Hall.find();
+    const exams = await Models.Exam.find();
+    const seatingPlans = await Models.SeatingPlan.find();
+    
+    res.json({
+      timestamp: new Date().toISOString(),
+      students,
+      halls,
+      exams,
+      seatingPlans
+    });
+  } catch (error) {
+    console.error("Backup failed:", error);
+    res.status(500).json({ error: 'Backup failed' });
+  }
+});
+
+// 1.3 Database Backup Restore Endpoint
+app.post('/api/settings/restore', async (req, res) => {
+  try {
+    const { students, halls, exams, seatingPlans } = req.body;
+    
+    if (!Array.isArray(students) || !Array.isArray(halls) || !Array.isArray(exams) || !Array.isArray(seatingPlans)) {
+      return res.status(400).json({ error: 'Invalid backup format. Must contain students, halls, exams, and seatingPlans arrays.' });
+    }
+    
+    // Clear all existing databases
+    await Models.Student.deleteMany({});
+    await Models.Hall.deleteMany({});
+    await Models.Exam.deleteMany({});
+    await Models.SeatingPlan.deleteMany({});
+    
+    // Restore data if not empty
+    if (students.length > 0) await Models.Student.create(students);
+    if (halls.length > 0) await Models.Hall.create(halls);
+    if (exams.length > 0) await Models.Exam.create(exams);
+    if (seatingPlans.length > 0) await Models.SeatingPlan.create(seatingPlans);
+    
+    logActivity('student', 'Database Restored', `Restored ${students.length} students, ${halls.length} halls, ${exams.length} exams, and ${seatingPlans.length} seating plans from backup.`);
+    
+    res.json({ success: true, message: 'Database restored successfully!' });
+  } catch (error) {
+    console.error("Restore failed:", error);
+    res.status(500).json({ error: 'Restore failed: ' + error.message });
+  }
+});
+
 // 2. Dashboard Metrics
 app.get('/api/dashboard/stats', async (req, res) => {
   try {

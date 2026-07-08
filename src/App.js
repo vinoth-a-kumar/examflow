@@ -39,6 +39,30 @@ function App() {
     localStorage.setItem('examflow-theme', newTheme);
   };
 
+  const [collegeDetails, setCollegeDetails] = useState(() => {
+    const saved = localStorage.getItem('examflow-college-details');
+    
+    // Auto-calculate current academic year based on current date
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth(); // 0 = Jan, 5 = June
+    const autoYear = currentMonth < 5 
+      ? `${currentYear - 1}-${String(currentYear).slice(-2)}` 
+      : `${currentYear}-${String(currentYear + 1).slice(-2)}`;
+
+    return saved ? JSON.parse(saved) : {
+      name: 'ExamFlow Engineering College',
+      logo: '', 
+      address: '123 University Campus, Tech City, 600001',
+      academicYear: autoYear
+    };
+  });
+
+  const handleSaveCollegeDetails = (details) => {
+    setCollegeDetails(details);
+    localStorage.setItem('examflow-college-details', JSON.stringify(details));
+  };
+
   const handleLogin = (userData) => {
     setUser(userData);
     localStorage.setItem('examflow-user', JSON.stringify(userData));
@@ -368,7 +392,7 @@ function App() {
           />
         );
       case 'seating':
-        return <SeatingPlanView exams={exams} halls={halls} />;
+        return <SeatingPlanView exams={exams} halls={halls} collegeDetails={collegeDetails} />;
       case 'settings':
         return (
           <SettingsView 
@@ -377,6 +401,8 @@ function App() {
             refreshData={fetchAllData}
             currentTheme={theme}
             onChangeTheme={handleThemeChange}
+            collegeDetails={collegeDetails}
+            onSaveCollegeDetails={handleSaveCollegeDetails}
           />
         );
       case 'profile':
@@ -423,11 +449,12 @@ function App() {
         currentTab={currentTab} 
         setCurrentTab={setCurrentTab} 
         user={user}
+        collegeDetails={collegeDetails}
       />
 
       {/* Main View Area */}
       <main className="main-content">
-        <Header />
+        <Header collegeDetails={collegeDetails} />
         {renderView()}
       </main>
     </div>

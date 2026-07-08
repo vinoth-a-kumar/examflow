@@ -7,7 +7,7 @@ import {
   Sparkles
 } from 'lucide-react';
 
-function SeatingPlanView({ exams, halls }) {
+function SeatingPlanView({ exams, halls, collegeDetails }) {
   const [selectedExamId, setSelectedExamId] = useState('');
   const [selectedHallId, setSelectedHallId] = useState('');
   const [seatingPlan, setSeatingPlan] = useState(null);
@@ -250,6 +250,49 @@ function SeatingPlanView({ exams, halls }) {
       {/* Seating Plan Dashboard Displays */}
       {!loading && seatingPlan && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Hidden Print Header (visible only on print) */}
+          <div className="print-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              {collegeDetails?.logo ? (
+                <img src={collegeDetails.logo} alt="College Logo" style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} />
+              ) : (
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '8px',
+                  backgroundColor: '#f3f4f6',
+                  color: '#111827',
+                  border: '1px solid #d1d5db',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold',
+                  fontSize: '24px'
+                }}>
+                  {collegeDetails?.name?.charAt(0) || 'E'}
+                </div>
+              )}
+              <div>
+                <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#111827', margin: 0 }}>
+                  {collegeDetails?.name || 'ExamFlow Engineering College'}
+                </h2>
+                <p style={{ fontSize: '11px', color: '#4b5563', margin: '4px 0 0 0', maxWidth: '350px', lineHeight: '1.4' }}>
+                  {collegeDetails?.address || '123 University Campus, Tech City'}
+                </p>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#111827', display: 'block' }}>
+                Academic Year: {collegeDetails?.academicYear || '2026-27'}
+              </span>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#4b5563', display: 'block', marginTop: '4px' }}>
+                Exam: {selectedExam?.name}
+              </span>
+              <span style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginTop: '2px' }}>
+                Date: {selectedExam?.date} ({selectedExam?.session === 'FN' ? 'Forenoon' : 'Afternoon'})
+              </span>
+            </div>
+          </div>
           {/* Seating Stats Summary */}
           <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <div className="stat-card">

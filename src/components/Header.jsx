@@ -1,28 +1,10 @@
 import React, { useState } from 'react';
 import { HelpCircle, X, Info } from 'lucide-react';
 
-function Header() {
+function Header({ collegeDetails }) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const getAcademicYear = () => {
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth(); // 0 = Jan, 5 = June
-    
-    if (currentMonth < 5) {
-      // Before June: e.g. Jan 2026 -> 2025-26
-      const prevYear = currentYear - 1;
-      const shortCurrentYear = String(currentYear).slice(-2);
-      return `${prevYear}-${shortCurrentYear}`;
-    } else {
-      // June or later: e.g. June 2026 -> 2026-27
-      const nextYear = currentYear + 1;
-      const shortNextYear = String(nextYear).slice(-2);
-      return `${currentYear}-${shortNextYear}`;
-    }
-  };
-
-  const academicYear = getAcademicYear();
+  const academicYear = collegeDetails?.academicYear || '2026-27';
 
   return (
     <>

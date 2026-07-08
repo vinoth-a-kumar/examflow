@@ -124,7 +124,7 @@ function DashboardView({ stats, activities, setTab, onUpdateHall, onClearActivit
             <div className="donut-chart-container">
               <div className="donut-svg-wrapper">
                 <svg width="100%" height="100%" viewBox="0 0 42 42">
-                  <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#f1f5f9" strokeWidth="4" />
+                  <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="var(--border-color)" strokeWidth="4" />
                   
                   {departmentDistribution.map((dept, idx) => {
                     const percentage = (dept.count / totalStudentsInDist) * 100;

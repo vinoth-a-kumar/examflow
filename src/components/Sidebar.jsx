@@ -8,7 +8,7 @@ import {
   Settings
 } from 'lucide-react';
 
-function Sidebar({ currentTab, setCurrentTab, user }) {
+function Sidebar({ currentTab, setCurrentTab, user, collegeDetails }) {
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
     { id: 'upload', name: 'Upload Data', icon: Upload },
@@ -18,14 +18,38 @@ function Sidebar({ currentTab, setCurrentTab, user }) {
     { id: 'settings', name: 'Settings', icon: Settings },
   ];
 
+  const collegeName = collegeDetails?.name || 'ExamFlow';
+  const collegeLogo = collegeDetails?.logo || '';
+
   return (
     <aside className="sidebar">
       <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-        <div className="sidebar-logo">
-          <h1>ExamFlow</h1>
-          <span style={{ textTransform: 'none', fontSize: '11px', color: 'var(--text-secondary)' }}>
-            {user ? `@${user.username}` : 'Admin Control Center'}
-          </span>
+        <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {collegeLogo ? (
+            <img src={collegeLogo} alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover' }} />
+          ) : (
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '6px',
+              backgroundColor: 'var(--color-primary-light)',
+              color: 'var(--color-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: '16px',
+              flexShrink: 0
+            }}>
+              {collegeName.charAt(0)}
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <h1 style={{ fontSize: '15px', margin: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', width: '130px' }} title={collegeName}>{collegeName}</h1>
+            <span style={{ textTransform: 'none', fontSize: '10px', color: 'var(--text-secondary)' }}>
+              {user ? `@${user.username}` : 'Admin Control Center'}
+            </span>
+          </div>
         </div>
 
         <nav className="sidebar-menu">
