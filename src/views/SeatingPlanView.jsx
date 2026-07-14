@@ -8,34 +8,52 @@ import {
 } from 'lucide-react';
 
 function SeatingPlanView({ exams, halls, collegeDetails }) {
-  const [selectedExamId, setSelectedExamId] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedSession, setSelectedSession] = useState('FN');
   const [selectedHallId, setSelectedHallId] = useState('');
   const [seatingPlan, setSeatingPlan] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Selected Exam object for assigned halls
-  const selectedExam = exams.find(e => e._id === selectedExamId);
-  // Get halls that are assigned to the selected exam
-  const examHalls = halls.filter(h => selectedExam?.assignedHalls?.includes(h.name));
+  // Extract unique dates from scheduled exams
+  const uniqueExamDates = React.useMemo(() => {
+    const dates = exams.map(e => e.date.split('T')[0]);
+    return [...new Set(dates)].sort();
+  }, [exams]);
+
+  // Find all exams on the selected date and session
+  const examsOnSelectedDate = React.useMemo(() => {
+    if (!selectedDate) return [];
+    return exams.filter(e => e.date.split('T')[0] === selectedDate && e.session === selectedSession);
+  }, [exams, selectedDate, selectedSession]);
+
+  // Find all halls assigned to any exams on the selected date and session
+  const examHalls = React.useMemo(() => {
+    const hallNames = new Set();
+    examsOnSelectedDate.forEach(e => {
+      if (e.assignedHalls) {
+        e.assignedHalls.forEach(h => hallNames.add(h));
+      }
+    });
+    return halls.filter(h => hallNames.has(h.name));
+  }, [halls, examsOnSelectedDate]);
 
   const selectedHall = halls.find(h => h._id === selectedHallId);
   const colsCount = selectedHall ? selectedHall.columns : 4;
 
   const fetchSeatingPlan = async () => {
-    if (!selectedExamId || !selectedHallId) return;
+    if (!selectedDate || !selectedSession || !selectedHallId) return;
     setLoading(true);
     setErrorMsg('');
     setSeatingPlan(null);
 
     try {
-      const response = await fetch(`http://localhost:5000/api/seating/${selectedExamId}/${selectedHallId}`);
+      const response = await fetch(`http://localhost:5000/api/seating/by-date-session?date=${selectedDate}&session=${selectedSession}&hallId=${selectedHallId}`);
       if (response.ok) {
         const data = await response.json();
         setSeatingPlan(data);
       } else {
-        // Not generated yet
-        setErrorMsg('No seating plan found. Click the button below to generate one.');
+        setErrorMsg('No seating plan found for this date, session, and hall. Click the button below to generate.');
       }
     } catch (err) {
       console.error(err);
@@ -45,10 +63,9 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
     }
   };
 
-  // Reset hall selection if it is no longer valid for the selected exam
+  // Reset hall selection if it is no longer valid for the selected date/session
   useEffect(() => {
     if (examHalls.length > 0) {
-      // Auto-select first hall if none selected or if selected hall is not in the list
       const isValid = examHalls.some(h => h._id === selectedHallId);
       if (!isValid) {
         setSelectedHallId(examHalls[0]._id);
@@ -59,35 +76,36 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
     setSeatingPlan(null);
     setErrorMsg('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedExamId]);
+  }, [selectedDate, selectedSession]);
 
-  // Automatically fetch seating plan when exam or hall selection changes
+  // Automatically fetch seating plan when date, session or hall changes
   useEffect(() => {
-    if (selectedExamId && selectedHallId) {
+    if (selectedDate && selectedSession && selectedHallId) {
       fetchSeatingPlan();
     } else {
       setSeatingPlan(null);
       setErrorMsg('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedExamId, selectedHallId]);
+  }, [selectedDate, selectedSession, selectedHallId]);
 
   const handleGenerate = async () => {
-    if (!selectedExamId || !selectedHallId) {
-      alert("Please select both Exam and Hall.");
+    if (!selectedDate || !selectedSession || !selectedHallId) {
+      alert("Please select Date, Session and Hall.");
       return;
     }
     setLoading(true);
     setErrorMsg('');
 
     try {
-      const response = await fetch('http://localhost:5000/api/seating/generate', {
+      const response = await fetch('http://localhost:5000/api/seating/generate-by-date-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          examId: selectedExamId,
+          date: selectedDate,
+          session: selectedSession,
           hallId: selectedHallId
         })
       });
@@ -126,18 +144,30 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
       {/* Control selectors */}
       <div className="seating-controls">
         <div className="form-group" style={{ flex: 1 }}>
-          <label htmlFor="examSelect">Select Exam</label>
+          <label htmlFor="dateSelect">Select Date</label>
           <select 
-            id="examSelect"
-            value={selectedExamId}
-            onChange={(e) => setSelectedExamId(e.target.value)}
+            id="dateSelect"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
           >
-            <option value="">-- Choose Exam --</option>
-            {exams.map(e => (
-              <option key={e._id} value={e._id}>
-                {e.name} ({e.date} - {e.session})
+            <option value="">-- Choose Date --</option>
+            {uniqueExamDates.map(d => (
+              <option key={d} value={d}>
+                {new Date(d).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })}
               </option>
             ))}
+          </select>
+        </div>
+
+        <div className="form-group" style={{ flex: 1 }}>
+          <label htmlFor="sessionSelect">Select Session</label>
+          <select 
+            id="sessionSelect"
+            value={selectedSession}
+            onChange={(e) => setSelectedSession(e.target.value)}
+          >
+            <option value="FN">FN (Forenoon 10:00 AM - 01:00 PM)</option>
+            <option value="AN">AN (Afternoon 02:00 PM - 05:00 PM)</option>
           </select>
         </div>
 
@@ -147,7 +177,7 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
             id="hallSelect"
             value={selectedHallId}
             onChange={(e) => setSelectedHallId(e.target.value)}
-            disabled={!selectedExamId || examHalls.length === 0}
+            disabled={!selectedDate || examHalls.length === 0}
           >
             {examHalls.length === 0 ? (
               <option value="">-- No halls assigned --</option>
@@ -165,7 +195,7 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
         <button 
           className="btn-primary" 
           onClick={fetchSeatingPlan}
-          disabled={!selectedExamId || !selectedHallId || loading}
+          disabled={!selectedDate || !selectedHallId || loading}
           style={{ height: '42px', display: 'flex', alignItems: 'center', gap: '6px' }}
         >
           <Search size={16} />
@@ -176,7 +206,7 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
           <button 
             className="btn-secondary" 
             onClick={handleGenerate}
-            disabled={!selectedExamId || !selectedHallId || loading}
+            disabled={!selectedDate || !selectedHallId || loading}
             style={{ 
               height: '42px', 
               display: 'flex', 
@@ -230,7 +260,7 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
           <p style={{ color: 'var(--text-secondary)', maxWidth: '400px', fontSize: '14px', marginBottom: '20px' }}>
             {errorMsg}
           </p>
-          {selectedExamId && selectedHallId && (
+          {selectedDate && selectedHallId && (
             <button className="btn-primary" onClick={handleGenerate} style={{ gap: '6px' }}>
               <Sparkles size={16} />
               <span>Generate Seating Plan</span>
@@ -243,7 +273,7 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
       {!loading && !seatingPlan && !errorMsg && (
         <div className="card-container" style={{ textAlign: 'center', padding: '60px 24px', color: 'var(--text-muted)' }}>
           <Armchair size={48} style={{ margin: '0 auto 16px auto', strokeWidth: 1.5 }} />
-          <p style={{ fontSize: '15px', fontWeight: 500 }}>Please select an Exam and an Assigned Hall to view or generate seating plans.</p>
+          <p style={{ fontSize: '15px', fontWeight: 500 }}>Please select Date, Session and Hall to view or generate seating plans.</p>
         </div>
       )}
 
@@ -286,10 +316,10 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
                 Academic Year: {collegeDetails?.academicYear || '2026-27'}
               </span>
               <span style={{ fontSize: '12px', fontWeight: 600, color: '#4b5563', display: 'block', marginTop: '4px' }}>
-                Exam: {selectedExam?.name}
+                Exam(s): {examsOnSelectedDate.map(e => e.name).join(', ')}
               </span>
               <span style={{ fontSize: '11px', color: '#6b7280', display: 'block', marginTop: '2px' }}>
-                Date: {selectedExam?.date} ({selectedExam?.session === 'FN' ? 'Forenoon' : 'Afternoon'})
+                Date: {new Date(selectedDate).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })} ({selectedSession === 'FN' ? 'Forenoon' : 'Afternoon'})
               </span>
             </div>
           </div>
