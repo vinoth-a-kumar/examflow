@@ -49,44 +49,7 @@ const generateId = () => {
   return Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
 };
 
-// Helper: dynamic query builders
-function buildWhere(query) {
-  const keys = Object.keys(query);
-  if (keys.length === 0) return { clause: '', values: [] };
-  const clauses = keys.map(k => `\`${k}\` = ?`);
-  return {
-    clause: ` WHERE ${clauses.join(' AND ')}`,
-    values: keys.map(k => query[k])
-  };
-}
 
-async function runQuery(sql, values) {
-  if (!pool) throw new Error('MySQL connection pool not initialized.');
-  const [rows] = await pool.query(sql, values);
-  return rows;
-}
-
-// Parsing JSON array columns
-const parseExam = (row) => {
-  if (!row) return null;
-  return {
-    ...row,
-    departments: row.departments ? JSON.parse(row.departments) : [],
-    subjectCodes: row.subjectCodes ? JSON.parse(row.subjectCodes) : [],
-    assignedHalls: row.assignedHalls ? JSON.parse(row.assignedHalls) : [],
-    seatsPerBench: row.seatsPerBench || 2
-  };
-};
-
-const parseSeatingPlan = (row) => {
-  if (!row) return null;
-  return {
-    ...row,
-    seatingGrid: row.seatingGrid ? JSON.parse(row.seatingGrid) : [],
-    attendanceRoster: row.attendanceRoster ? JSON.parse(row.attendanceRoster) : [],
-    unseatedStudents: row.unseatedStudents ? JSON.parse(row.unseatedStudents) : []
-  };
-};
 
 // Initialise connection
 async function initMysql() {
@@ -195,6 +158,13 @@ async function createTables() {
   // Migration: add seatsPerBench column if missing
   try {
     await pool.query(`ALTER TABLE exams ADD COLUMN \`seatsPerBench\` INT DEFAULT 2`);
+  } catch (err) {
+    // Ignore error if column already exists
+  }
+
+  // Migration: add time column if missing to exams
+  try {
+    await pool.query(`ALTER TABLE exams ADD COLUMN \`time\` VARCHAR(255) DEFAULT ''`);
   } catch (err) {
     // Ignore error if column already exists
   }
@@ -523,7 +493,7 @@ const Models = {
       if (isMysqlConnected) {
         const _id = generateId();
         await runQuery(
-          `INSERT INTO exams (\`_id\`, \`name\`, \`departments\`, \`subjectCodes\`, \`date\`, \`session\`, \`studentsCount\`, \`status\`, \`assignedHalls\`, \`seatsPerBench\`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO exams (\`_id\`, \`name\`, \`departments\`, \`subjectCodes\`, \`date\`, \`session\`, \`studentsCount\`, \`status\`, \`assignedHalls\`, \`seatsPerBench\`, \`time\`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             _id,
             doc.name,
@@ -534,10 +504,11 @@ const Models = {
             doc.studentsCount || 0,
             doc.status || 'Draft',
             JSON.stringify(doc.assignedHalls || []),
-            doc.seatsPerBench || 2
+            doc.seatsPerBench || 2,
+            doc.time || ''
           ]
         );
-        return { _id, ...doc, departments: doc.departments || [], subjectCodes: doc.subjectCodes || [], assignedHalls: doc.assignedHalls || [], seatsPerBench: doc.seatsPerBench || 2 };
+        return { _id, ...doc, departments: doc.departments || [], subjectCodes: doc.subjectCodes || [], assignedHalls: doc.assignedHalls || [], seatsPerBench: doc.seatsPerBench || 2, time: doc.time || '' };
       }
       // Fallback
       const data = readJson('exams');
@@ -549,7 +520,7 @@ const Models = {
     findByIdAndUpdate: async (id, doc) => {
       if (isMysqlConnected) {
         await runQuery(
-          `UPDATE exams SET \`name\` = ?, \`departments\` = ?, \`subjectCodes\` = ?, \`date\` = ?, \`session\` = ?, \`studentsCount\` = ?, \`assignedHalls\` = ?, \`seatsPerBench\` = ? WHERE \`_id\` = ?`,
+          `UPDATE exams SET \`name\` = ?, \`departments\` = ?, \`subjectCodes\` = ?, \`date\` = ?, \`session\` = ?, \`studentsCount\` = ?, \`assignedHalls\` = ?, \`seatsPerBench\` = ?, \`time\` = ? WHERE \`_id\` = ?`,
           [
             doc.name,
             JSON.stringify(doc.departments || []),
@@ -559,6 +530,7 @@ const Models = {
             doc.studentsCount || 0,
             JSON.stringify(doc.assignedHalls || []),
             doc.seatsPerBench || 2,
+            doc.time || '',
             id
           ]
         );

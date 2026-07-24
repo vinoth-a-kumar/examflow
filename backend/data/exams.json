@@ -1,1 +1,31 @@
-[]
+[
+  {
+    "_id": "pf47rhwmryyxuz6",
+    "name": "TAM111, BB211, CA213",
+    "departments": [],
+    "subjectCodes": [
+      "TAM111",
+      "BB211",
+      "CA213",
+      "CM211"
+    ],
+    "date": "2026-07-25",
+    "session": "FN",
+    "time": "10:00 AM - 01:00 PM",
+    "studentsCount": 325,
+    "assignedHalls": [
+      "A1",
+      "A2",
+      "A3",
+      "A6",
+      "A7",
+      "A8",
+      "A9",
+      "B1",
+      "B2",
+      "C4"
+    ],
+    "seatsPerBench": 2,
+    "status": "Scheduled"
+  }
+]

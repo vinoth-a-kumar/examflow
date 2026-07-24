@@ -1,30 +1,61 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Armchair, 
   Info, 
   Printer, 
   Search, 
-  Sparkles
+  Sparkles,
+  Download,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 function SeatingPlanView({ exams, halls, collegeDetails }) {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSession, setSelectedSession] = useState('FN');
   const [selectedHallId, setSelectedHallId] = useState('');
+  const [showAllUnseated, setShowAllUnseated] = useState(false);
+  const [showAllSeating, setShowAllSeating] = useState(false);
   const [seatingPlan, setSeatingPlan] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [viewFormat, setViewFormat] = useState('university');
 
   // Extract unique dates from scheduled exams
   const uniqueExamDates = React.useMemo(() => {
-    const dates = exams.map(e => e.date.split('T')[0]);
-    return [...new Set(dates)].sort();
+    const dates = (exams || []).map(e => e.date ? e.date.split('T')[0] : '');
+    return [...new Set(dates.filter(Boolean))].sort();
   }, [exams]);
+
+  // Helper to format date dropdown options with created exam time(s)
+  const getDateOptionLabel = (d) => {
+    const formattedDate = new Date(d).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+    const examsOnDate = exams ? exams.filter(e => e.date && e.date.split('T')[0] === d) : [];
+    if (examsOnDate.length === 0) return formattedDate;
+    
+    const sessionInfos = examsOnDate.map(e => `${e.session}: ${e.time || (e.session === 'FN' ? '10:00 AM - 01:00 PM' : '02:00 PM - 05:00 PM')}`);
+    return `${formattedDate} (${sessionInfos.join(', ')})`;
+  };
+
+  // Handle Date change in seating plan, auto-selecting available session
+  const handleDateChange = (newDate) => {
+    setSelectedDate(newDate);
+    if (newDate && exams) {
+      const examsOnDate = exams.filter(e => e.date && e.date.split('T')[0] === newDate);
+      if (examsOnDate.length > 0) {
+        const hasCurrentSession = examsOnDate.some(e => e.session === selectedSession);
+        if (!hasCurrentSession) {
+          setSelectedSession(examsOnDate[0].session);
+        }
+      }
+    }
+  };
+
 
   // Find all exams on the selected date and session
   const examsOnSelectedDate = React.useMemo(() => {
     if (!selectedDate) return [];
-    return exams.filter(e => e.date.split('T')[0] === selectedDate && e.session === selectedSession);
+    return (exams || []).filter(e => e.date && e.date.split('T')[0] === selectedDate && e.session === selectedSession);
   }, [exams, selectedDate, selectedSession]);
 
   // Find all halls assigned to any exams on the selected date and session
@@ -35,8 +66,47 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
         e.assignedHalls.forEach(h => hallNames.add(h));
       }
     });
-    return halls.filter(h => hallNames.has(h.name));
+    return (halls || []).filter(h => h && hallNames.has(h.name));
   }, [halls, examsOnSelectedDate]);
+
+
+  // Format date as DD/MM/YYYY
+  const formattedExamDate = React.useMemo(() => {
+    if (!selectedDate) return '';
+    try {
+      const d = new Date(selectedDate);
+      if (!isNaN(d.getTime())) {
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+      }
+    } catch (e) {}
+    return selectedDate;
+  }, [selectedDate]);
+
+  // Format exam time details
+  // Format exam time details
+  const examTime = useMemo(() => {
+    if (!selectedDate || !selectedSession || !exams) {
+      return selectedSession === 'FN' ? '10:00 AM - 01:00 PM' : '02:00 PM - 05:00 PM';
+    }
+    const targetDateStr = selectedDate.split('T')[0];
+    const match = exams.find(e => 
+      e.date.split('T')[0] === targetDateStr && 
+      e.session === selectedSession && 
+      e.time && 
+      e.time.trim() !== ''
+    );
+    return match ? match.time : (selectedSession === 'FN' ? '10:00 AM - 01:00 PM' : '02:00 PM - 05:00 PM');
+  }, [selectedDate, selectedSession, exams]);
+
+  // Handle download Excel action
+  const handleDownloadExcel = () => {
+    if (!selectedDate || !selectedSession || !selectedHallId) return;
+    const url = `http://localhost:5000/api/seating/download-roster?date=${selectedDate}&session=${selectedSession}&hallId=${selectedHallId}`;
+    window.open(url, '_blank');
+  };
 
   const selectedHall = halls.find(h => h._id === selectedHallId);
   const colsCount = selectedHall ? selectedHall.columns : 4;
@@ -51,7 +121,12 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
       const response = await fetch(`http://localhost:5000/api/seating/by-date-session?date=${selectedDate}&session=${selectedSession}&hallId=${selectedHallId}`);
       if (response.ok) {
         const data = await response.json();
-        setSeatingPlan(data);
+        if (data.notFound) {
+          setSeatingPlan(null);
+          setErrorMsg(data.message || 'No seating plan found for this date, session, and hall. Click the button below to generate.');
+        } else {
+          setSeatingPlan(data);
+        }
       } else {
         setErrorMsg('No seating plan found for this date, session, and hall. Click the button below to generate.');
       }
@@ -142,36 +217,36 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
       </div>
 
       {/* Control selectors */}
-      <div className="seating-controls">
-        <div className="form-group" style={{ flex: 1 }}>
+      <div className="seating-controls" style={{ flexWrap: 'wrap' }}>
+        <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
           <label htmlFor="dateSelect">Select Date</label>
           <select 
             id="dateSelect"
             value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
+            onChange={(e) => handleDateChange(e.target.value)}
           >
             <option value="">-- Choose Date --</option>
             {uniqueExamDates.map(d => (
               <option key={d} value={d}>
-                {new Date(d).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })}
+                {getDateOptionLabel(d)}
               </option>
             ))}
           </select>
         </div>
 
-        <div className="form-group" style={{ flex: 1 }}>
+        <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
           <label htmlFor="sessionSelect">Select Session</label>
           <select 
             id="sessionSelect"
             value={selectedSession}
             onChange={(e) => setSelectedSession(e.target.value)}
           >
-            <option value="FN">FN (Forenoon 10:00 AM - 01:00 PM)</option>
-            <option value="AN">AN (Afternoon 02:00 PM - 05:00 PM)</option>
+            <option value="FN">FN (Forenoon)</option>
+            <option value="AN">AN (Afternoon)</option>
           </select>
         </div>
 
-        <div className="form-group" style={{ flex: 1 }}>
+        <div className="form-group" style={{ flex: 1, minWidth: '180px' }}>
           <label htmlFor="hallSelect">Select Hall</label>
           <select 
             id="hallSelect"
@@ -201,26 +276,6 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
           <Search size={16} />
           <span>Search Seating</span>
         </button>
-
-        {seatingPlan && (
-          <button 
-            className="btn-secondary" 
-            onClick={handleGenerate}
-            disabled={!selectedDate || !selectedHallId || loading}
-            style={{ 
-              height: '42px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px',
-              backgroundColor: 'var(--color-primary-light)',
-              color: 'var(--color-primary)',
-              borderColor: 'var(--color-primary)'
-            }}
-          >
-            <Sparkles size={16} />
-            <span>Regenerate Seating</span>
-          </button>
-        )}
       </div>
 
       {/* Loading Indicator */}
@@ -284,7 +339,7 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
           <div className="print-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               {collegeDetails?.logo ? (
-                <img src={collegeDetails.logo} alt="College Logo" style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} />
+                <img src={collegeDetails.logo.startsWith('data:') ? collegeDetails.logo : process.env.PUBLIC_URL + collegeDetails.logo} alt="College Logo" style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'contain' }} />
               ) : (
                 <div style={{
                   width: '60px',
@@ -299,15 +354,15 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
                   fontWeight: 'bold',
                   fontSize: '24px'
                 }}>
-                  {collegeDetails?.name?.charAt(0) || 'E'}
+                  {collegeDetails?.name?.charAt(0) || 'R'}
                 </div>
               )}
               <div>
                 <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#111827', margin: 0 }}>
-                  {collegeDetails?.name || 'ExamFlow Engineering College'}
+                  {collegeDetails?.name || "Rajapalayam Rajus' College"}
                 </h2>
                 <p style={{ fontSize: '11px', color: '#4b5563', margin: '4px 0 0 0', maxWidth: '350px', lineHeight: '1.4' }}>
-                  {collegeDetails?.address || '123 University Campus, Tech City'}
+                  {collegeDetails?.address || 'Rajapalayam, Tamil Nadu, 626117'}
                 </p>
               </div>
             </div>
@@ -334,148 +389,387 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
 
             <div className="stat-card">
               <div className="stat-card-info">
-                <span className="stat-card-number">{seatingPlan.totalStudents}</span>
+                <span className="stat-card-number">
+                  {(() => {
+                    if (seatingPlan.attendanceRoster && seatingPlan.attendanceRoster.length > 0) {
+                      return seatingPlan.attendanceRoster.length;
+                    }
+                    if (seatingPlan.seatingGrid && Array.isArray(seatingPlan.seatingGrid)) {
+                      let count = 0;
+                      seatingPlan.seatingGrid.forEach(b => {
+                        if (b.seat1) count++;
+                        if (b.seat2) count++;
+                        if (b.seat3) count++;
+                      });
+                      if (count > 0) return count;
+                    }
+                    return seatingPlan.totalStudents || 0;
+                  })()}
+                </span>
                 <span className="stat-card-label">Students Allocated</span>
               </div>
             </div>
 
             <div className="stat-card">
               <div className="stat-card-info">
-                <span className="stat-card-number">{seatingPlan.emptySeats}</span>
+                <span className="stat-card-number">
+                  {(() => {
+                    if (seatingPlan.seatingGrid && Array.isArray(seatingPlan.seatingGrid)) {
+                      let empty = 0;
+                      seatingPlan.seatingGrid.forEach(b => {
+                        if (!b.seat1) empty++;
+                        if (!b.seat2) empty++;
+                        if (b.seat3 !== undefined && !b.seat3) empty++;
+                      });
+                      return empty;
+                    }
+                    return seatingPlan.emptySeats !== undefined ? seatingPlan.emptySeats : 0;
+                  })()}
+                </span>
                 <span className="stat-card-label">Empty Seats</span>
               </div>
             </div>
           </div>
 
           {/* Balance/Unseated Students Alert */}
-          {seatingPlan.unseatedStudents && seatingPlan.unseatedStudents.length > 0 && (
-            <div className="card-container" style={{ borderColor: 'var(--color-error)', backgroundColor: 'var(--color-error-bg)', gap: '12px' }}>
-              <h4 style={{ color: 'var(--color-error)', fontWeight: 700, fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Info size={20} />
-                <span>Balance Students ({seatingPlan.unseatedStudents.length} Not Seated due to capacity)</span>
-              </h4>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                The following students could not be allocated a seat because the hall capacity was exceeded:
-              </p>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
-                {seatingPlan.unseatedStudents.map(student => (
-                  <span 
-                    key={student.registerNo} 
-                    style={{ 
-                      fontSize: '11px', 
-                      backgroundColor: 'var(--bg-card)', 
-                      border: '1px solid var(--border-color)', 
-                      color: 'var(--text-primary)', 
-                      padding: '4px 8px', 
-                      borderRadius: '4px',
-                      fontWeight: 600
-                    }}
-                    title={student.name}
-                  >
-                    {student.registerNo} ({student.department})
-                  </span>
-                ))}
+          {seatingPlan.unseatedStudents && seatingPlan.unseatedStudents.length > 0 && (() => {
+            const totalUnseated = seatingPlan.unseatedStudents.length;
+            const limit = 20;
+            const displayedStudents = showAllUnseated ? seatingPlan.unseatedStudents : seatingPlan.unseatedStudents.slice(0, limit);
+            const hasMore = totalUnseated > limit;
+
+            return (
+              <div className="card-container" style={{ borderColor: 'var(--color-error)', backgroundColor: 'var(--color-error-bg)', gap: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <h4 style={{ color: 'var(--color-error)', fontWeight: 700, fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                    <Info size={20} />
+                    <span>Balance Students ({totalUnseated} Not Seated due to capacity)</span>
+                  </h4>
+                  {hasMore && (
+                    <button
+                      onClick={() => setShowAllUnseated(!showAllUnseated)}
+                      style={{
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                        color: 'var(--color-error)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        padding: '4px 12px',
+                        borderRadius: '9999px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <span>{showAllUnseated ? 'Show Less' : `Show More (${totalUnseated - limit} more)`}</span>
+                      {showAllUnseated ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                  )}
+                </div>
+
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+                  The following students could not be allocated a seat because the hall capacity was exceeded:
+                </p>
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                  {displayedStudents.map((student, idx) => (
+                    <span 
+                      key={`${student.registerNo || 'uns'}-${idx}`} 
+                      style={{ 
+                        fontSize: '11px', 
+                        backgroundColor: 'var(--bg-card)', 
+                        border: '1px solid var(--border-color)', 
+                        color: 'var(--text-primary)', 
+                        padding: '4px 8px', 
+                        borderRadius: '4px',
+                        fontWeight: 600
+                      }}
+                      title={student.name}
+                    >
+                      {student.registerNo} ({student.department})
+                    </span>
+                  ))}
+                </div>
+
+                {hasMore && !showAllUnseated && (
+                  <div style={{ textAlign: 'center', marginTop: '4px' }}>
+                    <button
+                      onClick={() => setShowAllUnseated(true)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--color-error)',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <span>+ Show {totalUnseated - limit} More Balance Students</span>
+                      <ChevronDown size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Seating Arrangement Layout Grid */}
-          <div className="card-container">
-            <div className="card-title-bar">
-              <h3>{seatingPlan.hallName} - Seating Arrangement</h3>
-            </div>
-            
-            <div 
-              className="seating-layout-grid" 
-              style={{ gridTemplateColumns: `repeat(${colsCount}, minmax(${seatingPlan?.seatingGrid?.[0]?.seat3 !== undefined ? '250px' : '180px'}, 1fr))` }}
-            >
-              {seatingPlan.seatingGrid.map((bench) => (
-                <div className="bench-card" key={bench.benchCode}>
-                  <span className="bench-code">{bench.benchCode}</span>
-                  
-                  <div className="bench-seats">
-                    <div className={`bench-seat ${bench.seat1 ? 'seat-left' : 'empty'}`} title={bench.seat1 ? `${bench.seat1.name} (${bench.seat1.department}${bench.seat1.subjectCode ? ' - ' + bench.seat1.subjectCode : ''})` : 'Empty'}>
-                      {bench.seat1 ? bench.seat1.registerNo : 'Empty'}
-                    </div>
-                    
-                    <div className="bench-divider" />
+          {(() => {
+            const totalBenches = seatingPlan.seatingGrid ? seatingPlan.seatingGrid.length : 0;
+            const benchLimit = 16;
+            const displayedBenches = showAllSeating ? seatingPlan.seatingGrid : seatingPlan.seatingGrid.slice(0, benchLimit);
+            const hasMoreBenches = totalBenches > benchLimit;
 
-                    {bench.seat3 !== undefined && (
-                      <>
-                        <div className={`bench-seat ${bench.seat2 ? 'seat-middle' : 'empty'}`} title={bench.seat2 ? `${bench.seat2.name} (${bench.seat2.department}${bench.seat2.subjectCode ? ' - ' + bench.seat2.subjectCode : ''})` : 'Empty'}>
-                          {bench.seat2 ? bench.seat2.registerNo : 'Empty'}
-                        </div>
-                        <div className="bench-divider" />
-                      </>
-                    )}
-                    
-                    <div className={`bench-seat ${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? 'seat-right' : 'empty'}`} title={(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? `${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).name} (${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).department}${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).subjectCode ? ' - ' + (bench.seat3 !== undefined ? bench.seat3 : bench.seat2).subjectCode : ''})` : 'Empty'}>
-                      {(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? (bench.seat3 !== undefined ? bench.seat3 : bench.seat2).registerNo : 'Empty'}
-                    </div>
-                  </div>
+            return (
+              <div className="card-container">
+                <div className="card-title-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3>{seatingPlan.hallName} - Seating Arrangement</h3>
+                  {hasMoreBenches && (
+                    <button
+                      onClick={() => setShowAllSeating(!showAllSeating)}
+                      style={{
+                        background: 'var(--color-primary-light)',
+                        border: '1px solid var(--color-primary)',
+                        color: 'var(--color-primary)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        padding: '6px 14px',
+                        borderRadius: '9999px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <span>{showAllSeating ? 'Show Less' : `Show More (${totalBenches - benchLimit} more benches)`}</span>
+                      {showAllSeating ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>
-          </div>
+                
+                <div 
+                  className="seating-layout-grid" 
+                  style={{ gridTemplateColumns: `repeat(${colsCount}, minmax(${seatingPlan?.seatingGrid?.[0]?.seat3 !== undefined ? '250px' : '180px'}, 1fr))` }}
+                >
+                  {displayedBenches.map((bench, bIdx) => (
+                    <div className="bench-card" key={`${bench.benchCode || 'bench'}-${bIdx}`}>
+                      <span className="bench-code">{bench.benchCode}</span>
+                      
+                      <div className="bench-seats">
+                        <div className={`bench-seat ${bench.seat1 ? 'seat-left' : 'empty'}`} title={bench.seat1 ? `${bench.seat1.name} (${bench.seat1.department}${bench.seat1.subjectCode ? ' - ' + bench.seat1.subjectCode : ''})` : 'Empty'}>
+                          {bench.seat1 ? bench.seat1.registerNo : 'Empty'}
+                        </div>
+                        
+                        <div className="bench-divider" />
+
+                        {bench.seat3 !== undefined && (
+                          <>
+                            <div className={`bench-seat ${bench.seat2 ? 'seat-middle' : 'empty'}`} title={bench.seat2 ? `${bench.seat2.name} (${bench.seat2.department}${bench.seat2.subjectCode ? ' - ' + bench.seat2.subjectCode : ''})` : 'Empty'}>
+                              {bench.seat2 ? bench.seat2.registerNo : 'Empty'}
+                            </div>
+                            <div className="bench-divider" />
+                          </>
+                        )}
+                        
+                        <div className={`bench-seat ${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? 'seat-right' : 'empty'}`} title={(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? `${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).name} (${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).department}${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).subjectCode ? ' - ' + (bench.seat3 !== undefined ? bench.seat3 : bench.seat2).subjectCode : ''})` : 'Empty'}>
+                          {(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? (bench.seat3 !== undefined ? bench.seat3 : bench.seat2).registerNo : 'Empty'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {hasMoreBenches && (
+                  <div style={{ textAlign: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px dashed var(--border-color)' }}>
+                    <button
+                      onClick={() => setShowAllSeating(!showAllSeating)}
+                      className="btn-secondary"
+                      style={{
+                        padding: '8px 20px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <span>{showAllSeating ? 'Show Less Benches' : `Show All ${totalBenches} Benches (${totalBenches - benchLimit} Hidden)`}</span>
+                      {showAllSeating ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Roster & Printable Table */}
           <div className="card-container">
-            <div className="card-title-bar">
+            <div className="card-title-bar" style={{ flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <h3>Attendance Roster</h3>
                 <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                  Ready for PDF export. Use the download button to print or save this roster as a PDF.
+                  Export as formatted Excel (.xlsx) or print university-style attendance sheets.
                 </p>
               </div>
-              <button className="btn-primary" onClick={handlePrint} style={{ gap: '8px' }}>
-                <Printer size={16} />
-                <span>Download PDF / Print</span>
+              <div className="no-print" style={{ display: 'flex', gap: '8px' }}>
+                <button className="btn-secondary" onClick={handleDownloadExcel} style={{ gap: '8px', display: 'flex', alignItems: 'center' }}>
+                  <Download size={16} />
+                  <span>Download Excel (.xlsx)</span>
+                </button>
+                <button className="btn-primary" onClick={handlePrint} style={{ gap: '8px', display: 'flex', alignItems: 'center' }}>
+                  <Printer size={16} />
+                  <span>Download PDF / Print</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Toggle view format */}
+            <div className="uni-view-toggle no-print">
+              <button 
+                className={`uni-toggle-btn ${viewFormat === 'university' ? 'active' : ''}`}
+                onClick={() => setViewFormat('university')}
+              >
+                University Sheet Format
+              </button>
+              <button 
+                className={`uni-toggle-btn ${viewFormat === 'standard' ? 'active' : ''}`}
+                onClick={() => setViewFormat('standard')}
+              >
+                Standard List
               </button>
             </div>
 
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Register No</th>
-                    <th>Name</th>
-                    <th>Department</th>
-                    <th>Subject Code</th>
-                    <th>Bench</th>
-                    <th>Seat Position</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {seatingPlan.attendanceRoster.length === 0 ? (
+            {/* Standard Table View */}
+            {viewFormat === 'standard' && (
+              <div className="table-wrapper no-print">
+                <table className="data-table">
+                  <thead>
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px' }}>
-                        No student seats allocated in this hall.
-                      </td>
+                      <th>Register No</th>
+                      <th>Name</th>
+                      <th>Bench</th>
+                      <th>Seat Position</th>
                     </tr>
-                  ) : (
-                    seatingPlan.attendanceRoster.map((item) => (
-                      <tr key={item.registerNo}>
-                        <td style={{ fontWeight: 600 }}>{item.registerNo}</td>
-                        <td>{item.name}</td>
-                        <td>
-                          <span className="status-pill info">{item.department}</span>
-                        </td>
-                        <td>
-                          <span className="status-pill success" style={{ fontSize: '11px', padding: '2px 8px' }}>
-                            {item.subjectCode || '-'}
-                          </span>
-                        </td>
-                        <td style={{ fontWeight: 'bold' }}>{item.bench}</td>
-                        <td>
-                          <span className={`status-pill ${item.seat === 'Left' ? 'success' : 'info'}`} style={{ fontSize: '11px', padding: '2px 8px' }}>
-                            {item.seat} Seat
-                          </span>
+                  </thead>
+                  <tbody>
+                    {seatingPlan.attendanceRoster.length === 0 ? (
+                      <tr>
+                        <td colSpan="4" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px' }}>
+                          No student seats allocated in this hall.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      seatingPlan.attendanceRoster.map((item, idx) => (
+                        <tr key={`${item.registerNo || 'rost'}-${idx}`}>
+                          <td style={{ fontWeight: 600 }}>{item.registerNo}</td>
+                          <td>{item.name}</td>
+                          <td style={{ fontWeight: 'bold' }}>{item.bench}</td>
+                          <td>
+                            <span className={`status-pill ${item.seat === 'Left' ? 'success' : 'info'}`} style={{ fontSize: '11px', padding: '2px 8px' }}>
+                              {item.seat} Seat
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* University Sheet Format View - Single Combined Roster for All Students */}
+            <div className={viewFormat === 'university' ? '' : 'only-print'}>
+              {(!seatingPlan.attendanceRoster || seatingPlan.attendanceRoster.length === 0) ? (
+                <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
+                  No student seats allocated in this hall.
+                </div>
+              ) : (() => {
+                // Combine all students into a single list sorted by Register Number
+                const allStudents = [...seatingPlan.attendanceRoster].sort((a, b) => {
+                  return (a.registerNo || '').localeCompare(b.registerNo || '');
+                });
+
+                return (
+                  <div className="university-roster-sheet">
+                    {/* Header */}
+                    <div className="uni-roster-header">
+                      <h1 className="uni-title">MADURAI KAMARAJ UNIVERSITY EXAMINATIONS</h1>
+                      <h2 className="college-title">RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM</h2>
+                    </div>
+
+                    {/* Info Meta Grid */}
+                    <div className="uni-roster-meta">
+                      <div className="meta-row">
+                        <div className="meta-cell"><strong>DATE OF EXAM:</strong> {formattedExamDate}</div>
+                        <div className="meta-cell text-right"><strong>TIME OF EXAM:</strong> {examTime}</div>
+                      </div>
+                      <div className="meta-row">
+                        <div className="meta-cell"><strong>HALL NO:</strong> {seatingPlan.hallName}</div>
+                        <div className="meta-cell text-right"><strong>TOTAL STUDENTS:</strong> {allStudents.length}</div>
+                      </div>
+                    </div>
+
+                    {/* Roster Table */}
+                    <table className="uni-roster-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: '8%' }}>SL NO</th>
+                          <th style={{ width: '25%' }}>REGISTER NUMBER</th>
+                          <th style={{ width: '42%' }}>NAME OF THE CANDIDATE</th>
+                          <th style={{ width: '25%' }}>SIGNATURE OF THE CANDIDATE</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allStudents.map((student, idx) => (
+                          <tr key={`${student.registerNo || 'std'}-${idx}`}>
+                            <td className="text-center" style={{ fontWeight: 'bold' }}>{idx + 1}</td>
+                            <td style={{ fontWeight: 600 }}>{student.registerNo}</td>
+                            <td className="text-uppercase">{student.name}</td>
+                            <td className="empty-sig-cell"></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {/* Footer */}
+                    <div className="uni-roster-footer">
+                      <div className="footer-row">
+                        <div className="footer-cell">
+                          <strong>Absentees Reg. No.:</strong>
+                          <span className="bottom-line"></span>
+                        </div>
+                        <div className="footer-cell text-right">
+                          <strong>Hall No.:</strong> {seatingPlan.hallName}
+                        </div>
+                      </div>
+                      <div className="footer-row">
+                        <div className="footer-cell">
+                          <strong>Total No. of Absentees:</strong>
+                          <span className="bottom-line" style={{ maxWidth: '80px', minWidth: '60px' }}></span>
+                        </div>
+                        <div className="footer-cell text-right">
+                          <strong>Name of the Invigilator and College:</strong>
+                          <span className="bottom-line" style={{ minWidth: '220px' }}></span>
+                        </div>
+                      </div>
+                      <div className="footer-row sig-row">
+                        <div className="footer-cell" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                          Signature of the Chief Superintendent
+                        </div>
+                        <div className="footer-cell text-right" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                          Signature of the Invigilator
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

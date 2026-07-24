@@ -10,7 +10,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 
-function UploadDataView({ students, uploads, onUpload, onClear, refreshData, onClearUploadHistory }) {
+function UploadDataView({ students, uploads, onClear, refreshData, onClearUploadHistory }) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -52,10 +52,13 @@ function UploadDataView({ students, uploads, onUpload, onClear, refreshData, onC
   };
 
   // Filter students based on search and department
-  const filteredStudents = students.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          s.registerNo.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesDept = deptFilter === 'ALL' || s.department.toUpperCase() === deptFilter.toUpperCase();
+  const filteredStudents = (students || []).filter(s => {
+    if (!s) return false;
+    const nameStr = (s.name || '').toLowerCase();
+    const regStr = (s.registerNo || '').toLowerCase();
+    const deptStr = (s.department || '').toUpperCase();
+    const matchesSearch = nameStr.includes(searchQuery.toLowerCase()) || regStr.includes(searchQuery.toLowerCase());
+    const matchesDept = deptFilter === 'ALL' || deptStr === deptFilter.toUpperCase();
     return matchesSearch && matchesDept;
   });
 
@@ -64,7 +67,7 @@ function UploadDataView({ students, uploads, onUpload, onClear, refreshData, onC
   const hasMoreRows = filteredStudents.length > ROWS_TO_SHOW;
 
   // Get list of unique departments for filter dropdown
-  const departments = ['ALL', ...new Set(students.map(s => s.department.toUpperCase()))];
+  const departments = ['ALL', ...new Set((students || []).map(s => (s && s.department ? s.department.toUpperCase() : '')).filter(Boolean))];
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -154,7 +157,7 @@ function UploadDataView({ students, uploads, onUpload, onClear, refreshData, onC
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
       <div className="page-intro">
         <h2>Upload Student Data</h2>
         <p>Import student rosters, enrollment details and departments securely.</p>
@@ -165,188 +168,178 @@ function UploadDataView({ students, uploads, onUpload, onClear, refreshData, onC
         {/* Left Side: File Upload Box */}
         <div className="card-container">
           <div className="card-title-bar">
-            <h3>Import Roster</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '32px', height: '32px', borderRadius: '8px',
+                background: 'linear-gradient(135deg, rgba(79,70,229,0.1), rgba(139,92,246,0.06))',
+                border: '1px solid rgba(79,70,229,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--color-primary)',
+              }}>
+                <UploadCloud size={15} />
+              </div>
+              <h3>Import Roster</h3>
+            </div>
             <button 
               className="btn-secondary" 
               onClick={() => setCsvTextMode(!csvTextMode)}
               style={{ padding: '6px 12px', fontSize: '12px' }}
             >
-              {csvTextMode ? "Switch to File Upload" : "Switch to Paste CSV Text"}
+              {csvTextMode ? '📁 File Upload' : '📋 Paste CSV'}
             </button>
           </div>
 
           {csvTextMode ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div className="form-group">
-                <label>Paste CSV Contents (Format: Register No, Name, Department)</label>
+                <label>Paste CSV Contents (Register No, Name, Department)</label>
                 <textarea
                   rows={6}
                   placeholder="2024CSE001, John Smith, CSE&#10;2024IT045, Jane Doe, IT&#10;2024ECE012, Alex Jones, ECE"
                   value={manualCsvText}
                   onChange={(e) => setManualCsvText(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-color)',
-                    fontFamily: 'monospace',
-                    fontSize: '13px',
-                    resize: 'vertical'
-                  }}
+                  style={{ fontFamily: 'monospace', fontSize: '13px', resize: 'vertical' }}
                 />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button 
                   className="btn-primary" 
                   onClick={handleUploadSubmit}
                   disabled={isUploading || !manualCsvText.trim()}
                 >
-                  {isUploading ? "Uploading..." : "Import CSV Text"}
+                  {isUploading ? 'Importing…' : 'Import CSV Text'}
                 </button>
               </div>
             </div>
           ) : (
-            <div 
-              className="uploader-box"
-              onDragEnter={handleDrag}
-              onDragOver={handleDrag}
-              onDragLeave={handleDrag}
-              onDrop={handleDrop}
-              onClick={onButtonClick}
-              style={{ borderColor: dragActive ? 'var(--color-primary)' : 'var(--color-primary-alpha-40)' }}
-            >
-              <input 
-                type="file" 
-                ref={fileInputRef}
-                style={{ display: 'none' }}
-                onChange={handleFileChange}
-                accept=".csv,.xlsx,.xls"
-              />
-
-              <div className="uploader-icon">
-                <UploadCloud />
-              </div>
-
-              <div className="uploader-text">
-                <h4>Drag & Drop Files Here</h4>
-                <p>Upload CSV files containing student information for automatic processing.</p>
-              </div>
-
-              <button 
-                className="btn-primary" 
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onButtonClick();
+            <>
+              <div 
+                className="uploader-box"
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                onClick={onButtonClick}
+                style={{
+                  borderColor: dragActive ? 'var(--color-primary)' : undefined,
+                  background: dragActive
+                    ? 'radial-gradient(ellipse at center, var(--color-primary-alpha-20) 0%, transparent 80%)'
+                    : undefined,
                 }}
               >
-                Browse Files
-              </button>
-
-              <span className="uploader-file-info">
-                Supported formats: CSV, Excel (.xlsx, .xls) &nbsp;·&nbsp; Maximum file size: 50 MB
-              </span>
+                <input 
+                  type="file" 
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  onChange={handleFileChange}
+                  accept=".csv,.xlsx,.xls"
+                />
+                <div className="uploader-icon"><UploadCloud /></div>
+                <div className="uploader-text">
+                  <h4>{dragActive ? 'Drop to Upload!' : 'Drag & Drop Files Here'}</h4>
+                  <p>Upload CSV files containing student information for automatic processing.</p>
+                </div>
+                <button 
+                  className="btn-primary" 
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onButtonClick(); }}
+                >
+                  Browse Files
+                </button>
+                <span className="uploader-file-info">
+                  Supported: CSV, Excel (.xlsx, .xls) · Max 50 MB
+                </span>
+              </div>
 
               {selectedFile && (
-                <div style={{ 
-                  marginTop: '8px', 
-                  padding: '8px 16px', 
-                  backgroundColor: 'var(--color-primary-light)', 
-                  color: 'var(--color-primary)',
-                  borderRadius: 'var(--radius-sm)',
-                  fontWeight: 600,
-                  fontSize: '13px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <FileSpreadsheet size={16} />
-                  <span>Selected: {selectedFile.name}</span>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedFile(null);
-                    }}
-                    style={{ 
-                      background: 'none', 
-                      border: 'none', 
-                      color: 'var(--color-error)', 
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      padding: '0 4px'
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
+                <>
+                  <div style={{ 
+                    padding: '10px 16px',
+                    background: 'linear-gradient(135deg, rgba(79,70,229,0.08), rgba(139,92,246,0.05))',
+                    border: '1px solid rgba(79,70,229,0.2)',
+                    borderRadius: '10px',
+                    fontWeight: 600, fontSize: '13px', color: 'var(--color-primary)',
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                  }}>
+                    <FileSpreadsheet size={16} />
+                    <span style={{ flex: 1 }}>Selected: {selectedFile.name}</span>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
+                      style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', fontWeight: 'bold' }}
+                    >✕</button>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button className="btn-primary" onClick={handleUploadSubmit} disabled={isUploading}>
+                      {isUploading ? 'Uploading…' : 'Confirm Upload'}
+                    </button>
+                  </div>
+                </>
               )}
-            </div>
-          )}
-
-          {selectedFile && !csvTextMode && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button 
-                className="btn-primary" 
-                onClick={handleUploadSubmit}
-                disabled={isUploading}
-              >
-                {isUploading ? "Uploading..." : "Confirm Upload"}
-              </button>
-            </div>
+            </>
           )}
         </div>
 
         {/* Right Side: Upload History Panel */}
         <div className="card-container" style={{ height: 'fit-content', maxHeight: '450px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div className="card-title-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>Upload History</h3>
+          <div className="card-title-bar">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '32px', height: '32px', borderRadius: '8px',
+                background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(5,150,105,0.06))',
+                border: '1px solid rgba(16,185,129,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--color-success)',
+              }}>
+                <Database size={15} />
+              </div>
+              <h3>Upload History</h3>
+            </div>
             {uploads && uploads.length > 0 && (
               <button 
                 onClick={onClearUploadHistory}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--color-error)',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  transition: 'background-color 0.2s'
+                  background: 'none', border: '1px solid var(--border-color)',
+                  color: 'var(--color-error)', fontSize: '12px', fontWeight: 700,
+                  cursor: 'pointer', padding: '5px 12px', borderRadius: '8px',
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  transition: 'all 0.15s', fontFamily: 'var(--font-primary)',
                 }}
-                onMouseOver={(e) => e.target.style.backgroundColor = 'var(--color-error-bg)'}
-                onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+                onMouseOver={(e) => { e.currentTarget.style.background = 'var(--color-error-bg)'; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = 'none'; }}
               >
-                Clear History
+                <Trash2 size={12} />
+                Clear
               </button>
             )}
           </div>
 
           <div className="activity-list" style={{ flex: 1, overflowY: 'auto' }}>
             {uploads.length === 0 ? (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px 16px' }}>
-                <UploadCloud size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
-                <p style={{ fontSize: '14px', margin: 0 }}>No upload history yet.</p>
-                <p style={{ fontSize: '12px', margin: '4px 0 0', color: 'var(--text-muted)' }}>Upload a CSV or Excel file to see history here.</p>
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--bg-app)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <UploadCloud size={22} style={{ opacity: 0.4 }} />
+                </div>
+                <p style={{ fontSize: '13px', margin: 0, fontWeight: 600 }}>No upload history yet</p>
+                <p style={{ fontSize: '12px', margin: 0 }}>Upload a file to see logs here.</p>
               </div>
             ) : (
-              uploads.map((log) => (
-                <div className="activity-item" key={log._id}>
+              uploads.map((log, index) => (
+                <div className="activity-item" key={`${log._id || log.id || 'log'}-${index}`}>
                   <div 
                     className="activity-dot" 
                     style={{ backgroundColor: log.status === 'SUCCESS' ? 'var(--color-success)' : 'var(--color-error)' }} 
                   />
                   <div className="activity-content">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="activity-title" style={{ fontSize: '13px', wordBreak: 'break-all', maxWidth: '75%' }}>{log.filename}</span>
+                      <span className="activity-title" style={{ wordBreak: 'break-all', maxWidth: '75%' }}>{log.filename}</span>
                       <span className={`status-pill ${log.status === 'SUCCESS' ? 'success' : 'error'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
                         {log.status}
                       </span>
                     </div>
                     {log.status === 'SUCCESS' ? (
-                      <span className="activity-desc" style={{ fontSize: '11px' }}>Imported {log.recordCount} Records</span>
+                      <span className="activity-desc">Imported {log.recordCount} records</span>
                     ) : (
-                      <span className="activity-desc" style={{ fontSize: '11px', color: 'var(--color-error)' }}>{log.errorMessage}</span>
+                      <span className="activity-desc" style={{ color: 'var(--color-error)' }}>{log.errorMessage}</span>
                     )}
                     <span className="activity-time">
                       {new Date(log.uploadedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
@@ -359,112 +352,102 @@ function UploadDataView({ students, uploads, onUpload, onClear, refreshData, onC
         </div>
       </div>
 
-      {/* Full-Width Student Database Browser */}
+      {/* Student Records Table */}
       <div className="card-container">
         <div className="card-title-bar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Database size={18} style={{ color: 'var(--text-secondary)' }} />
-            <h3>Student Records Database</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '32px', height: '32px', borderRadius: '8px',
+              background: 'linear-gradient(135deg, rgba(6,182,212,0.1), rgba(14,165,233,0.06))',
+              border: '1px solid rgba(6,182,212,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#0ea5e9',
+            }}>
+              <Database size={15} />
+            </div>
+            <h3>Student Records</h3>
             {students.length > 0 && (
               <span style={{
-                fontSize: '12px',
-                fontWeight: 600,
-                padding: '2px 10px',
-                borderRadius: '9999px',
-                backgroundColor: 'var(--color-primary-light)',
-                color: 'var(--color-primary)',
-                marginLeft: '4px'
+                fontSize: '11px', fontWeight: 700, padding: '3px 9px',
+                borderRadius: '9999px', background: 'rgba(6,182,212,0.08)',
+                color: '#0ea5e9', border: '1px solid rgba(6,182,212,0.2)',
               }}>
                 {students.length} records
               </span>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="btn-secondary" onClick={refreshData} title="Refresh Records">
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn-icon" onClick={refreshData} title="Refresh Records">
               <RefreshCw size={14} />
             </button>
             <button 
               className="btn-danger" 
               onClick={onClear} 
               disabled={students.length === 0}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{ padding: '7px 14px', fontSize: '13px' }}
             >
-              <Trash2 size={14} />
-              <span>Clear Database</span>
+              <Trash2 size={13} />
+              Clear Database
             </button>
           </div>
         </div>
 
         {/* Search and Filters */}
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <div className="header-search" style={{ flex: 1, width: 'auto' }}>
-            <Search size={16} style={{ top: '50%' }} />
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch' }}>
+          <div style={{
+            flex: 1, display: 'flex', alignItems: 'center', gap: '10px',
+            background: 'var(--bg-app)', border: '1.5px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)', padding: '9px 14px',
+            transition: 'border-color 0.15s',
+          }}
+          onFocusCapture={(e) => { e.currentTarget.style.borderColor = 'var(--border-focus)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--border-focus-glow)'; }}
+          onBlurCapture={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.boxShadow = 'none'; }}
+          >
+            <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <input 
               type="text" 
-              placeholder="Search students by name or roll number..." 
+              placeholder="Search by name or register number…" 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ borderRadius: 'var(--radius-md)' }}
+              style={{ border: 'none', background: 'none', outline: 'none', fontSize: '13.5px', color: 'var(--text-primary)', width: '100%', fontFamily: 'var(--font-primary)' }}
             />
           </div>
-
-          <div className="form-group" style={{ width: '180px' }}>
-            <select 
-              value={deptFilter} 
-              onChange={(e) => setDeptFilter(e.target.value)}
-              style={{ height: '100%' }}
-            >
-              {departments.map(d => (
-                <option key={d} value={d}>Dept: {d}</option>
-              ))}
+          <div className="form-group" style={{ width: '170px', margin: 0 }}>
+            <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
+              {departments.map(d => <option key={d} value={d}>Dept: {d}</option>)}
             </select>
           </div>
         </div>
 
-        {/* Students Table - Full Width with Horizontal Scroll */}
+        {/* Students Table */}
         <div className="table-wrapper" style={{ maxHeight: isTableExpanded ? '600px' : 'none', overflowY: isTableExpanded ? 'auto' : 'visible' }}>
           <table className="data-table">
             <thead style={{ position: isTableExpanded ? 'sticky' : 'static', top: 0, zIndex: 2 }}>
               <tr>
-                <th style={{ whiteSpace: 'nowrap' }}>#</th>
-                {tableHeaders.map((header) => (
-                  <th key={header} style={{ whiteSpace: 'nowrap' }}>{header}</th>
-                ))}
+                <th>#</th>
+                {tableHeaders.map((header) => <th key={header} style={{ whiteSpace: 'nowrap' }}>{header}</th>)}
               </tr>
             </thead>
             <tbody>
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={tableHeaders.length + 1} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
-                    {students.length === 0 ? "No student records uploaded yet." : "No records match search filters."}
+                  <td colSpan={tableHeaders.length + 1} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
+                    {students.length === 0 ? 'No student records uploaded yet.' : 'No records match your search filters.'}
                   </td>
                 </tr>
               ) : (
                 displayedStudents.map((s, rowIndex) => (
-                  <tr key={s._id || s.registerNo}>
-                    <td style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 500 }}>
-                      {rowIndex + 1}
-                    </td>
+                  <tr key={`${s._id || s.registerNo || 'std'}-${rowIndex}`}>
+                    <td style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 500 }}>{rowIndex + 1}</td>
                     {tableHeaders.map((header, index) => {
                       const value = getCellValue(s, header);
                       const isFirst = index === 0;
                       const headerLower = header.toLowerCase();
                       const isDept = headerLower.includes('dept') || headerLower.includes('depart') || headerLower.includes('branch') || headerLower.includes('course') || headerLower.includes('subject');
                       const isBatch = headerLower.includes('batch') || headerLower.includes('year');
-
                       return (
-                        <td 
-                          key={header} 
-                          style={{
-                            ...(isFirst ? { fontWeight: 600 } : isBatch ? { color: 'var(--text-secondary)' } : {}),
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          {isDept ? (
-                            <span className="status-pill info">{value}</span>
-                          ) : (
-                            value
-                          )}
+                        <td key={header} style={{ ...(isFirst ? { fontWeight: 600 } : isBatch ? { color: 'var(--text-secondary)' } : {}), whiteSpace: 'nowrap' }}>
+                          {isDept ? <span className="status-pill info">{value}</span> : value}
                         </td>
                       );
                     })}
@@ -480,42 +463,17 @@ function UploadDataView({ students, uploads, onUpload, onClear, refreshData, onC
           {hasMoreRows && (
             <button
               onClick={() => setIsTableExpanded(!isTableExpanded)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 16px',
-                background: 'var(--color-primary-light)',
-                color: 'var(--color-primary)',
-                border: '1px solid var(--color-primary-alpha-40)',
-                borderRadius: 'var(--radius-md)',
-                cursor: 'pointer',
-                fontWeight: 600,
-                fontSize: '12px',
-                transition: 'all 0.25s ease',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'var(--color-primary)';
-                e.currentTarget.style.color = '#fff';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'var(--color-primary-light)';
-                e.currentTarget.style.color = 'var(--color-primary)';
-              }}
+              className="btn-secondary"
+              style={{ padding: '6px 14px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
               {isTableExpanded ? (
-                <>
-                  <ChevronUp size={14} style={{ transition: 'transform 0.3s ease' }} />
-                  View Less
-                </>
+                <><ChevronUp size={14} /> View Less</>
               ) : (
-                <>
-                  <ChevronDown size={14} style={{ transition: 'transform 0.3s ease' }} />
-                  View More ({filteredStudents.length - ROWS_TO_SHOW} more)
-                </>
+                <><ChevronDown size={14} /> View More ({filteredStudents.length - ROWS_TO_SHOW} more)</>
               )}
             </button>
           )}
+
         </div>
       </div>
     </div>

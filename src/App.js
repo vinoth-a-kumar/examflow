@@ -12,16 +12,18 @@ import LoginView from './views/LoginView';
 
 function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
-  const [searchQuery, setSearchQuery] = useState('');
   
   // Auth & Theme States
   const [user, setUser] = useState(() => {
-    const isBypassNetwork = ['localhost', '127.0.0.1', '10.106.232.208'].includes(window.location.hostname);
-    if (isBypassNetwork) {
-      return { username: 'Admin', email: 'admin@examflow.com' };
-    }
     const savedUser = localStorage.getItem('examflow-user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    if (savedUser) {
+      try {
+        return JSON.parse(savedUser);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return null;
   });
 
   const [theme, setTheme] = useState(() => {
@@ -50,12 +52,36 @@ function App() {
       ? `${currentYear - 1}-${String(currentYear).slice(-2)}` 
       : `${currentYear}-${String(currentYear + 1).slice(-2)}`;
 
-    return saved ? JSON.parse(saved) : {
-      name: 'ExamFlow Engineering College',
-      logo: '', 
-      address: '123 University Campus, Tech City, 600001',
+    const defaultDetails = {
+      name: "Rajapalayam Rajus' College",
+      logo: '/college-logo.png', 
+      address: 'Rajapalayam, Tamil Nadu, 626117',
       academicYear: autoYear
     };
+
+    if (!saved) {
+      localStorage.setItem('examflow-college-details', JSON.stringify(defaultDetails));
+      return defaultDetails;
+    }
+
+    try {
+      const parsed = JSON.parse(saved);
+      // Auto-migrate old default college details or empty logo
+      const isOldName = parsed.name === 'ExamFlow Engineering College' || parsed.name === 'ExamFlow AI';
+      if (isOldName || !parsed.logo || parsed.logo === '' || parsed.logo.includes('logo.svg') || parsed.logo.includes('logo192') || parsed.logo.includes('favicon.ico') || (typeof parsed.logo === 'string' && parsed.logo.startsWith('data:'))) {
+        const updated = {
+          ...parsed,
+          name: isOldName ? "Rajapalayam Rajus' College" : (parsed.name || "Rajapalayam Rajus' College"),
+          logo: '/college-logo.png',
+          address: parsed.address === '123 University Campus, Tech City, 600001' ? 'Rajapalayam, Tamil Nadu, 626117' : (parsed.address || 'Rajapalayam, Tamil Nadu, 626117')
+        };
+        localStorage.setItem('examflow-college-details', JSON.stringify(updated));
+        return updated;
+      }
+      return parsed;
+    } catch (e) {
+      return defaultDetails;
+    }
   });
 
   const handleSaveCollegeDetails = (details) => {
@@ -70,12 +96,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    const isBypassNetwork = ['localhost', '127.0.0.1', '10.106.232.208'].includes(window.location.hostname);
-    if (isBypassNetwork) {
-      setUser({ username: 'Admin', email: 'admin@examflow.com' });
-    } else {
-      setUser(null);
-    }
+    setUser(null);
     localStorage.removeItem('examflow-user');
   };
 
@@ -148,6 +169,33 @@ function App() {
   };
 
   useEffect(() => {
+    // Migrate old settings dynamically if found
+    const saved = localStorage.getItem('examflow-college-details');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if ((parsed.name && parsed.name.includes('ExamFlow')) || !parsed.logo || parsed.logo === '' || parsed.logo.includes('logo.svg') || parsed.logo.includes('logo192') || parsed.logo.includes('favicon.ico') || (typeof parsed.logo === 'string' && parsed.logo.startsWith('data:'))) {
+          const today = new Date();
+          const currentYear = today.getFullYear();
+          const currentMonth = today.getMonth();
+          const autoYear = currentMonth < 5 
+            ? `${currentYear - 1}-${String(currentYear).slice(-2)}` 
+            : `${currentYear}-${String(currentYear + 1).slice(-2)}`;
+
+          const updated = {
+            name: "Rajapalayam Rajus' College",
+            logo: '/college-logo.png',
+            address: 'Rajapalayam, Tamil Nadu, 626117',
+            academicYear: parsed.academicYear || autoYear
+          };
+          localStorage.setItem('examflow-college-details', JSON.stringify(updated));
+          setCollegeDetails(updated);
+        }
+      } catch (e) {
+        console.error("LocalStorage migration failed: ", e);
+      }
+    }
+
     fetchAllData();
     // Auto-refresh stats/activities periodically
     const timer = setInterval(fetchAllData, 10000);
@@ -185,26 +233,6 @@ function App() {
         console.error(err);
         alert("Failed to clear hall records.");
       }
-    }
-  };
-
-  // Add Hall
-  const handleAddHall = async (hallData) => {
-    try {
-      const resp = await fetch('http://localhost:5000/api/halls', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(hallData)
-      });
-      if (resp.ok) {
-        fetchAllData();
-      } else {
-        const err = await resp.json();
-        alert("Failed to add hall: " + err.error);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Network error adding hall.");
     }
   };
 
@@ -274,25 +302,6 @@ function App() {
     }
   };
 
-  // Update Hall
-  const handleUpdateHall = async (id, hallData) => {
-    try {
-      const resp = await fetch(`http://localhost:5000/api/halls/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(hallData)
-      });
-      if (resp.ok) {
-        fetchAllData();
-      } else {
-        const err = await resp.json();
-        alert("Failed to update hall: " + err.error);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Network error updating hall.");
-    }
-  };
 
   // Reset entire database (Students, Halls, Exams, Seating Plans)
   const handleClearAll = async () => {
@@ -360,7 +369,7 @@ function App() {
   const renderView = () => {
     switch (currentTab) {
       case 'dashboard':
-        return <DashboardView stats={stats} activities={activities} setTab={setCurrentTab} onUpdateHall={handleUpdateHall} onClearActivities={handleClearActivities} />;
+        return <DashboardView stats={stats} activities={activities} setTab={setCurrentTab} onClearActivities={handleClearActivities} />;
       case 'upload':
         return (
           <UploadDataView 
@@ -401,12 +410,20 @@ function App() {
             refreshData={fetchAllData}
             currentTheme={theme}
             onChangeTheme={handleThemeChange}
-            collegeDetails={collegeDetails}
-            onSaveCollegeDetails={handleSaveCollegeDetails}
           />
         );
       case 'profile':
-        return <ProfileView />;
+        return (
+          <ProfileView 
+            user={user} 
+            collegeDetails={collegeDetails} 
+            onSaveCollegeDetails={handleSaveCollegeDetails}
+            onSaveUser={(updatedUser) => {
+              setUser(updatedUser);
+              localStorage.setItem('examflow-user', JSON.stringify(updatedUser));
+            }}
+          />
+        );
       default:
         return <DashboardView stats={stats} activities={activities} setTab={setCurrentTab} onClearActivities={handleClearActivities} />;
     }
@@ -420,26 +437,25 @@ function App() {
         alignItems: 'center',
         justifyContent: 'center',
         height: '100vh',
-        backgroundColor: 'var(--bg-app)',
+        background: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)',
         fontFamily: 'var(--font-primary)'
       }}>
         <div style={{
-          width: '50px',
-          height: '50px',
-          border: '5px solid var(--border-color)',
-          borderTopColor: 'var(--color-primary)',
+          width: '56px',
+          height: '56px',
+          border: '4px solid rgba(79,70,229,0.2)',
+          borderTopColor: '#818cf8',
           borderRadius: '50%',
-          animation: 'spin 1s linear infinite'
+          animation: 'spinSlow 0.85s linear infinite'
         }} />
-        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-        <h3 style={{ marginTop: '20px', color: 'var(--text-primary)', fontFamily: 'var(--font-display)', fontWeight: 700 }}>Loading ExamFlow</h3>
-        <p style={{ marginTop: '8px', color: 'var(--text-secondary)', fontSize: '13px' }}>Establishing backend controller connection...</p>
+        <h3 style={{ marginTop: '24px', color: '#e0e7ff', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '22px', letterSpacing: '-0.5px' }}>ExamFlow</h3>
+        <p style={{ marginTop: '8px', color: 'rgba(148,163,184,0.7)', fontSize: '13px', fontWeight: 500 }}>Establishing connection...</p>
       </div>
     );
   }
 
   if (!user) {
-    return <LoginView onLoginSuccess={handleLogin} />;
+    return <LoginView onLoginSuccess={handleLogin} collegeDetails={collegeDetails} />;
   }
 
   return (
@@ -450,6 +466,7 @@ function App() {
         setCurrentTab={setCurrentTab} 
         user={user}
         collegeDetails={collegeDetails}
+        onLogout={handleLogout}
       />
 
       {/* Main View Area */}
