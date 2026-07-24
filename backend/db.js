@@ -247,17 +247,95 @@ async function createTables() {
 // Start database initialization
 initMysql();
 
+function safeParseJson(value, fallback = []) {
+  if (!value) return fallback;
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch (err) {
+    return fallback;
+  }
+}
+
+function parseExam(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    departments: safeParseJson(row.departments, []),
+    subjectCodes: safeParseJson(row.subjectCodes, []),
+    assignedHalls: safeParseJson(row.assignedHalls, []),
+    seatsPerBench: row.seatsPerBench || 2,
+    studentsCount: row.studentsCount || 0,
+    time: row.time || ''
+  };
+}
+
+function parseSeatingPlan(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    seatingGrid: safeParseJson(row.seatingGrid, []),
+    attendanceRoster: safeParseJson(row.attendanceRoster, []),
+    unseatedStudents: safeParseJson(row.unseatedStudents, []),
+    totalBenches: row.totalBenches || 0,
+    totalStudents: row.totalStudents || 0,
+    emptySeats: row.emptySeats || 0
+  };
+}
+
+async function runQuery(sql, params = []) {
+  if (!isMysqlConnected || !pool) {
+    throw new Error('MySQL is not connected.');
+  }
+  const [rows] = await pool.query(sql, params);
+  return rows;
+}
+
+async function safeMysqlQuery(fn) {
+  if (!isMysqlConnected || !pool) return null;
+  try {
+    return await fn();
+  } catch (err) {
+    const isNetworkOrDbError = (err.code && (
+      err.code.startsWith('ER_') ||
+      err.code === 'ECONNREFUSED' ||
+      err.code === 'PROTOCOL_CONNECTION_LOST' ||
+      err.code === 'ENOTFOUND' ||
+      err.code === 'EHOSTUNREACH'
+    )) || (err.message && (err.message.includes('MySQL is not connected') || err.message.includes('pool')));
+
+    if (isNetworkOrDbError) {
+      console.warn(`[Database Fallback] Genuine MySQL database error (${err.message}). Falling back to Local JSON storage.`);
+      isMysqlConnected = false;
+      return null;
+    } else {
+      console.error(`[Application Error in MySQL operation]`, err);
+      throw err;
+    }
+  }
+}
+
+const buildWhere = (query = {}) => {
+  const keys = Object.keys(query).filter(k => query[k] !== undefined && query[k] !== null);
+  if (keys.length === 0) return { clause: '', values: [] };
+  const clauses = keys.map(k => `\`${k}\` = ?`);
+  const values = keys.map(k => query[k]);
+  return { clause: ' WHERE ' + clauses.join(' AND '), values };
+};
+
 const Models = {
   Student: {
     find: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         const rows = await runQuery(`SELECT * FROM students${clause} ORDER BY idx ASC`, values);
         return rows.map(r => ({
           ...r,
           csvData: r.csvData ? JSON.parse(r.csvData) : null
         }));
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
+
       // Fallback
       let data = readJson('students');
       if (query.registerNo) data = data.filter(s => s.registerNo === query.registerNo);
@@ -265,7 +343,7 @@ const Models = {
       return data;
     },
     findOne: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         const rows = await runQuery(`SELECT * FROM students${clause} LIMIT 1`, values);
         if (rows[0]) {
@@ -275,7 +353,9 @@ const Models = {
           };
         }
         return null;
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
+
       // Fallback
       const data = readJson('students');
       return data.find(s => {
@@ -286,11 +366,10 @@ const Models = {
       }) || null;
     },
     create: async (doc) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const docs = Array.isArray(doc) ? doc : [doc];
         const added = [];
         for (let item of docs) {
-          // Delete existing student to update order/idx and avoid duplicates
           await runQuery(`DELETE FROM students WHERE registerNo = ?`, [item.registerNo]);
           const _id = generateId();
           await runQuery(
@@ -300,13 +379,14 @@ const Models = {
           added.push({ _id, ...item, batch: item.batch || '2024-25' });
         }
         return Array.isArray(doc) ? added : added[0];
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
+
       // Fallback
       const docs = Array.isArray(doc) ? doc : [doc];
       let data = readJson('students');
       const added = [];
       for (let item of docs) {
-        // Remove existing from JSON to update order
         data = data.filter(s => s.registerNo !== item.registerNo);
         const newItem = { _id: generateId(), ...item };
         data.push(newItem);
@@ -316,7 +396,7 @@ const Models = {
       return Array.isArray(doc) ? added : added[0];
     },
     deleteMany: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         if (Object.keys(query).length === 0) {
           await runQuery(`TRUNCATE TABLE students`);
           return { deletedCount: 0 };
@@ -324,7 +404,9 @@ const Models = {
         const { clause, values } = buildWhere(query);
         const res = await runQuery(`DELETE FROM students${clause}`, values);
         return { deletedCount: res.affectedRows };
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
+
       // Fallback
       if (Object.keys(query).length === 0) {
         writeJson('students', []);
@@ -342,48 +424,46 @@ const Models = {
       return { deletedCount: prevLen - data.length };
     },
     countDocuments: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         const rows = await runQuery(`SELECT COUNT(*) as count FROM students${clause}`, values);
         return rows[0].count;
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
+
       // Fallback
-      const data = readJson('students');
-      if (Object.keys(query).length === 0) return data.length;
-      return data.filter(s => {
-        for (let key in query) {
-          if (s[key] !== query[key]) return false;
-        }
-        return true;
-      }).length;
+      let data = readJson('students');
+      if (query.department) data = data.filter(s => s.department === query.department);
+      return data.length;
     }
   },
 
   Hall: {
     find: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         const rows = await runQuery(`SELECT * FROM halls${clause} ORDER BY idx ASC`, values);
         return rows.map(r => ({
           ...r,
           csvData: r.csvData ? JSON.parse(r.csvData) : null
         }));
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       return readJson('halls');
     },
     findById: async (id) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const rows = await runQuery(`SELECT * FROM halls WHERE \`_id\` = ? LIMIT 1`, [id]);
         return rows[0] || null;
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       const data = readJson('halls');
       return data.find(h => h._id === id) || null;
     },
     create: async (doc) => {
-      if (isMysqlConnected) {
-        // Delete existing hall with same name to avoid duplicates and ensure correct order
+      const mysqlRes = await safeMysqlQuery(async () => {
         await runQuery(`DELETE FROM halls WHERE name = ?`, [doc.name]);
         const _id = generateId();
         await runQuery(
@@ -391,7 +471,8 @@ const Models = {
           [_id, doc.name, doc.rows, doc.columns, doc.capacity, doc.benches, JSON.stringify(doc.csvData || null)]
         );
         return { _id, ...doc };
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       let data = readJson('halls');
       data = data.filter(h => h.name !== doc.name);
@@ -401,13 +482,14 @@ const Models = {
       return newItem;
     },
     findByIdAndUpdate: async (id, doc) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         await runQuery(
           `UPDATE halls SET \`name\` = ?, \`rows\` = ?, \`columns\` = ?, \`capacity\` = ?, \`benches\` = ? WHERE \`_id\` = ?`,
           [doc.name, doc.rows, doc.columns, doc.capacity, doc.benches, id]
         );
         return { _id: id, ...doc };
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       const data = readJson('halls');
       const idx = data.findIndex(h => h._id === id);
@@ -419,12 +501,13 @@ const Models = {
       return null;
     },
     findByIdAndDelete: async (id) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const rows = await runQuery(`SELECT * FROM halls WHERE \`_id\` = ? LIMIT 1`, [id]);
         if (rows.length === 0) return null;
         await runQuery(`DELETE FROM halls WHERE \`_id\` = ?`, [id]);
         return rows[0];
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       let data = readJson('halls');
       const item = data.find(h => h._id === id);
@@ -433,7 +516,7 @@ const Models = {
       return item || null;
     },
     deleteMany: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         if (Object.keys(query).length === 0) {
           await runQuery(`TRUNCATE TABLE halls`);
           return { deletedCount: 0 };
@@ -441,7 +524,8 @@ const Models = {
         const { clause, values } = buildWhere(query);
         const res = await runQuery(`DELETE FROM halls${clause}`, values);
         return { deletedCount: res.affectedRows };
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       if (Object.keys(query).length === 0) {
         writeJson('halls', []);
@@ -459,10 +543,11 @@ const Models = {
       return { deletedCount: prevLen - data.length };
     },
     countDocuments: async () => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const rows = await runQuery(`SELECT COUNT(*) as count FROM halls`);
         return rows[0].count;
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       return readJson('halls').length;
     }
@@ -470,27 +555,29 @@ const Models = {
 
   Exam: {
     find: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         const rows = await runQuery(`SELECT * FROM exams${clause}`, values);
         return rows.map(parseExam);
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       let data = readJson('exams');
       if (query.status) data = data.filter(e => e.status === query.status);
       return data;
     },
     findById: async (id) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const rows = await runQuery(`SELECT * FROM exams WHERE \`_id\` = ? LIMIT 1`, [id]);
         return parseExam(rows[0]);
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       const data = readJson('exams');
       return data.find(e => e._id === id) || null;
     },
     create: async (doc) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const _id = generateId();
         await runQuery(
           `INSERT INTO exams (\`_id\`, \`name\`, \`departments\`, \`subjectCodes\`, \`date\`, \`session\`, \`studentsCount\`, \`status\`, \`assignedHalls\`, \`seatsPerBench\`, \`time\`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -509,7 +596,8 @@ const Models = {
           ]
         );
         return { _id, ...doc, departments: doc.departments || [], subjectCodes: doc.subjectCodes || [], assignedHalls: doc.assignedHalls || [], seatsPerBench: doc.seatsPerBench || 2, time: doc.time || '' };
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       const data = readJson('exams');
       const newItem = { _id: generateId(), ...doc };
@@ -518,7 +606,7 @@ const Models = {
       return newItem;
     },
     findByIdAndUpdate: async (id, doc) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         await runQuery(
           `UPDATE exams SET \`name\` = ?, \`departments\` = ?, \`subjectCodes\` = ?, \`date\` = ?, \`session\` = ?, \`studentsCount\` = ?, \`assignedHalls\` = ?, \`seatsPerBench\` = ?, \`time\` = ? WHERE \`_id\` = ?`,
           [
@@ -535,7 +623,8 @@ const Models = {
           ]
         );
         return { _id: id, ...doc };
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       const data = readJson('exams');
       const idx = data.findIndex(e => e._id === id);
@@ -547,12 +636,13 @@ const Models = {
       return null;
     },
     findByIdAndDelete: async (id) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const rows = await runQuery(`SELECT * FROM exams WHERE \`_id\` = ? LIMIT 1`, [id]);
         if (rows.length === 0) return null;
         await runQuery(`DELETE FROM exams WHERE \`_id\` = ?`, [id]);
         return parseExam(rows[0]);
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       let data = readJson('exams');
       const item = data.find(e => e._id === id);
@@ -561,11 +651,12 @@ const Models = {
       return item || null;
     },
     countDocuments: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         const rows = await runQuery(`SELECT COUNT(*) as count FROM exams${clause}`, values);
         return rows[0].count;
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       let data = readJson('exams');
       if (query.status) data = data.filter(e => e.status === query.status);
@@ -575,11 +666,12 @@ const Models = {
 
   SeatingPlan: {
     find: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         const rows = await runQuery(`SELECT * FROM seating_plans${clause}`, values);
         return rows.map(parseSeatingPlan);
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       let data = readJson('seating_plans');
       if (query.examId) data = data.filter(p => p.examId === query.examId);
@@ -587,11 +679,12 @@ const Models = {
       return data;
     },
     findOne: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         const rows = await runQuery(`SELECT * FROM seating_plans${clause} LIMIT 1`, values);
         return parseSeatingPlan(rows[0]);
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       const data = readJson('seating_plans');
       return data.find(p => {
@@ -602,8 +695,7 @@ const Models = {
       }) || null;
     },
     create: async (doc) => {
-      if (isMysqlConnected) {
-        // Delete old seating plan for same exam/hall if it exists
+      const mysqlRes = await safeMysqlQuery(async () => {
         await runQuery(`DELETE FROM seating_plans WHERE examId = ? AND hallId = ?`, [doc.examId, doc.hallId]);
         const _id = generateId();
         const generatedAt = new Date();
@@ -625,7 +717,8 @@ const Models = {
           ]
         );
         return { _id, ...doc, generatedAt };
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       const data = readJson('seating_plans');
       const filteredData = data.filter(p => !(p.examId === doc.examId && p.hallId === doc.hallId));
@@ -635,11 +728,12 @@ const Models = {
       return newItem;
     },
     deleteMany: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         const res = await runQuery(`DELETE FROM seating_plans${clause}`, values);
         return { deletedCount: res.affectedRows };
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       if (Object.keys(query).length === 0) {
         writeJson('seating_plans', []);
@@ -660,16 +754,17 @@ const Models = {
 
   UploadHistory: {
     find: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         return await runQuery(`SELECT * FROM upload_histories${clause} ORDER BY uploadedAt DESC`, values);
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       const data = readJson('upload_history');
       return data.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
     },
     create: async (doc) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const _id = generateId();
         const uploadedAt = new Date();
         await runQuery(
@@ -684,7 +779,8 @@ const Models = {
           ]
         );
         return { _id, ...doc, uploadedAt };
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       const data = readJson('upload_history');
       const newItem = { _id: generateId(), ...doc, uploadedAt: new Date() };
@@ -693,11 +789,12 @@ const Models = {
       return newItem;
     },
     deleteMany: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         const res = await runQuery(`DELETE FROM upload_histories${clause}`, values);
         return { deletedCount: res.affectedRows };
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       if (Object.keys(query).length === 0) {
         writeJson('upload_history', []);
@@ -709,10 +806,11 @@ const Models = {
 
   User: {
     find: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         return await runQuery(`SELECT * FROM users${clause}`, values);
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       let data = readJson('users');
       if (query.email) data = data.filter(u => u.email === query.email);
@@ -720,11 +818,12 @@ const Models = {
       return data;
     },
     findOne: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         const rows = await runQuery(`SELECT * FROM users${clause} LIMIT 1`, values);
         return rows[0] || null;
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       const data = readJson('users');
       return data.find(u => {
@@ -735,7 +834,7 @@ const Models = {
       }) || null;
     },
     create: async (doc) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const _id = generateId();
         const createdAt = new Date();
         await runQuery(
@@ -743,7 +842,8 @@ const Models = {
           [_id, doc.username, doc.email, doc.password, createdAt]
         );
         return { _id, ...doc, createdAt };
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       const data = readJson('users');
       const newItem = { _id: generateId(), ...doc, createdAt: new Date() };
@@ -752,11 +852,12 @@ const Models = {
       return newItem;
     },
     deleteMany: async (query = {}) => {
-      if (isMysqlConnected) {
+      const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         const res = await runQuery(`DELETE FROM users${clause}`, values);
         return { deletedCount: res.affectedRows };
-      }
+      });
+      if (mysqlRes !== null) return mysqlRes;
       // Fallback
       if (Object.keys(query).length === 0) {
         writeJson('users', []);

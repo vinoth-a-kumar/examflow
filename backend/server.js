@@ -214,6 +214,43 @@ const getPrintoutCount = () => {
 
 // API ROUTES
 
+// 0. Authentication
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { emailOrUsername, password } = req.body;
+    console.log(`[AUTH] Login request received for user: '${emailOrUsername || 'empty'}'`);
+    console.log(`[AUTH] Storage mode: ${dbStatus().mode}`);
+
+    if (!emailOrUsername || !password) {
+      console.log(`[AUTH] Response status: 400 (Missing input)`);
+      return res.status(400).json({ error: 'Username/Email and Password are required.' });
+    }
+
+    const inputLower = emailOrUsername.trim().toLowerCase();
+    const isAdminUser = inputLower === 'admin' || inputLower === 'admin@rajuscollege.edu.in' || inputLower === 'admin@examflow.com';
+    const isValidPassword = password === 'admin@123';
+
+    if (!isAdminUser || !isValidPassword) {
+      console.log(`[AUTH] Response status: 401 (Invalid credentials)`);
+      return res.status(401).json({ error: 'Invalid username or password. Please try again.' });
+    }
+
+    const user = {
+      _id: 'admin_master',
+      username: 'admin',
+      email: 'admin@rajuscollege.edu.in',
+      role: 'Administrator'
+    };
+
+    console.log(`[AUTH] Response status: 200 OK (User authenticated as Administrator)`);
+    logActivity('user', 'User Logged In', 'Administrator logged into the system.');
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('[AUTH] Login error:', error);
+    res.status(500).json({ error: 'Login server error: ' + error.message });
+  }
+});
+
 // 1. Connection Status
 app.get('/api/status', (req, res) => {
   res.json(dbStatus());
@@ -2857,60 +2894,6 @@ app.post('/api/auth/register', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { emailOrUsername, password } = req.body;
-    if (!emailOrUsername || !password) {
-      return res.status(400).json({ error: 'Username/Email and password are required.' });
-    }
-
-    const inputLower = emailOrUsername.trim().toLowerCase();
-    
-    // Find all users and match case-insensitively
-    const allUsers = await Models.User.find();
-    let user = allUsers.find(u => 
-      (u.email && u.email.toLowerCase() === inputLower) || 
-      (u.username && u.username.toLowerCase() === inputLower)
-    );
-
-    // Fallback for admin user if searching by 'admin' or 'admin@...' or if user table is empty
-    if (!user && (inputLower.includes('admin') || inputLower.startsWith('admin@') || allUsers.length === 0)) {
-      user = { username: 'admin', email: 'admin@examflow.com', password: hashPassword('admin') };
-    }
-
-    // Fallback to default admin user
-    if (!user) {
-      user = { username: 'admin', email: 'admin@examflow.com', password: hashPassword('admin') };
-    }
-
-    const hashedPassword = hashPassword(password);
-    
-    // Allow master admin passwords: 'admin', 'admin123', 'admin@123', 'password', '123456'
-    const cleanPassword = password.trim().toLowerCase();
-    const isMasterPassword = ['admin', 'admin123', 'admin@123', 'password', '123456'].includes(cleanPassword);
-    const isAdminUser = (user.username && user.username.toLowerCase() === 'admin') || 
-                        (user.email && user.email.toLowerCase().startsWith('admin@')) ||
-                        inputLower.includes('admin');
-
-    if (user.password !== hashedPassword && !(isAdminUser && isMasterPassword) && !isMasterPassword) {
-      return res.status(401).json({ error: 'Invalid username/email or password.' });
-    }
-
-    logActivity('user', 'User Logged In', `User '${user.username}' logged in successfully.`);
-
-    res.json({
-      success: true,
-      user: {
-        username: user.username,
-        email: user.email
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // Auto-seed default admin user if no users exist or update existing admin
 async function ensureAdminUser() {
   try {
@@ -2930,8 +2913,21 @@ async function ensureAdminUser() {
   }
 }
 
-// Start Server
-app.listen(PORT, async () => {
+// Start Server with Graceful EADDRINUSE Startup Protection
+const server = app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   await ensureAdminUser();
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log(`\n==================================================`);
+    console.log(`ExamFlow backend is already running on port ${PORT}.`);
+    console.log(`No duplicate server started.`);
+    console.log(`==================================================\n`);
+    process.exit(0);
+  } else {
+    console.error('Server startup error:', err);
+    process.exit(1);
+  }
 });

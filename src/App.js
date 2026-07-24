@@ -197,10 +197,15 @@ function App() {
     }
 
     fetchAllData();
-    // Auto-refresh stats/activities periodically
-    const timer = setInterval(fetchAllData, 10000);
-    return () => clearInterval(timer);
-  }, []);
+    // Auto-refresh stats/activities periodically if logged in
+    let timer = null;
+    if (user) {
+      timer = setInterval(fetchAllData, 15000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [user]);
 
   // CRUD Actions
   

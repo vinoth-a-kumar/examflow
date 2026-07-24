@@ -5,5 +5,13 @@
     "email": "admin@examflow.com",
     "password": "4c83bffb5953bd61924396415122c469f7c5fa57b6a3e083103f6d21a287aaec",
     "createdAt": "2026-06-23T09:51:06.195Z"
+  },
+  {
+    "_id": "user_1784902897219",
+    "username": "vinothannasamy",
+    "email": "vinothannasamy@gmail.com",
+    "role": "Administrator",
+    "password": "admin",
+    "createdAt": "2026-07-24T14:21:37.222Z"
   }
 ]
