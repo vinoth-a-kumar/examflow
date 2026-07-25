@@ -12,6 +12,23 @@ import LoginView from './views/LoginView';
 
 function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Auto-close mobile sidebar when window resizes to desktop width
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setIsMobileSidebarOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleTabChange = (tab) => {
+    setCurrentTab(tab);
+    setIsMobileSidebarOpen(false);
+  };
   
   // Auth & Theme States
   const [user, setUser] = useState(() => {
@@ -415,6 +432,7 @@ function App() {
             refreshData={fetchAllData}
             currentTheme={theme}
             onChangeTheme={handleThemeChange}
+            setTab={handleTabChange}
           />
         );
       case 'profile':
@@ -430,7 +448,7 @@ function App() {
           />
         );
       default:
-        return <DashboardView stats={stats} activities={activities} setTab={setCurrentTab} onClearActivities={handleClearActivities} />;
+        return <DashboardView stats={stats} activities={activities} setTab={handleTabChange} onClearActivities={handleClearActivities} />;
     }
   };
 
@@ -468,15 +486,21 @@ function App() {
       {/* Sidebar Navigation */}
       <Sidebar 
         currentTab={currentTab} 
-        setCurrentTab={setCurrentTab} 
+        setCurrentTab={handleTabChange} 
         user={user}
         collegeDetails={collegeDetails}
         onLogout={handleLogout}
+        isOpen={isMobileSidebarOpen}
+        onClose={() => setIsMobileSidebarOpen(false)}
       />
 
       {/* Main View Area */}
       <main className="main-content">
-        <Header collegeDetails={collegeDetails} />
+        <Header 
+          collegeDetails={collegeDetails} 
+          isMobileSidebarOpen={isMobileSidebarOpen}
+          onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+        />
         {renderView()}
       </main>
     </div>

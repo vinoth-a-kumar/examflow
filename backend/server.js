@@ -256,17 +256,27 @@ app.get('/api/status', (req, res) => {
   res.json(dbStatus());
 });
 
-// 1.1 System Info (Settings About Section)
+// 1.1 System Info (Settings Control Center)
 app.get('/api/settings/system-info', async (req, res) => {
   try {
     let sizeBytes = 0;
     const dataDir = path.join(__dirname, 'data');
     if (fs.existsSync(dataDir)) {
-      const files = fs.readdirSync(dataDir);
-      files.forEach(file => {
-        const stats = fs.statSync(path.join(dataDir, file));
-        sizeBytes += stats.size;
-      });
+      const getDirSize = (dir) => {
+        let size = 0;
+        const files = fs.readdirSync(dir);
+        files.forEach(file => {
+          const filePath = path.join(dir, file);
+          const stats = fs.statSync(filePath);
+          if (stats.isDirectory()) {
+            size += getDirSize(filePath);
+          } else {
+            size += stats.size;
+          }
+        });
+        return size;
+      };
+      sizeBytes += getDirSize(dataDir);
     }
 
     const studentCount = (await Models.Student.find()).length;
@@ -276,15 +286,17 @@ app.get('/api/settings/system-info', async (req, res) => {
     
     const isConnected = dbStatus().connected;
     if (isConnected) {
-      sizeBytes += (studentCount + hallCount + examCount + planCount) * 256; 
+      sizeBytes += (studentCount + hallCount + examCount + planCount) * 320; 
     }
 
-    const storageUsedKb = (sizeBytes / 1024).toFixed(2);
+    const storageUsedMb = (sizeBytes / (1024 * 1024)).toFixed(2);
+    const storageUsedKb = (sizeBytes / 1024).toFixed(1);
 
     res.json({
       projectVersion: 'v1.2.0',
-      databaseStatus: isConnected ? 'Connected (MySQL)' : 'Local JSON Fallback',
-      storageUsed: `${storageUsedKb} KB`,
+      databaseStatus: isConnected ? 'Connected (MySQL)' : 'Local JSON Mode',
+      databaseEngine: isConnected ? 'MySQL' : 'JSON Store',
+      storageUsed: sizeBytes >= 1024 * 1024 ? `${storageUsedMb} MB` : `${storageUsedKb} KB`,
       recordCounts: {
         students: studentCount,
         halls: hallCount,
@@ -306,20 +318,62 @@ app.get('/api/settings/backup', async (req, res) => {
     const exams = await Models.Exam.find();
     const seatingPlans = await Models.SeatingPlan.find();
     
-    res.json({
+    const backupPayload = {
       timestamp: new Date().toISOString(),
+      version: 'v1.2.0',
       students,
       halls,
       exams,
       seatingPlans
-    });
+    };
+
+    // Save snapshot to data/backups directory for backup history tracking
+    try {
+      const backupsDir = path.join(__dirname, 'data', 'backups');
+      if (!fs.existsSync(backupsDir)) {
+        fs.mkdirSync(backupsDir, { recursive: true });
+      }
+      const filename = `examflow_backup_${Date.now()}.json`;
+      fs.writeFileSync(path.join(backupsDir, filename), JSON.stringify(backupPayload, null, 2));
+      logActivity('database', 'Database Backup Created', `System backup created (${(JSON.stringify(backupPayload).length / 1024).toFixed(1)} KB).`);
+    } catch (saveErr) {
+      console.error("Failed to save backup history snapshot:", saveErr);
+    }
+
+    res.json(backupPayload);
   } catch (error) {
     console.error("Backup failed:", error);
     res.status(500).json({ error: 'Backup failed' });
   }
 });
 
-// 1.3 Database Backup Restore Endpoint
+// 1.3 Database Backups List Endpoint
+app.get('/api/settings/backups-list', (req, res) => {
+  try {
+    const backupsDir = path.join(__dirname, 'data', 'backups');
+    if (!fs.existsSync(backupsDir)) {
+      return res.json([]);
+    }
+    const files = fs.readdirSync(backupsDir).filter(f => f.endsWith('.json'));
+    const list = files.map(file => {
+      const filePath = path.join(backupsDir, file);
+      const stats = fs.statSync(filePath);
+      return {
+        filename: file,
+        size: (stats.size / 1024).toFixed(1) + ' KB',
+        sizeBytes: stats.size,
+        timestamp: stats.mtime
+      };
+    }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    res.json(list);
+  } catch (error) {
+    console.error("Failed to list backups:", error);
+    res.json([]);
+  }
+});
+
+// 1.4 Database Backup Restore Endpoint
 app.post('/api/settings/restore', async (req, res) => {
   try {
     const { students, halls, exams, seatingPlans } = req.body;
@@ -340,7 +394,7 @@ app.post('/api/settings/restore', async (req, res) => {
     if (exams.length > 0) await Models.Exam.create(exams);
     if (seatingPlans.length > 0) await Models.SeatingPlan.create(seatingPlans);
     
-    logActivity('student', 'Database Restored', `Restored ${students.length} students, ${halls.length} halls, ${exams.length} exams, and ${seatingPlans.length} seating plans from backup.`);
+    logActivity('database', 'Database Restored', `Restored ${students.length} students, ${halls.length} halls, ${exams.length} exams, and ${seatingPlans.length} seating plans from backup.`);
     
     res.json({ success: true, message: 'Database restored successfully!' });
   } catch (error) {

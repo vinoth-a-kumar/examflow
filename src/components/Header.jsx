@@ -1,14 +1,40 @@
 import React, { useState } from 'react';
-import { HelpCircle, X, Info } from 'lucide-react';
+import { HelpCircle, X, Info, Menu } from 'lucide-react';
 
-function Header({ collegeDetails }) {
+function Header({ collegeDetails, isMobileSidebarOpen, onToggleMobileSidebar }) {
   const [isOpen, setIsOpen] = useState(false);
 
   const academicYear = collegeDetails?.academicYear || '2026-27';
+  const collegeName = collegeDetails?.name || 'ExamFlow';
+  const collegeLogo = collegeDetails?.logo || '';
 
   return (
     <>
-      <header className="header" style={{ justifyContent: 'flex-end' }}>
+      <header className="header">
+        <div className="header-mobile-brand">
+          <button 
+            className="mobile-hamburger-btn"
+            onClick={onToggleMobileSidebar}
+            aria-label="Toggle Navigation Menu"
+            title="Toggle Menu"
+          >
+            {isMobileSidebarOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+          
+          <div className="mobile-brand-title">
+            {collegeLogo ? (
+              <img 
+                src={collegeLogo.startsWith('data:') ? collegeLogo : process.env.PUBLIC_URL + collegeLogo} 
+                alt="Logo" 
+                className="mobile-brand-logo"
+              />
+            ) : (
+              <div className="mobile-brand-initial">{collegeName.charAt(0)}</div>
+            )}
+            <span className="mobile-brand-name">{collegeName}</span>
+          </div>
+        </div>
+
         <div className="header-actions">
           <span className="header-year">Academic Year {academicYear}</span>
           

@@ -6,10 +6,11 @@ import {
   CalendarDays,
   Grid3X3,
   Settings,
-  LogOut
+  LogOut,
+  X
 } from 'lucide-react';
 
-function Sidebar({ currentTab, setCurrentTab, user, collegeDetails, onLogout }) {
+function Sidebar({ currentTab, setCurrentTab, user, collegeDetails, onLogout, isOpen, onClose }) {
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
     { id: 'upload',    name: 'Upload Data',      icon: Upload },
@@ -22,61 +23,84 @@ function Sidebar({ currentTab, setCurrentTab, user, collegeDetails, onLogout }) 
   const collegeName = collegeDetails?.name || 'ExamFlow';
   const collegeLogo = collegeDetails?.logo || '';
 
+  const handleNavClick = (tabId) => {
+    setCurrentTab(tabId);
+    if (onClose) onClose();
+  };
+
   return (
-    <aside className="sidebar">
-      {/* ── Logo / Brand ─────────────────────── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div className="sidebar-logo">
-          {collegeLogo ? (
-            <img
-              src={collegeLogo.startsWith('data:') ? collegeLogo : process.env.PUBLIC_URL + collegeLogo}
-              alt="Logo"
-              className="sidebar-logo-img"
-            />
-          ) : (
-            <div className="sidebar-logo-initials">
-              {collegeName.charAt(0)}
+    <>
+      {/* Mobile Drawer Overlay Backdrop */}
+      <div 
+        className={`sidebar-backdrop ${isOpen ? 'show' : ''}`} 
+        onClick={onClose} 
+      />
+
+      <aside className={`sidebar ${isOpen ? 'mobile-open' : ''}`}>
+        {/* ── Logo / Brand ─────────────────────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="sidebar-logo">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, overflow: 'hidden' }}>
+              {collegeLogo ? (
+                <img
+                  src={collegeLogo.startsWith('data:') ? collegeLogo : process.env.PUBLIC_URL + collegeLogo}
+                  alt="Logo"
+                  className="sidebar-logo-img"
+                />
+              ) : (
+                <div className="sidebar-logo-initials">
+                  {collegeName.charAt(0)}
+                </div>
+              )}
+              <div className="sidebar-logo-text">
+                <h1 title={collegeName}>{collegeName}</h1>
+                <span>{user ? `@${user.username}` : 'Admin Panel'}</span>
+              </div>
             </div>
-          )}
-          <div className="sidebar-logo-text">
-            <h1 title={collegeName}>{collegeName}</h1>
-            <span>{user ? `@${user.username}` : 'Admin Panel'}</span>
+            
+            {/* Mobile Close X Button */}
+            <button 
+              className="sidebar-mobile-close-btn" 
+              onClick={onClose}
+              title="Close Menu"
+            >
+              <X size={20} />
+            </button>
           </div>
+
+          {/* ── Navigation ───────────────────────── */}
+          <nav className="sidebar-menu">
+            <span className="sidebar-section-label">Main Menu</span>
+            {menuItems.slice(0, 5).map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  className={`sidebar-item ${currentTab === item.id ? 'active' : ''}`}
+                  onClick={() => handleNavClick(item.id)}
+                >
+                  <Icon size={18} className="sidebar-icon" />
+                  <span>{item.name}</span>
+                </button>
+              );
+            })}
+
+            <span className="sidebar-section-label" style={{ marginTop: '8px' }}>System</span>
+            {menuItems.slice(5).map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  className={`sidebar-item ${currentTab === item.id ? 'active' : ''}`}
+                  onClick={() => handleNavClick(item.id)}
+                >
+                  <Icon size={18} className="sidebar-icon" />
+                  <span>{item.name}</span>
+                </button>
+              );
+            })}
+          </nav>
         </div>
-
-        {/* ── Navigation ───────────────────────── */}
-        <nav className="sidebar-menu">
-          <span className="sidebar-section-label">Main Menu</span>
-          {menuItems.slice(0, 5).map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                className={`sidebar-item ${currentTab === item.id ? 'active' : ''}`}
-                onClick={() => setCurrentTab(item.id)}
-              >
-                <Icon size={18} className="sidebar-icon" />
-                <span>{item.name}</span>
-              </button>
-            );
-          })}
-
-          <span className="sidebar-section-label" style={{ marginTop: '8px' }}>System</span>
-          {menuItems.slice(5).map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                className={`sidebar-item ${currentTab === item.id ? 'active' : ''}`}
-                onClick={() => setCurrentTab(item.id)}
-              >
-                <Icon size={18} className="sidebar-icon" />
-                <span>{item.name}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
 
       {/* ── Footer ───────────────────────────── */}
       <div className="sidebar-footer">
@@ -138,6 +162,7 @@ function Sidebar({ currentTab, setCurrentTab, user, collegeDetails, onLogout }) 
         </div>
       </div>
     </aside>
+  </>
   );
 }
 

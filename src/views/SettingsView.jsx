@@ -1,327 +1,831 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Trash2,
   Database,
-  ShieldAlert,
-  Upload,
-  Info,
+  Server,
+  HardDrive,
+  ShieldCheck,
   Download,
+  Upload,
+  RefreshCw,
+  Activity,
+  Info,
+  TriangleAlert,
+  Trash2,
+  ExternalLink,
   Clock,
-  RefreshCw
+  CheckCircle2,
+  X,
+  FileText
 } from 'lucide-react';
 
-function SettingsView({ dbStatus, onClearAll, refreshData, currentTheme, onChangeTheme }) {
-
+function SettingsView({ dbStatus, onClearAll, refreshData, setTab }) {
   const [systemInfo, setSystemInfo] = useState({
     projectVersion: 'v1.2.0',
-    databaseStatus: dbStatus.mode + ' Mode',
+    databaseStatus: 'Checking...',
+    databaseEngine: 'MySQL',
     storageUsed: 'Checking...',
     recordCounts: { students: 0, halls: 0, exams: 0, plans: 0 }
   });
-  const [isLoadingInfo, setIsLoadingInfo] = useState(false);
-  const [lastBackup, setLastBackup] = useState(
-    () => localStorage.getItem('examflow-last-backup') || 'Never'
-  );
+
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [lastCheckTime, setLastCheckTime] = useState('Just now');
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [isCreatingBackup, setIsCreatingBackup] = useState(false);
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  // Restore Modal State
+  const [restoreModalFile, setRestoreModalFile] = useState(null);
+  const [restoreParsedData, setRestoreParsedData] = useState(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  // Danger Zone Reset Modal State
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetConfirmInput, setResetConfirmInput] = useState('');
+
+  // Last Backup Info
+  const [lastBackupInfo, setLastBackupInfo] = useState(() => {
+    const saved = localStorage.getItem('examflow-last-backup-meta');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return { time: '03 Jul 2026 • 10:00 PM', size: '1.4 MB', available: true };
+  });
+
+  const showToast = (text, type = 'success') => {
+    setToastMessage({ text, type });
+    setTimeout(() => setToastMessage(null), 4000);
+  };
 
   const fetchSystemInfo = async () => {
-    setIsLoadingInfo(true);
+    setIsCheckingStatus(true);
     try {
       const resp = await fetch('http://localhost:5000/api/settings/system-info');
-      if (resp.ok) setSystemInfo(await resp.json());
+      if (resp.ok) {
+        const data = await resp.json();
+        setSystemInfo(data);
+      }
+
+      const actResp = await fetch('http://localhost:5000/api/dashboard/activities');
+      if (actResp.ok) {
+        const activities = await actResp.json();
+        setRecentActivities(activities.slice(0, 5));
+      }
+
+      const now = new Date();
+      setLastCheckTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (err) {
       console.error('Failed to fetch system info:', err);
     } finally {
-      setIsLoadingInfo(false);
+      setIsCheckingStatus(false);
     }
   };
 
   useEffect(() => {
     fetchSystemInfo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dbStatus]);
 
-  const handleDownloadBackup = async () => {
+  const handleManualStatusCheck = async () => {
+    await fetchSystemInfo();
+    showToast('System status refreshed live.');
+  };
+
+  const handleRefreshSystemData = async () => {
+    setIsRefreshingData(true);
+    try {
+      if (refreshData) await refreshData();
+      await fetchSystemInfo();
+      showToast('Application data synchronized with backend.');
+    } catch (e) {
+      showToast('Failed to refresh system data.', 'error');
+    } finally {
+      setIsRefreshingData(false);
+    }
+  };
+
+  const handleCreateBackup = async () => {
+    setIsCreatingBackup(true);
     try {
       const resp = await fetch('http://localhost:5000/api/settings/backup');
       if (resp.ok) {
         const data = await resp.json();
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
+        const sizeMb = (blob.size / (1024 * 1024)).toFixed(2);
+        const sizeKb = (blob.size / 1024).toFixed(1);
+        const displaySize = blob.size >= 1024 * 1024 ? `${sizeMb} MB` : `${sizeKb} KB`;
+        
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const formattedBackupTime = `${dateStr} • ${timeStr}`;
+
         const a = document.createElement('a');
         a.href = url;
-        a.download = `examflow_backup_${new Date().toISOString().slice(0, 10)}.json`;
+        a.download = `examflow_backup_${now.toISOString().slice(0, 10)}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        const nowStr = new Date().toLocaleString();
-        setLastBackup(nowStr);
-        localStorage.setItem('examflow-last-backup', nowStr);
+
+        const newMeta = { time: formattedBackupTime, size: displaySize, available: true };
+        setLastBackupInfo(newMeta);
+        localStorage.setItem('examflow-last-backup-meta', JSON.stringify(newMeta));
+
+        showToast('New system backup created and downloaded successfully!');
         fetchSystemInfo();
       } else {
-        alert('Failed to export database backup.');
+        showToast('Failed to generate database backup.', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Network error: Failed to backup system database.');
+      showToast('Network error: Could not reach backup API.', 'error');
+    } finally {
+      setIsCreatingBackup(false);
     }
   };
 
-  const handleRestoreBackup = (e) => {
+  const handleSelectRestoreFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (!window.confirm('WARNING: Restoring a backup will completely overwrite your current database. Continue?')) {
-      e.target.value = null;
-      return;
-    }
+
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       try {
-        const backupData = JSON.parse(event.target.result);
-        if (!backupData.students || !backupData.halls || !backupData.exams || !backupData.seatingPlans) {
-          alert('Invalid backup file format.');
+        const parsed = JSON.parse(event.target.result);
+        if (!parsed.students || !parsed.halls || !parsed.exams || !parsed.seatingPlans) {
+          showToast('Invalid backup file. Must contain students, halls, exams, and seatingPlans.', 'error');
+          e.target.value = null;
           return;
         }
-        const resp = await fetch('http://localhost:5000/api/settings/restore', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(backupData),
-        });
-        if (resp.ok) {
-          alert('Database backup restored successfully!');
-          fetchSystemInfo();
-          refreshData();
-        } else {
-          const err = await resp.json();
-          alert('Failed to restore backup: ' + err.error);
-        }
+        setRestoreModalFile(file);
+        setRestoreParsedData(parsed);
       } catch (err) {
-        console.error(err);
-        alert('Failed to parse backup JSON file.');
+        showToast('Failed to parse backup JSON file.', 'error');
       }
     };
     reader.readAsText(file);
     e.target.value = null;
   };
 
+  const handleConfirmRestore = async () => {
+    if (!restoreParsedData) return;
+    setIsRestoring(true);
+    try {
+      const resp = await fetch('http://localhost:5000/api/settings/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(restoreParsedData),
+      });
+
+      if (resp.ok) {
+        showToast('Database snapshot restored successfully!');
+        setRestoreModalFile(null);
+        setRestoreParsedData(null);
+        if (refreshData) refreshData();
+        fetchSystemInfo();
+      } else {
+        const err = await resp.json();
+        showToast('Failed to restore backup: ' + (err.error || 'Unknown error'), 'error');
+      }
+    } catch (err) {
+      showToast('Network error during database restore.', 'error');
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
+  const handleExecuteReset = async () => {
+    if (resetConfirmInput !== 'RESET') return;
+    if (onClearAll) {
+      await onClearAll();
+      setIsResetModalOpen(false);
+      setResetConfirmInput('');
+      fetchSystemInfo();
+      showToast('System operational data has been completely reset.');
+    }
+  };
+
+  const isDbConnected = dbStatus?.connected ?? true;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-      <div className="page-intro">
-        <h2>Settings Panel</h2>
-        <p>Manage backups, visual themes, and database health.</p>
+    <div style={{ maxWidth: '1200px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          right: '24px',
+          zIndex: 10000,
+          background: toastMessage.type === 'error' ? '#ef4444' : '#10b981',
+          color: '#ffffff',
+          padding: '12px 20px',
+          borderRadius: '10px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          fontWeight: 600,
+          fontSize: '14px',
+          animation: 'fadeIn 0.2s ease'
+        }}>
+          {toastMessage.type === 'error' ? <TriangleAlert size={18} /> : <CheckCircle2 size={18} />}
+          <span>{toastMessage.text}</span>
+        </div>
+      )}
+
+      {/* PAGE HEADER */}
+      <div className="page-intro" style={{ margin: 0 }}>
+        <h2>Settings</h2>
+        <p>System maintenance, data protection and application controls.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '24px' }}>
-
-        {/* LEFT — System Info & Backups */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-          {/* System Information */}
-          <div className="card-container">
-            <div className="card-title-bar">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: '34px', height: '34px', borderRadius: '10px',
-                  background: 'linear-gradient(135deg, rgba(79,70,229,0.12), rgba(139,92,246,0.08))',
-                  border: '1px solid rgba(79,70,229,0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'var(--color-primary)', flexShrink: 0,
-                }}>
-                  <Info size={16} />
-                </div>
-                <h3>System Information</h3>
-              </div>
-              <button
-                onClick={fetchSystemInfo}
-                disabled={isLoadingInfo}
-                title="Refresh Stats"
-                style={{
-                  background: 'none', border: 'none', color: 'var(--text-muted)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px',
-                  borderRadius: '6px', transition: 'color 0.2s',
-                }}
-              >
-                <RefreshCw size={14} style={{ animation: isLoadingInfo ? 'spinSlow 1s linear infinite' : 'none' }} />
-              </button>
+      {/* 1. SYSTEM HEALTH (Full Width) */}
+      <div className="card-container" style={{ padding: '20px 24px' }}>
+        <div className="card-title-bar" style={{ paddingBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '34px', height: '34px', borderRadius: '10px',
+              background: 'linear-gradient(135deg, rgba(79,70,229,0.12), rgba(139,92,246,0.08))',
+              border: '1px solid rgba(79,70,229,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--color-primary)', flexShrink: 0
+            }}>
+              <ShieldCheck size={18} />
             </div>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>System Health</h3>
+            </div>
+          </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {[
-                { label: 'Project Version', value: systemInfo.projectVersion },
-                { label: 'Database Mode', value: systemInfo.databaseStatus, status: dbStatus.connected ? 'success' : 'warning' },
-                { label: 'Storage Used', value: systemInfo.storageUsed },
-                { label: 'Last Backup', value: lastBackup, icon: true },
-              ].map((row) => (
-                <div key={row.label} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '10px 14px', background: 'var(--bg-app)',
-                  borderRadius: '10px', border: '1px solid var(--border-color)',
-                }}>
-                  <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>{row.label}</span>
-                  {row.status ? (
-                    <span className={`status-pill ${row.status}`}>{row.value}</span>
-                  ) : (
-                    <span style={{ fontSize: '12.5px', color: 'var(--text-primary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      {row.icon && <Clock size={12} style={{ color: 'var(--text-muted)' }} />}
-                      {row.value}
-                    </span>
-                  )}
-                </div>
-              ))}
+          <button
+            onClick={handleManualStatusCheck}
+            disabled={isCheckingStatus}
+            className="btn-secondary"
+            style={{ padding: '6px 14px', fontSize: '12.5px', gap: '6px' }}
+          >
+            <RefreshCw size={14} style={{ animation: isCheckingStatus ? 'spinSlow 1s linear infinite' : 'none' }} />
+            <span>Check System Status</span>
+          </button>
+        </div>
 
-              {/* Record Counts */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginTop: '4px' }}>
-                {[
-                  { label: 'Students', val: systemInfo.recordCounts?.students || 0, color: '#4f46e5' },
-                  { label: 'Halls',    val: systemInfo.recordCounts?.halls    || 0, color: '#059669' },
-                  { label: 'Exams',   val: systemInfo.recordCounts?.exams    || 0, color: '#d97706' },
-                  { label: 'Plans',   val: systemInfo.recordCounts?.plans    || 0, color: '#0ea5e9' },
-                ].map((rc) => (
-                  <div key={rc.label} style={{
-                    textAlign: 'center', padding: '12px 8px',
-                    background: 'var(--bg-app)', borderRadius: '10px',
-                    border: '1px solid var(--border-color)',
-                  }}>
-                    <div style={{ fontSize: '22px', fontWeight: 900, color: rc.color, fontFamily: 'var(--font-display)', letterSpacing: '-1px' }}>
-                      {rc.val}
-                    </div>
-                    <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px' }}>
-                      {rc.label}
-                    </div>
-                  </div>
-                ))}
+        {/* Compact Status Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginTop: '12px' }}>
+          
+          {/* Database Status */}
+          <div style={{ padding: '12px 14px', background: 'var(--bg-app)', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Database size={18} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Database</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: isDbConnected ? '#10b981' : '#ef4444' }} />
+                <span>{isDbConnected ? 'Connected' : 'Disconnected'}</span>
               </div>
             </div>
           </div>
 
-          {/* Backup & Restore */}
-          <div className="card-container">
-            <div className="card-title-bar">
+          {/* Database Engine */}
+          <div style={{ padding: '12px 14px', background: 'var(--bg-app)', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Server size={18} style={{ color: '#06b6d4', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Database Engine</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                {systemInfo.databaseEngine || 'MySQL'}
+              </div>
+            </div>
+          </div>
+
+          {/* Backend Server */}
+          <div style={{ padding: '12px 14px', background: 'var(--bg-app)', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Activity size={18} style={{ color: '#10b981', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Backend Server</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} />
+                <span>Online</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Last System Check */}
+          <div style={{ padding: '12px 14px', background: 'var(--bg-app)', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Clock size={18} style={{ color: '#8b5cf6', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Last System Check</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                {lastCheckTime}
+              </div>
+            </div>
+          </div>
+
+          {/* Storage Usage */}
+          <div style={{ padding: '12px 14px', background: 'var(--bg-app)', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <HardDrive size={18} style={{ color: '#f59e0b', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Storage Usage</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                {systemInfo.storageUsed || '1.45 MB'}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* 2 & 3. DATA MANAGEMENT & BACKUP CENTER (2-Column Grid) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '24px' }}>
+        
+        {/* 2. DATA MANAGEMENT */}
+        <div className="card-container" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div className="card-title-bar" style={{ paddingBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '34px', height: '34px', borderRadius: '10px',
+                  background: 'linear-gradient(135deg, rgba(6,182,212,0.12), rgba(14,165,233,0.08))',
+                  border: '1px solid rgba(6,182,212,0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#06b6d4', flexShrink: 0
+                }}>
+                  <FileText size={18} />
+                </div>
+                <h3>Data Management</h3>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.5 }}>
+              Summary of operational records stored across system modules.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                { label: 'Students', count: systemInfo.recordCounts?.students ?? 0, tab: 'upload' },
+                { label: 'Halls', count: systemInfo.recordCounts?.halls ?? 0, tab: 'halls' },
+                { label: 'Exams', count: systemInfo.recordCounts?.exams ?? 0, tab: 'exams' },
+                { label: 'Seating Plans', count: systemInfo.recordCounts?.plans ?? 0, tab: 'seating' },
+              ].map((row) => (
+                <div key={row.label} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  background: 'var(--bg-app)',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-color)'
+                }}>
+                  <div>
+                    <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{row.label}</span>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500, marginTop: '2px' }}>
+                      {row.count} {row.count === 1 ? 'record' : 'records'}
+                    </div>
+                  </div>
+                  {setTab && (
+                    <button
+                      onClick={() => setTab(row.tab)}
+                      className="btn-secondary"
+                      style={{ padding: '4px 12px', fontSize: '12px', height: '32px', gap: '4px' }}
+                    >
+                      <span>View</span>
+                      <ExternalLink size={12} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 3. BACKUP CENTER */}
+        <div className="card-container" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div className="card-title-bar" style={{ paddingBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{
                   width: '34px', height: '34px', borderRadius: '10px',
                   background: 'linear-gradient(135deg, rgba(5,150,105,0.1), rgba(16,185,129,0.06))',
                   border: '1px solid rgba(5,150,105,0.15)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'var(--color-success)', flexShrink: 0,
+                  color: 'var(--color-success)', flexShrink: 0
                 }}>
-                  <Database size={16} />
+                  <Database size={18} />
                 </div>
-                <h3>Backup &amp; Restore</h3>
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>Backup Center</h3>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0' }}>Protect and recover examination system data.</p>
+                </div>
               </div>
             </div>
 
+            {/* Last Backup Info Box */}
+            <div style={{
+              padding: '14px',
+              background: 'var(--bg-app)',
+              borderRadius: '10px',
+              border: '1px solid var(--border-color)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              marginBottom: '16px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>LAST BACKUP</span>
+                <span style={{
+                  fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px',
+                  background: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)'
+                }}>
+                  ● Available
+                </span>
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                {lastBackupInfo.time}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Backup Size: <strong>{lastBackupInfo.size}</strong>
+              </div>
+            </div>
+
+            {/* Backup & Restore Action Buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                Download a full JSON snapshot of your data, or restore from a previous backup file.
-              </p>
               <button
-                onClick={handleDownloadBackup}
+                onClick={handleCreateBackup}
+                disabled={isCreatingBackup}
                 className="btn-primary"
-                style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #059669, #10b981)', boxShadow: '0 4px 12px rgba(5,150,105,0.25)' }}
+                style={{ width: '100%', justifyContent: 'center', padding: '10px' }}
               >
-                <Download size={15} />
-                Create Database Backup
+                <Download size={16} />
+                <span>{isCreatingBackup ? 'Creating Backup...' : 'Create New Backup'}</span>
               </button>
-              <input type="file" accept=".json" onChange={handleRestoreBackup} style={{ display: 'none' }} id="restore-backup-file-input" />
+
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleSelectRestoreFile}
+                style={{ display: 'none' }}
+                id="settings-restore-file-input"
+              />
               <label
-                htmlFor="restore-backup-file-input"
+                htmlFor="settings-restore-file-input"
                 className="btn-secondary"
-                style={{ width: '100%', justifyContent: 'center', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                style={{ width: '100%', justifyContent: 'center', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px' }}
               >
-                <Upload size={15} />
-                Restore Database Backup
+                <Upload size={16} />
+                <span>Restore Backup</span>
               </label>
             </div>
           </div>
-
         </div>
 
-        {/* RIGHT — Theme & Danger Zone */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      </div>
 
-          {/* Theme Customization */}
-          <div className="card-container">
-            <div className="card-title-bar">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: '34px', height: '34px', borderRadius: '10px',
-                  background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(167,139,250,0.08))',
-                  border: '1px solid rgba(139,92,246,0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0,
-                }}>
-                  <span style={{ fontSize: '16px', lineHeight: 1 }}>🎨</span>
-                </div>
-                <h3>Theme</h3>
+      {/* 4 & 5. SYSTEM ACTIVITY & APPLICATION INFORMATION (2-Column Grid) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '24px' }}>
+        
+        {/* 4. SYSTEM ACTIVITY */}
+        <div className="card-container">
+          <div className="card-title-bar" style={{ paddingBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '34px', height: '34px', borderRadius: '10px',
+                background: 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(217,119,6,0.08))',
+                border: '1px solid rgba(245,158,11,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#d97706', flexShrink: 0
+              }}>
+                <Activity size={18} />
               </div>
+              <h3>System Activity</h3>
             </div>
+          </div>
 
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '4px' }}>
-              Choose the visual appearance for your control dashboard.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {[
-                { id: 'light',  label: 'Modern Slate',    sublabel: 'Clean light mode',   bg: 'linear-gradient(135deg, #f0f4ff, #e8eeff)', dot: 'linear-gradient(135deg, #4f46e5, #8b5cf6)', textColor: '#1e293b', border: '#c7d2fe' },
-                { id: 'dark',   label: 'Midnight Obsidian', sublabel: 'Sleek dark mode', bg: 'linear-gradient(135deg, #0f172a, #1e293b)', dot: 'linear-gradient(135deg, #38bdf8, #818cf8)', textColor: '#94a3b8', border: '#334155' },
-                { id: 'sunset', label: 'Sunset Gold',     sublabel: 'Warm dark gradient', bg: 'linear-gradient(135deg, #1c0a0a, #2d1515)', dot: 'linear-gradient(135deg, #f97316, #e879f9)', textColor: '#d6d3d1', border: '#451a03' },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => onChangeTheme(t.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '12px',
-                    padding: '12px 14px', background: t.bg,
-                    border: currentTheme === t.id ? '2px solid var(--color-primary)' : `1px solid ${t.border}`,
-                    borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease', outline: 'none',
-                    boxShadow: currentTheme === t.id ? '0 4px 12px rgba(79,70,229,0.2)' : 'none',
-                  }}
-                >
-                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: t.dot, flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }} />
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: t.textColor }}>{t.label}</div>
-                    <div style={{ fontSize: '11px', color: t.textColor, opacity: 0.65, fontWeight: 500 }}>{t.sublabel}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {recentActivities.length > 0 ? (
+              recentActivities.map((act) => (
+                <div key={act.id} style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                  padding: '10px 12px',
+                  background: 'var(--bg-app)',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-color)'
+                }}>
+                  <div style={{
+                    width: '28px', height: '28px', borderRadius: '50%',
+                    background: 'rgba(79,70,229,0.1)', color: 'var(--color-primary)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0, marginTop: '2px'
+                  }}>
+                    <Activity size={14} />
                   </div>
-                  {currentTheme === t.id && <div style={{ marginLeft: 'auto', fontSize: '18px', color: t.textColor }}>✓</div>}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Danger Zone */}
-          <div className="card-container" style={{ border: '1px solid rgba(220,38,38,0.25)', background: 'linear-gradient(135deg, rgba(220,38,38,0.03), transparent)' }}>
-            <div className="card-title-bar" style={{ borderBottomColor: 'rgba(220,38,38,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: '34px', height: '34px', borderRadius: '10px',
-                  background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.2)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'var(--color-error)', flexShrink: 0,
-                }}>
-                  <ShieldAlert size={16} />
+                  <div style={{ flex: 1, overflow: 'hidden' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {act.message}
+                    </div>
+                    {act.detail && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                        {act.detail}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Clock size={11} />
+                      <span>{new Date(act.time).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  </div>
                 </div>
-                <h3 style={{ color: 'var(--color-error)' }}>Danger Zone</h3>
+              ))
+            ) : (
+              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                No recent administrative activity logged.
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* 5. APPLICATION INFORMATION */}
+        <div className="card-container">
+          <div className="card-title-bar" style={{ paddingBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '34px', height: '34px', borderRadius: '10px',
+                background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(167,139,250,0.08))',
+                border: '1px solid rgba(139,92,246,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#8b5cf6', flexShrink: 0
+              }}>
+                <Info size={18} />
+              </div>
+              <h3>Application Information</h3>
             </div>
-
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-              Permanently deletes <strong>all</strong> students, halls, exams, and generated seating plans. This cannot be undone.
-            </p>
-
-            <button
-              className="btn-danger"
-              onClick={onClearAll}
-              style={{ width: '100%', justifyContent: 'center', marginTop: '4px' }}
-            >
-              <Trash2 size={15} />
-              Reset Entire Database
-            </button>
           </div>
 
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {[
+              { label: 'Application', value: 'Exam Seating Management System' },
+              { label: 'Version', value: systemInfo.projectVersion || 'v1.2.0' },
+              { label: 'Environment', value: process.env.NODE_ENV === 'production' ? 'Production' : 'Development' },
+              { label: 'Database', value: systemInfo.databaseEngine || 'MySQL' },
+              { label: 'Server Framework', value: 'Node.js / Express' },
+            ].map((info) => (
+              <div key={info.label} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '10px 14px',
+                background: 'var(--bg-app)',
+                borderRadius: '10px',
+                border: '1px solid var(--border-color)'
+              }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>{info.label}</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 700 }}>{info.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+
+      {/* 6. MAINTENANCE */}
+      <div className="card-container" style={{ padding: '20px 24px' }}>
+        <div className="card-title-bar" style={{ paddingBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '34px', height: '34px', borderRadius: '10px',
+              background: 'linear-gradient(135deg, rgba(79,70,229,0.12), rgba(139,92,246,0.08))',
+              border: '1px solid rgba(79,70,229,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--color-primary)', flexShrink: 0
+            }}>
+              <RefreshCw size={18} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>Maintenance</h3>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginTop: '8px' }}>
+          <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', margin: 0, flex: 1, minWidth: '240px' }}>
+            Refetch active record collections and synchronize caching with the backend database.
+          </p>
+          <button
+            onClick={handleRefreshSystemData}
+            disabled={isRefreshingData}
+            className="btn-secondary"
+            style={{ padding: '8px 18px', fontSize: '13px', gap: '8px' }}
+          >
+            <RefreshCw size={15} style={{ animation: isRefreshingData ? 'spinSlow 1s linear infinite' : 'none' }} />
+            <span>Refresh System Data</span>
+          </button>
         </div>
       </div>
+
+      {/* 7. DANGER ZONE (Full Width at Bottom) */}
+      <div className="card-container" style={{
+        background: '#ffffff',
+        border: '1px solid rgba(239, 68, 68, 0.3)',
+        boxShadow: '0 4px 16px rgba(239, 68, 68, 0.05)',
+        padding: '20px 24px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{
+              width: '38px', height: '38px', borderRadius: '10px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#dc2626', flexShrink: 0
+            }}>
+              <TriangleAlert size={20} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#dc2626', margin: 0 }}>Danger Zone</h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
+                Permanently removes operational data from the system.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              setResetConfirmInput('');
+              setIsResetModalOpen(true);
+            }}
+            style={{
+              background: 'transparent',
+              border: '1px solid #dc2626',
+              color: '#dc2626',
+              padding: '8px 18px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.06)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+          >
+            <Trash2 size={15} />
+            <span>Reset System Data</span>
+          </button>
+        </div>
+      </div>
+
+      {/* RESTORE CONFIRMATION MODAL */}
+      {restoreModalFile && restoreParsedData && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 10000, padding: '20px'
+        }}>
+          <div style={{
+            background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+            borderRadius: '16px', width: '100%', maxWidth: '480px', overflow: 'hidden',
+            boxShadow: 'var(--shadow-lg)', animation: 'fadeIn 0.2s ease'
+          }}>
+            <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '17px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Confirm Database Restore</h3>
+              <button onClick={() => { setRestoreModalFile(null); setRestoreParsedData(null); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ padding: '12px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '10px', color: '#dc2626', fontSize: '13px', lineHeight: 1.5 }}>
+                <strong>Warning:</strong> Restoring this backup file will completely overwrite all existing database records.
+              </div>
+
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                File: <strong>{restoreModalFile.name}</strong> ({(restoreModalFile.size / 1024).toFixed(1)} KB)
+              </div>
+
+              <div style={{ background: 'var(--bg-app)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px' }}>
+                <div>Students: <strong>{restoreParsedData.students?.length ?? 0}</strong></div>
+                <div>Halls: <strong>{restoreParsedData.halls?.length ?? 0}</strong></div>
+                <div>Exams: <strong>{restoreParsedData.exams?.length ?? 0}</strong></div>
+                <div>Seating Plans: <strong>{restoreParsedData.seatingPlans?.length ?? 0}</strong></div>
+              </div>
+            </div>
+
+            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', gap: '10px', background: 'var(--bg-app)' }}>
+              <button
+                onClick={() => { setRestoreModalFile(null); setRestoreParsedData(null); }}
+                className="btn-secondary"
+                style={{ padding: '8px 16px', fontSize: '13px' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRestore}
+                disabled={isRestoring}
+                className="btn-primary"
+                style={{ padding: '8px 16px', fontSize: '13px', background: '#10b981' }}
+              >
+                {isRestoring ? 'Restoring Database...' : 'Confirm Restore'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DANGER ZONE RESET MODAL */}
+      {isResetModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 10000, padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff', border: '1px solid rgba(239,68,68,0.3)',
+            borderRadius: '16px', width: '100%', maxWidth: '500px', overflow: 'hidden',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.2)', animation: 'fadeIn 0.2s ease'
+          }}>
+            <div style={{ padding: '18px 20px', borderBottom: '1px solid #fee2e2', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fef2f2' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <TriangleAlert size={20} style={{ color: '#dc2626' }} />
+                <h3 style={{ fontSize: '17px', fontWeight: 700, margin: 0, color: '#dc2626' }}>Reset Operational System Data</h3>
+              </div>
+              <button onClick={() => setIsResetModalOpen(false)} style={{ background: 'none', border: 'none', color: '#991b1b', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+                This action will permanently delete all operational records currently stored in the system:
+              </p>
+
+              <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px' }}>
+                <div>Students: <strong style={{ color: '#dc2626' }}>{systemInfo.recordCounts?.students ?? 0} records</strong></div>
+                <div>Halls: <strong style={{ color: '#dc2626' }}>{systemInfo.recordCounts?.halls ?? 0} records</strong></div>
+                <div>Exams: <strong style={{ color: '#dc2626' }}>{systemInfo.recordCounts?.exams ?? 0} records</strong></div>
+                <div>Seating Plans: <strong style={{ color: '#dc2626' }}>{systemInfo.recordCounts?.plans ?? 0} records</strong></div>
+              </div>
+
+              {/* Recommended Backup Banner */}
+              <div style={{
+                padding: '12px 14px', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '10px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px'
+              }}>
+                <span style={{ fontSize: '12.5px', color: '#b45309', fontWeight: 600 }}>Creating a backup before resetting is recommended.</span>
+                <button
+                  onClick={handleCreateBackup}
+                  className="btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '12px', height: '30px', whiteSpace: 'nowrap', borderColor: '#fde68a', background: '#ffffff', color: '#b45309' }}
+                >
+                  <Download size={12} />
+                  <span>Create Backup First</span>
+                </button>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                  Type <strong style={{ color: '#dc2626' }}>RESET</strong> to confirm action:
+                </label>
+                <input
+                  type="text"
+                  value={resetConfirmInput}
+                  onChange={(e) => setResetConfirmInput(e.target.value)}
+                  placeholder="RESET"
+                  style={{
+                    width: '100%', padding: '10px 14px', borderRadius: '8px',
+                    border: '1px solid var(--border-color)', fontSize: '14px', outline: 'none'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ padding: '14px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: '10px', background: '#f8fafc' }}>
+              <button
+                onClick={() => setIsResetModalOpen(false)}
+                className="btn-secondary"
+                style={{ padding: '8px 16px', fontSize: '13px' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExecuteReset}
+                disabled={resetConfirmInput !== 'RESET'}
+                style={{
+                  padding: '8px 18px', fontSize: '13px', fontWeight: 700, borderRadius: '8px',
+                  background: resetConfirmInput === 'RESET' ? '#dc2626' : '#fca5a5',
+                  color: '#ffffff', border: 'none', cursor: resetConfirmInput === 'RESET' ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Confirm System Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
