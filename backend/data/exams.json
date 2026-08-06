@@ -1,31 +1,27 @@
 [
   {
-    "_id": "pf47rhwmryyxuz6",
-    "name": "TAM111, BB211, CA213",
+    "_id": "123vhfamshkbtzg",
+    "name": "SCAPC61, SCMPC41, SCHPC41",
     "departments": [],
     "subjectCodes": [
-      "TAM111",
-      "BB211",
-      "CA213",
-      "CM211"
+      "SCAPC61",
+      "SCMPC41",
+      "SCHPC41",
+      "SCHPS11",
+      "SCSPC6P",
+      "SENPC6P"
     ],
-    "date": "2026-07-25",
+    "date": "2026-08-13",
     "session": "FN",
     "time": "10:00 AM - 01:00 PM",
-    "studentsCount": 325,
+    "studentsCount": 173,
     "assignedHalls": [
       "A1",
       "A2",
       "A3",
-      "A6",
-      "A7",
-      "A8",
-      "A9",
-      "B1",
-      "B2",
-      "C4"
+      "C3"
     ],
-    "seatsPerBench": 2,
+    "seatsPerBench": 3,
     "status": "Scheduled"
   }
 ]

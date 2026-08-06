@@ -20,6 +20,54 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [viewFormat, setViewFormat] = useState('university');
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState('ALL');
+  const [rosterData, setRosterData] = useState(null);
+  const [showLabelExportMenu, setShowLabelExportMenu] = useState(false);
+  const [allHallsLabelSequence, setAllHallsLabelSequence] = useState([]);
+
+  // Fetch overall all-halls student sequence for printing
+  const fetchAllHallsLabelSequence = async () => {
+    if (!selectedDate || !selectedSession) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/seating/labels/download-csv?date=${selectedDate}&session=${selectedSession}`);
+      if (response.ok) {
+        const text = await response.text();
+        const regNos = text.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+        setAllHallsLabelSequence(regNos);
+      }
+    } catch (err) {
+      console.error('Error fetching all halls label sequence:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedDate && selectedSession) {
+      fetchAllHallsLabelSequence();
+    }
+  }, [selectedDate, selectedSession]);
+
+  // Overall Seat Label export handlers (All Halls for selected Date + Session)
+  const handlePrintLabels = () => {
+    window.print();
+  };
+
+  const handleDownloadLabelsPdf = () => {
+    if (!selectedDate || !selectedSession) return;
+    const url = `http://localhost:5000/api/seating/labels/download-pdf?date=${selectedDate}&session=${selectedSession}`;
+    window.open(url, '_blank');
+  };
+
+  const handleDownloadLabelsExcel = () => {
+    if (!selectedDate || !selectedSession) return;
+    const url = `http://localhost:5000/api/seating/labels/download-excel?date=${selectedDate}&session=${selectedSession}`;
+    window.open(url, '_blank');
+  };
+
+  const handleDownloadLabelsCsv = () => {
+    if (!selectedDate || !selectedSession) return;
+    const url = `http://localhost:5000/api/seating/labels/download-csv?date=${selectedDate}&session=${selectedSession}`;
+    window.open(url, '_blank');
+  };
 
   // Extract unique dates from scheduled exams
   const uniqueExamDates = React.useMemo(() => {
@@ -101,12 +149,36 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
     return match ? match.time : (selectedSession === 'FN' ? '10:00 AM - 01:00 PM' : '02:00 PM - 05:00 PM');
   }, [selectedDate, selectedSession, exams]);
 
-  // Handle download Excel action
+  // Handle download Excel action (Department-wise or All Departments)
   const handleDownloadExcel = () => {
-    if (!selectedDate || !selectedSession || !selectedHallId) return;
-    const url = `http://localhost:5000/api/seating/download-roster?date=${selectedDate}&session=${selectedSession}&hallId=${selectedHallId}`;
+    if (!selectedDate || !selectedSession) return;
+    let url = `http://localhost:5000/api/seating/download-roster?date=${selectedDate}&session=${selectedSession}&department=${selectedDeptFilter}`;
+    if (selectedHallId) {
+      url += `&hallId=${selectedHallId}`;
+    }
     window.open(url, '_blank');
   };
+
+  const fetchRosterData = async () => {
+    if (!selectedDate || !selectedSession) return;
+    try {
+      let url = `http://localhost:5000/api/seating/attendance-roster?date=${selectedDate}&session=${selectedSession}&department=${selectedDeptFilter}`;
+      if (selectedHallId) url += `&hallId=${selectedHallId}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setRosterData(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedDate && selectedSession) {
+      fetchRosterData();
+    }
+  }, [selectedDate, selectedSession, selectedDeptFilter, selectedHallId]);
 
   const selectedHall = halls.find(h => h._id === selectedHallId);
   const colsCount = selectedHall ? selectedHall.columns : 4;
@@ -276,6 +348,66 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
           <Search size={16} />
           <span>Search Seating</span>
         </button>
+
+        {/* Overall Seat Labels Action Dropdown (All Halls for Date + Session) */}
+        {selectedDate && selectedSession && (
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <button 
+              className="btn-secondary" 
+              onClick={() => setShowLabelExportMenu(!showLabelExportMenu)}
+              style={{ height: '42px', gap: '6px', display: 'flex', alignItems: 'center', fontSize: '13px', padding: '0 14px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', fontWeight: 600 }}
+            >
+              <Printer size={16} />
+              <span>Overall Seat Labels</span>
+              <ChevronDown size={14} />
+            </button>
+
+            {showLabelExportMenu && (
+              <div style={{
+                position: 'absolute',
+                right: 0,
+                top: '100%',
+                marginTop: '6px',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: 'var(--shadow-md)',
+                zIndex: 100,
+                minWidth: '210px',
+                overflow: 'hidden'
+              }}>
+                <button 
+                  onClick={() => { setShowLabelExportMenu(false); handlePrintLabels(); }}
+                  style={{ width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <Printer size={15} />
+                  <span>Print A4 Labels (All Halls)</span>
+                </button>
+                <button 
+                  onClick={() => { setShowLabelExportMenu(false); handleDownloadLabelsPdf(); }}
+                  style={{ width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid var(--border-color)' }}
+                >
+                  <Download size={15} />
+                  <span>Download PDF (All Halls)</span>
+                </button>
+                <button 
+                  onClick={() => { setShowLabelExportMenu(false); handleDownloadLabelsExcel(); }}
+                  style={{ width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid var(--border-color)' }}
+                >
+                  <Download size={15} />
+                  <span>Download Excel (.xlsx)</span>
+                </button>
+                <button 
+                  onClick={() => { setShowLabelExportMenu(false); handleDownloadLabelsCsv(); }}
+                  style={{ width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid var(--border-color)' }}
+                >
+                  <Download size={15} />
+                  <span>Download CSV (.csv)</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Loading Indicator */}
@@ -521,36 +653,38 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
           {/* Seating Arrangement Layout Grid */}
           {(() => {
             const totalBenches = seatingPlan.seatingGrid ? seatingPlan.seatingGrid.length : 0;
-            const benchLimit = 16;
+            const benchLimit = 6;
             const displayedBenches = showAllSeating ? seatingPlan.seatingGrid : seatingPlan.seatingGrid.slice(0, benchLimit);
             const hasMoreBenches = totalBenches > benchLimit;
 
             return (
               <div className="card-container">
-                <div className="card-title-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="card-title-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                   <h3>{seatingPlan.hallName} - Seating Arrangement</h3>
-                  {hasMoreBenches && (
-                    <button
-                      onClick={() => setShowAllSeating(!showAllSeating)}
-                      style={{
-                        background: 'var(--color-primary-light)',
-                        border: '1px solid var(--color-primary)',
-                        color: 'var(--color-primary)',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        padding: '6px 14px',
-                        borderRadius: '9999px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <span>{showAllSeating ? 'Show Less' : `Show More (${totalBenches - benchLimit} more benches)`}</span>
-                      {showAllSeating ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </button>
-                  )}
+                  <div className="no-print" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {hasMoreBenches && (
+                      <button
+                        onClick={() => setShowAllSeating(!showAllSeating)}
+                        style={{
+                          background: 'var(--color-primary-light)',
+                          border: '1px solid var(--color-primary)',
+                          color: 'var(--color-primary)',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          padding: '6px 14px',
+                          borderRadius: '9999px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <span>{showAllSeating ? 'Show Less' : `Show More (${totalBenches - benchLimit} more benches)`}</span>
+                        {showAllSeating ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 
                 <div 
@@ -614,10 +748,33 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
               <div>
                 <h3>Attendance Roster</h3>
                 <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                  Export as formatted Excel (.xlsx) or print university-style attendance sheets.
+                  Export as formatted Excel (.xlsx) or print university-style attendance sheets by Department and Subject Code.
                 </p>
               </div>
-              <div className="no-print" style={{ display: 'flex', gap: '8px' }}>
+              <div className="no-print" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* Department Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Dept:</label>
+                  <select
+                    value={selectedDeptFilter}
+                    onChange={(e) => setSelectedDeptFilter(e.target.value)}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-app)',
+                      color: 'var(--text-primary)',
+                      fontWeight: 'bold',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <option value="ALL">All Departments</option>
+                    {(rosterData?.departments || []).map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <button className="btn-secondary" onClick={handleDownloadExcel} style={{ gap: '8px', display: 'flex', alignItems: 'center' }}>
                   <Download size={16} />
                   <span>Download Excel (.xlsx)</span>
@@ -658,7 +815,7 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {seatingPlan.attendanceRoster.length === 0 ? (
+                    {(!seatingPlan || !seatingPlan.attendanceRoster || seatingPlan.attendanceRoster.length === 0) ? (
                       <tr>
                         <td colSpan="4" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px' }}>
                           No student seats allocated in this hall.
@@ -683,90 +840,123 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
               </div>
             )}
 
-            {/* University Sheet Format View - Single Combined Roster for All Students */}
+            {/* University Sheet Format View - Department + Subject Code, 25 Students Max per Page */}
             <div className={viewFormat === 'university' ? '' : 'only-print'}>
-              {(!seatingPlan.attendanceRoster || seatingPlan.attendanceRoster.length === 0) ? (
+              {(!rosterData || !rosterData.pages || rosterData.pages.length === 0) ? (
                 <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
-                  No student seats allocated in this hall.
+                  No attendance roster records found for the selected department/date.
                 </div>
               ) : (() => {
-                // Combine all students into a single list sorted by Register Number
-                const allStudents = [...seatingPlan.attendanceRoster].sort((a, b) => {
-                  return (a.registerNo || '').localeCompare(b.registerNo || '');
-                });
+                const pages = rosterData.pages;
 
                 return (
-                  <div className="university-roster-sheet">
-                    {/* Header */}
-                    <div className="uni-roster-header">
-                      <h1 className="uni-title">MADURAI KAMARAJ UNIVERSITY EXAMINATIONS</h1>
-                      <h2 className="college-title">RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM</h2>
-                    </div>
+                  <div className="university-rosters-wrapper">
+                    {pages.map((page, pIdx) => {
+                      const isContinuationPage = page.pageNum > 1;
 
-                    {/* Info Meta Grid */}
-                    <div className="uni-roster-meta">
-                      <div className="meta-row">
-                        <div className="meta-cell"><strong>DATE OF EXAM:</strong> {formattedExamDate}</div>
-                        <div className="meta-cell text-right"><strong>TIME OF EXAM:</strong> {examTime}</div>
-                      </div>
-                      <div className="meta-row">
-                        <div className="meta-cell"><strong>HALL NO:</strong> {seatingPlan.hallName}</div>
-                        <div className="meta-cell text-right"><strong>TOTAL STUDENTS:</strong> {allStudents.length}</div>
-                      </div>
-                    </div>
+                      return (
+                        <div
+                          key={`uni-page-${pIdx}`}
+                          className="university-roster-sheet"
+                          style={{
+                            pageBreakAfter: pIdx < pages.length - 1 ? 'always' : 'auto',
+                            breakAfter: pIdx < pages.length - 1 ? 'page' : 'auto',
+                            marginBottom: '32px'
+                          }}
+                        >
+                          {!isContinuationPage ? (
+                            <>
+                              {/* Header */}
+                              <div className="uni-roster-header">
+                                <h1 className="uni-title">MADURAI KAMARAJ UNIVERSITY EXAMINATIONS</h1>
+                                <h2 className="college-title">RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM</h2>
+                              </div>
 
-                    {/* Roster Table */}
-                    <table className="uni-roster-table">
-                      <thead>
-                        <tr>
-                          <th style={{ width: '8%' }}>SL NO</th>
-                          <th style={{ width: '25%' }}>REGISTER NUMBER</th>
-                          <th style={{ width: '42%' }}>NAME OF THE CANDIDATE</th>
-                          <th style={{ width: '25%' }}>SIGNATURE OF THE CANDIDATE</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allStudents.map((student, idx) => (
-                          <tr key={`${student.registerNo || 'std'}-${idx}`}>
-                            <td className="text-center" style={{ fontWeight: 'bold' }}>{idx + 1}</td>
-                            <td style={{ fontWeight: 600 }}>{student.registerNo}</td>
-                            <td className="text-uppercase">{student.name}</td>
-                            <td className="empty-sig-cell"></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                              {/* Info Meta Grid */}
+                              <div className="uni-roster-meta">
+                                <div className="meta-row">
+                                  <div className="meta-cell"><strong>DATE OF EXAM:</strong> {formattedExamDate}</div>
+                                  <div className="meta-cell text-right"><strong>TIME OF EXAM:</strong> {examTime}</div>
+                                </div>
+                                <div className="meta-row">
+                                  <div className="meta-cell">
+                                    <strong>DEPARTMENT:</strong> {page.deptName.toUpperCase()} &nbsp;|&nbsp; <strong>SUBJECT CODE:</strong> {page.subjectCode.toUpperCase()}
+                                  </div>
+                                  <div className="meta-cell text-right">
+                                    <strong>STUDENTS:</strong> {page.students.length} (Page {page.pageNum} of {page.totalPages})
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            /* Minimal Continuation Header for Page 2+ */
+                            <div className="uni-roster-continuation-header" style={{ marginBottom: '16px', borderBottom: '2px solid var(--text-primary)', paddingBottom: '8px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                                <span><strong>DEPARTMENT:</strong> {page.deptName.toUpperCase()}</span>
+                                <span><strong>SUBJECT CODE:</strong> {page.subjectCode.toUpperCase()}</span>
+                                <span><strong>DATE:</strong> {formattedExamDate} ({examTime})</span>
+                                <span><strong>STUDENTS:</strong> {page.students.length} (Page {page.pageNum} of {page.totalPages} - Continuation Sheet)</span>
+                              </div>
+                            </div>
+                          )}
 
-                    {/* Footer */}
-                    <div className="uni-roster-footer">
-                      <div className="footer-row">
-                        <div className="footer-cell">
-                          <strong>Absentees Reg. No.:</strong>
-                          <span className="bottom-line"></span>
+                          {/* Roster Table */}
+                          <table className="uni-roster-table">
+                            <thead>
+                              <tr>
+                                <th style={{ width: '8%' }}>SL NO</th>
+                                <th style={{ width: '25%' }}>REGISTER NUMBER</th>
+                                <th style={{ width: '42%' }}>NAME OF THE CANDIDATE</th>
+                                <th style={{ width: '25%' }}>SIGNATURE OF THE CANDIDATE</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {page.students.map((student, idx) => (
+                                <tr key={`${student.registerNo || 'std'}-${idx}`}>
+                                  <td className="text-center" style={{ fontWeight: 'bold' }}>{page.startIndex + idx}</td>
+                                  <td style={{ fontWeight: 600 }}>{student.registerNo}</td>
+                                  <td className="text-uppercase">{student.name}</td>
+                                  <td className="empty-sig-cell"></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+
+                          {!isContinuationPage && (
+                            /* Footer on Page 1 */
+                            <div className="uni-roster-footer">
+                              <div className="footer-row">
+                                <div className="footer-cell">
+                                  <strong>Absentees Reg. No.:</strong>
+                                  <span className="bottom-line"></span>
+                                </div>
+                                <div className="footer-cell text-right">
+                                  <strong>Hall No.:</strong> {page.hallName || 'ALL'}
+                                </div>
+                              </div>
+                              <div className="footer-row">
+                                <div className="footer-cell">
+                                  <strong>Total No. of Absentees:</strong>
+                                  <span className="bottom-line" style={{ maxWidth: '80px', minWidth: '60px' }}></span>
+                                </div>
+                                <div className="footer-cell text-right">
+                                  <strong>Name of the Invigilator and College:</strong>
+                                  <span className="bottom-line" style={{ minWidth: '220px' }}></span>
+                                </div>
+                              </div>
+                              <div className="footer-row sig-row">
+                                <div className="footer-cell" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                                  Signature of the Chief Superintendent
+                                </div>
+                                <div className="footer-cell text-right" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                                  Signature of the Invigilator
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <div className="footer-cell text-right">
-                          <strong>Hall No.:</strong> {seatingPlan.hallName}
-                        </div>
-                      </div>
-                      <div className="footer-row">
-                        <div className="footer-cell">
-                          <strong>Total No. of Absentees:</strong>
-                          <span className="bottom-line" style={{ maxWidth: '80px', minWidth: '60px' }}></span>
-                        </div>
-                        <div className="footer-cell text-right">
-                          <strong>Name of the Invigilator and College:</strong>
-                          <span className="bottom-line" style={{ minWidth: '220px' }}></span>
-                        </div>
-                      </div>
-                      <div className="footer-row sig-row">
-                        <div className="footer-cell" style={{ fontWeight: 'bold', fontSize: '13px' }}>
-                          Signature of the Chief Superintendent
-                        </div>
-                        <div className="footer-cell text-right" style={{ fontWeight: 'bold', fontSize: '13px' }}>
-                          Signature of the Invigilator
-                        </div>
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
                 );
               })()}
@@ -774,6 +964,47 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
           </div>
         </div>
       )}
+
+      {/* Seat Labels Printable Area (A4 Portrait - 7 Cols x 12 Rows = 84 Labels per Page) */}
+      <div id="seat-labels-print-area" className="seat-labels-print-wrapper">
+        {(() => {
+          let studentRegNos = allHallsLabelSequence;
+          if (!studentRegNos || studentRegNos.length === 0) {
+            studentRegNos = [];
+            if (seatingPlan && Array.isArray(seatingPlan.seatingGrid)) {
+              seatingPlan.seatingGrid.forEach(bench => {
+                if (bench.seat1 && bench.seat1.registerNo) studentRegNos.push(bench.seat1.registerNo);
+                if (bench.seat2 && bench.seat2.registerNo) studentRegNos.push(bench.seat2.registerNo);
+                if (bench.seat3 && bench.seat3.registerNo) studentRegNos.push(bench.seat3.registerNo);
+              });
+            }
+          }
+
+          const labelsPerPage = 84;
+          const totalPages = Math.ceil(studentRegNos.length / labelsPerPage) || 1;
+          const labelPages = [];
+
+          for (let p = 0; p < totalPages; p++) {
+            const pageStudents = studentRegNos.slice(p * labelsPerPage, (p + 1) * labelsPerPage);
+            labelPages.push(pageStudents);
+          }
+
+          return labelPages.map((pageStudents, pIdx) => (
+            <div key={`label-page-${pIdx}`} className="seat-labels-page">
+              <div className="seat-labels-grid">
+                {Array.from({ length: 84 }).map((_, lIdx) => {
+                  const regNo = pageStudents[lIdx] || '';
+                  return (
+                    <div key={`label-${pIdx}-${lIdx}`} className="seat-label-box">
+                      {regNo ? <span className="label-regno">{regNo}</span> : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ));
+        })()}
+      </div>
     </div>
   );
 }

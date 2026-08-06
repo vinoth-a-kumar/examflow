@@ -454,13 +454,18 @@ const Models = {
     },
     findById: async (id) => {
       const mysqlRes = await safeMysqlQuery(async () => {
-        const rows = await runQuery(`SELECT * FROM halls WHERE \`_id\` = ? LIMIT 1`, [id]);
-        return rows[0] || null;
+        const rows = await runQuery(`SELECT * FROM halls WHERE \`_id\` = ? OR \`name\` = ? LIMIT 1`, [id, id]);
+        if (!rows || rows.length === 0) return null;
+        const h = rows[0];
+        if (h && h.csvData && typeof h.csvData === 'string') {
+          try { h.csvData = JSON.parse(h.csvData); } catch (e) {}
+        }
+        return h;
       });
       if (mysqlRes !== null) return mysqlRes;
       // Fallback
       const data = readJson('halls');
-      return data.find(h => h._id === id) || null;
+      return data.find(h => h._id === id || h.name === id) || null;
     },
     create: async (doc) => {
       const mysqlRes = await safeMysqlQuery(async () => {
@@ -484,15 +489,15 @@ const Models = {
     findByIdAndUpdate: async (id, doc) => {
       const mysqlRes = await safeMysqlQuery(async () => {
         await runQuery(
-          `UPDATE halls SET \`name\` = ?, \`rows\` = ?, \`columns\` = ?, \`capacity\` = ?, \`benches\` = ? WHERE \`_id\` = ?`,
-          [doc.name, doc.rows, doc.columns, doc.capacity, doc.benches, id]
+          `UPDATE halls SET \`name\` = ?, \`rows\` = ?, \`columns\` = ?, \`capacity\` = ?, \`benches\` = ?, \`csvData\` = ? WHERE \`_id\` = ? OR \`name\` = ?`,
+          [doc.name, doc.rows, doc.columns, doc.capacity, doc.benches, JSON.stringify(doc.csvData || null), id, id]
         );
         return { _id: id, ...doc };
       });
       if (mysqlRes !== null) return mysqlRes;
       // Fallback
       const data = readJson('halls');
-      const idx = data.findIndex(h => h._id === id);
+      const idx = data.findIndex(h => h._id === id || h.name === id);
       if (idx !== -1) {
         data[idx] = { ...data[idx], ...doc };
         writeJson('halls', data);

@@ -219,7 +219,7 @@ function DashboardView({ stats, activities, setTab, onClearActivities }) {
               { label: 'Upload Student Data', tab: 'upload', color: '#4f46e5', bg: 'rgba(79,70,229,0.06)', border: 'rgba(79,70,229,0.12)' },
               { label: 'Manage Halls', tab: 'halls', color: '#059669', bg: 'rgba(16,185,129,0.06)', border: 'rgba(16,185,129,0.12)' },
               { label: 'Schedule Exam', tab: 'exams', color: '#d97706', bg: 'rgba(245,158,11,0.06)', border: 'rgba(245,158,11,0.12)' },
-              { label: 'Generate Seating Plan', tab: 'seating', color: '#0ea5e9', bg: 'rgba(6,182,212,0.06)', border: 'rgba(6,182,212,0.12)' },
+              { label: 'Assign Seating Plan', tab: 'seating', color: '#0ea5e9', bg: 'rgba(6,182,212,0.06)', border: 'rgba(6,182,212,0.12)' },
             ].map((action) => (
               <button
                 key={action.tab}
@@ -301,8 +301,8 @@ function DashboardView({ stats, activities, setTab, onClearActivities }) {
             activities.slice(0, 6).map((act, index) => {
               let dotColor = '#94a3b8';
               if (act.type === 'student') dotColor = 'var(--color-primary)';
-              if (act.type === 'hall')    dotColor = 'var(--color-success)';
-              if (act.type === 'exam')    dotColor = 'var(--color-draft)';
+              if (act.type === 'hall') dotColor = 'var(--color-success)';
+              if (act.type === 'exam') dotColor = 'var(--color-draft)';
               return (
                 <div className="activity-item" key={`${act.id || 'act'}-${index}`}>
                   <div className="activity-dot" style={{ backgroundColor: dotColor }} />

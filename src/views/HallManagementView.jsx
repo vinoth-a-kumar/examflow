@@ -7,7 +7,9 @@ import {
   UploadCloud,
   RefreshCw,
   Database,
-  Plus
+  Plus,
+  Edit2,
+  X
 } from 'lucide-react';
 
 function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
@@ -16,7 +18,54 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
   const [isUploading,    setIsUploading]    = useState(false);
   const [csvTextMode,    setCsvTextMode]    = useState(false);
   const [manualCsvText,  setManualCsvText]  = useState('');
+  const [editingHall,    setEditingHall]    = useState(null);
+  const [editFormData,   setEditFormData]   = useState({ name: '', rows: 0, columns: 0, benches: 0, capacity: 0 });
+  const [isSaving,       setIsSaving]       = useState(false);
   const fileInputRef = useRef(null);
+
+  const handleStartEdit = (hall) => {
+    setEditingHall(hall);
+    const benchCount = hall.benches || (hall.rows && hall.columns ? hall.rows * hall.columns : 0);
+    const cap = hall.capacity !== undefined && hall.capacity !== null ? hall.capacity : (benchCount * 2);
+    setEditFormData({
+      name: hall.name || '',
+      rows: hall.rows || 0,
+      columns: hall.columns || 0,
+      benches: benchCount,
+      capacity: cap
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingHall) return;
+    setIsSaving(true);
+    try {
+      const targetId = editingHall._id || editingHall.name;
+      const res = await fetch(`http://localhost:5000/api/halls/${targetId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editFormData.name,
+          rows: parseInt(editFormData.rows) || 1,
+          columns: parseInt(editFormData.columns) || 1,
+          benches: parseInt(editFormData.benches) || 0,
+          capacity: parseInt(editFormData.capacity) || 0
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEditingHall(null);
+        if (refreshData) refreshData();
+      } else {
+        alert('Error updating hall: ' + (data.error || data.message || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('Failed to update hall:', err);
+      alert('Failed to update hall.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const totalHallsCount = (halls || []).length;
   const totalCapacity   = (halls || []).reduce((sum, h) => sum + (h && h.capacity ? h.capacity : 0), 0);
@@ -385,13 +434,23 @@ Lab Block,6,4`}
                         </>
                       )}
                       <td style={{ textAlign: 'right' }}>
-                        <button
-                          className="btn-icon danger"
-                          onClick={() => { if (window.confirm(`Delete "${h.name}"?`)) onDeleteHall(h._id); }}
-                          title={`Delete ${h.name}`}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                          <button
+                            className="btn-icon"
+                            onClick={() => handleStartEdit(h)}
+                            title={`Edit ${h.name}`}
+                            style={{ color: 'var(--color-primary)', background: 'rgba(79,70,229,0.08)' }}
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            className="btn-icon danger"
+                            onClick={() => { if (window.confirm(`Delete "${h.name}"?`)) onDeleteHall(h._id); }}
+                            title={`Delete ${h.name}`}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -402,6 +461,114 @@ Lab Block,6,4`}
         </div>
 
       </div>
+
+      {/* ── Edit Hall Modal ────────────────────────────────────────────── */}
+      {editingHall && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+            borderRadius: '16px', width: '100%', maxWidth: '440px', padding: '24px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)', display: 'flex', flexDirection: 'column', gap: '18px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Edit2 size={18} style={{ color: 'var(--color-primary)' }} />
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Edit Hall Configuration
+                </h3>
+              </div>
+              <button
+                onClick={() => setEditingHall(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div className="form-group">
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Hall Name</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Total Benches</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={editFormData.benches}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                      const b = isNaN(val) || val === '' ? 0 : val;
+                      const c = b * 2;
+                      setEditFormData({
+                        ...editFormData,
+                        benches: val,
+                        capacity: c,
+                        rows: b > 0 ? b : editFormData.rows
+                      });
+                    }}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-app)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary)' }}>Total Seats / Capacity</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={editFormData.capacity}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                      const c = isNaN(val) || val === '' ? 0 : val;
+                      const b = Math.round(c / 2);
+                      setEditFormData({
+                        ...editFormData,
+                        capacity: val,
+                        benches: b,
+                        rows: b > 0 ? b : editFormData.rows
+                      });
+                    }}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1.5px solid var(--color-primary)', background: 'var(--bg-app)', color: 'var(--text-primary)', fontWeight: 700 }}
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Auto-calculates (2 seats/bench)</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+              <button
+                className="btn-secondary"
+                onClick={() => setEditingHall(null)}
+                disabled={isSaving}
+                style={{ padding: '8px 16px', fontSize: '13px' }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handleSaveEdit}
+                disabled={isSaving}
+                style={{ padding: '8px 18px', fontSize: '13px' }}
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

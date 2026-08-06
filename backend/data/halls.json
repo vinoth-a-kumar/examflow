@@ -8,9 +8,9 @@
     "capacity": 34,
     "csvData": {
       "H NO": "A1",
-      "SET OF BENCH": "17",
-      "2*SEATS": "34",
-      "3*SEATS": "51"
+      "SET OF BENCH": 17,
+      "2*SEATS": 34,
+      "3*SEATS": 51
     }
   },
   {

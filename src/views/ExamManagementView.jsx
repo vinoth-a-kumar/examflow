@@ -15,7 +15,7 @@ import {
   Armchair
 } from 'lucide-react';
 
-function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, onUpdateExam }) {
+function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, onUpdateExam, refreshData }) {
   const [modalOpen, setModalOpen] = useState(false);
   // eslint-disable-next-line no-unused-vars
   const [examName, setExamName] = useState('');
@@ -137,16 +137,21 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     if (!hall) return 0;
     const spb = parseInt(seatsPerBenchConfig) || 2;
 
+    if (hall.capacity !== undefined && hall.capacity !== null && !isNaN(parseInt(hall.capacity)) && parseInt(hall.capacity) > 0) {
+      if (spb === 2) return parseInt(hall.capacity);
+      if (spb === 3) return Math.round((parseInt(hall.capacity) / 2) * 3);
+    }
+
     if (hall.csvData) {
       const keys = Object.keys(hall.csvData);
       if (spb === 2) {
         const k2 = keys.find(k => /2\*seat|2_seat|2seat/i.test(k));
-        if (k2 && hall.csvData[k2] && !isNaN(parseInt(hall.csvData[k2]))) {
+        if (k2 && hall.csvData[k2] !== undefined && hall.csvData[k2] !== null && !isNaN(parseInt(hall.csvData[k2]))) {
           return parseInt(hall.csvData[k2]);
         }
       } else if (spb === 3) {
         const k3 = keys.find(k => /3\*seat|3_seat|3seat/i.test(k));
-        if (k3 && hall.csvData[k3] && !isNaN(parseInt(hall.csvData[k3]))) {
+        if (k3 && hall.csvData[k3] !== undefined && hall.csvData[k3] !== null && !isNaN(parseInt(hall.csvData[k3]))) {
           return parseInt(hall.csvData[k3]);
         }
       }
@@ -157,17 +162,79 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
       return benchCount * spb;
     }
 
-    if (spb === 3 && hall.capacity) {
-      return Math.round((hall.capacity / 2) * 3);
-    }
     return hall.capacity || 0;
   };
 
-  // Real-time metrics calculations for Create Exam Modal
+  // Helper: Extract all subject codes for a student
+  const getStudentAllSubCodes = (student) => {
+    if (!student) return [];
+    const codes = [];
+    if (student.csvData && typeof student.csvData === 'object') {
+      Object.values(student.csvData).forEach(val => {
+        if (val) {
+          String(val).split(/\s+/).forEach(tok => {
+            const clean = tok.trim().toUpperCase();
+            if (clean.length >= 2 && clean.length <= 25 && /^[A-Z0-9\-_/]+$/.test(clean)) {
+              codes.push(clean);
+            }
+          });
+        }
+      });
+    }
+    if (student.subjectCode) codes.push(student.subjectCode.toUpperCase());
+    return [...new Set(codes)];
+  };
+
+  // Map of student register numbers by subject code (cleaned without symbols)
+  const studentRegNosBySubCode = useMemo(() => {
+    const map = {};
+    (students || []).forEach(s => {
+      const sCodes = getStudentAllSubCodes(s).map(c => c.replace(/[^A-Z0-9]/gi, '').toUpperCase());
+      sCodes.forEach(code => {
+        if (!map[code]) map[code] = new Set();
+        if (s.registerNo) map[code].add(s.registerNo);
+      });
+    });
+    return map;
+  }, [students]);
+
+  // Set of student register numbers for selected subject codes in Create Modal
+  const selectedStudentsSet = useMemo(() => {
+    const set = new Set();
+    selectedSubjectCodes.forEach(rawCode => {
+      const cleanCode = rawCode.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      const regNos = studentRegNosBySubCode[cleanCode];
+      if (regNos) {
+        regNos.forEach(r => set.add(r));
+      }
+    });
+    return set;
+  }, [selectedSubjectCodes, studentRegNosBySubCode]);
+
+  // Set of student register numbers for selected subject codes in Edit Modal
+  const editSelectedStudentsSet = useMemo(() => {
+    const set = new Set();
+    editSelectedSubjectCodes.forEach(rawCode => {
+      const cleanCode = rawCode.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      const regNos = studentRegNosBySubCode[cleanCode];
+      if (regNos) {
+        regNos.forEach(r => set.add(r));
+      }
+    });
+    return set;
+  }, [editSelectedSubjectCodes, studentRegNosBySubCode]);
+
+  // Real-time metrics calculations for Create Exam Modal (deduplicated unique physical students)
   const totalStudentsSelected = useMemo(() => {
     if (!examDate) return selectedSubjectCodes.length > 0 ? 'Set Date' : 0;
-    return selectedSubjectCodes.reduce((sum, code) => sum + (remainingCounts[code.toUpperCase()] || 0), 0);
-  }, [selectedSubjectCodes, remainingCounts, examDate]);
+    if (selectedSubjectCodes.length === 0) return 0;
+    const upperCodes = selectedSubjectCodes.map(c => c.replace(/[^A-Z0-9]/gi, '').toUpperCase());
+    const matching = (students || []).filter(s => {
+      const sCodes = getStudentAllSubCodes(s).map(c => c.replace(/[^A-Z0-9]/gi, '').toUpperCase());
+      return sCodes.some(c => upperCodes.includes(c));
+    });
+    return matching.length;
+  }, [selectedSubjectCodes, students, examDate]);
 
   const totalAssignedCapacity = useMemo(() => {
     return selectedHalls.reduce((sum, hallName) => {
@@ -180,11 +247,17 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     }, 0);
   }, [selectedHalls, halls, seatsPerBench, examDate, hallAvailability]);
 
-  // Real-time metrics calculations for Edit Exam Modal
+  // Real-time metrics calculations for Edit Exam Modal (deduplicated unique physical students)
   const editTotalStudentsSelected = useMemo(() => {
     if (!editExamDate) return editSelectedSubjectCodes.length > 0 ? 'Set Date' : 0;
-    return editSelectedSubjectCodes.reduce((sum, code) => sum + (editRemainingCounts[code.toUpperCase()] || 0), 0);
-  }, [editSelectedSubjectCodes, editRemainingCounts, editExamDate]);
+    if (editSelectedSubjectCodes.length === 0) return 0;
+    const upperCodes = editSelectedSubjectCodes.map(c => c.replace(/[^A-Z0-9]/gi, '').toUpperCase());
+    const matching = (students || []).filter(s => {
+      const sCodes = getStudentAllSubCodes(s).map(c => c.replace(/[^A-Z0-9]/gi, '').toUpperCase());
+      return sCodes.some(c => upperCodes.includes(c));
+    });
+    return matching.length;
+  }, [editSelectedSubjectCodes, students, editExamDate]);
 
   const editTotalAssignedCapacity = useMemo(() => {
     return editSelectedHalls.reduce((sum, hallName) => {
@@ -883,18 +956,6 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                               style={{ paddingLeft: '32px', fontSize: '12px', height: '34px', borderRadius: '8px', border: '1px solid var(--border-color)', width: '100%' }}
                             />
                           </div>
-                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                            <button type="button" onClick={() => setActiveYearFilter('ALL')}
-                              style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '9999px', border: '1px solid var(--border-color)', cursor: 'pointer', transition: 'all 0.2s',
-                                background: activeYearFilter === 'ALL' ? 'var(--color-primary)' : 'transparent',
-                                color: activeYearFilter === 'ALL' ? '#fff' : 'var(--text-secondary)' }}>All Years</button>
-                            {availableYears.map(year => (
-                              <button type="button" key={year} onClick={() => setActiveYearFilter(year)}
-                                style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '9999px', border: '1px solid var(--border-color)', cursor: 'pointer', transition: 'all 0.2s',
-                                  background: activeYearFilter === year ? 'var(--color-primary)' : 'transparent',
-                                  color: activeYearFilter === year ? '#fff' : 'var(--text-secondary)' }}>{year}</button>
-                            ))}
-                          </div>
                           {filteredCodes.length > 0 && (
                             <button type="button" onClick={() => {
                               if (allFilteredSelected) {
@@ -929,20 +990,53 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                             <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px', fontSize: '13px', width: '100%', margin: 0 }}>No subject codes match your search.</p>
                           ) : (
                             filteredCodes.map(({ code }) => {
+                              const cleanCode = code.replace(/[^A-Z0-9]/gi, '').toUpperCase();
                               const count = examDate ? (remainingCounts[code.toUpperCase()] || 0) : 1;
-                              const isDisabled = examDate && count === 0;
                               const isSelected = selectedSubjectCodes.includes(code);
+
+                              // Conflict checking
+                              const candRegNos = studentRegNosBySubCode[cleanCode] || new Set();
+                              let conflictCount = 0;
+                              if (!isSelected && selectedSubjectCodes.length > 0) {
+                                candRegNos.forEach(r => {
+                                  if (selectedStudentsSet.has(r)) conflictCount++;
+                                });
+                              }
+                              const hasConflict = !isSelected && conflictCount > 0;
+                              const isDisabled = (examDate && count === 0) || hasConflict;
+
                               return (
                                 <button type="button" key={code}
                                   className={`checkbox-btn ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
-                                  onClick={() => handleSubjectCodeToggle(code)}
+                                  onClick={() => { if (!isDisabled) handleSubjectCodeToggle(code); }}
                                   disabled={isDisabled}
-                                  style={isDisabled ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: 'var(--bg-app)', borderColor: 'var(--border-color)', color: 'var(--text-muted)' } : { fontSize: '12px', padding: '7px 14px', borderRadius: '8px' }}
-                                  title={isDisabled ? 'No remaining students for this code' : examDate ? `${count} students remaining` : ''}
+                                  style={isDisabled ? {
+                                    opacity: 0.55,
+                                    cursor: 'not-allowed',
+                                    backgroundColor: hasConflict ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-app)',
+                                    borderColor: hasConflict ? 'rgba(239, 68, 68, 0.3)' : 'var(--border-color)',
+                                    color: hasConflict ? '#ef4444' : 'var(--text-muted)',
+                                    fontSize: '12px', padding: '7px 14px', borderRadius: '8px'
+                                  } : { fontSize: '12px', padding: '7px 14px', borderRadius: '8px' }}
+                                  title={
+                                    hasConflict
+                                      ? `⚠️ Cannot select: ${conflictCount} student(s) overlap with already selected subjects`
+                                      : isDisabled
+                                      ? 'No remaining students for this code'
+                                      : examDate
+                                      ? `${count} students remaining`
+                                      : ''
+                                  }
                                 >
                                   {isSelected && <Check size={11} style={{ marginRight: '4px' }} />}
                                   <span style={{ fontWeight: 700 }}>{code}</span>
-                                  {examDate && count > 0 && <span style={{ fontSize: '9.5px', marginLeft: '4px', opacity: 0.8, fontWeight: 600 }}>({count})</span>}
+                                  {hasConflict ? (
+                                    <span style={{ fontSize: '9.5px', marginLeft: '4px', color: '#ef4444', fontWeight: 800 }}>
+                                      ⚠️ Conflict ({conflictCount})
+                                    </span>
+                                  ) : examDate && count > 0 ? (
+                                    <span style={{ fontSize: '9.5px', marginLeft: '4px', opacity: 0.8, fontWeight: 600 }}>({count})</span>
+                                  ) : null}
                                 </button>
                               );
                             })
@@ -1269,18 +1363,6 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                               style={{ paddingLeft: '32px', fontSize: '12px', height: '34px', borderRadius: '8px', border: '1px solid var(--border-color)', width: '100%' }}
                             />
                           </div>
-                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                            <button type="button" onClick={() => setEditActiveYearFilter('ALL')}
-                              style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '9999px', border: '1px solid var(--border-color)', cursor: 'pointer', transition: 'all 0.2s',
-                                background: editActiveYearFilter === 'ALL' ? 'var(--color-primary)' : 'transparent',
-                                color: editActiveYearFilter === 'ALL' ? '#fff' : 'var(--text-secondary)' }}>All Years</button>
-                            {availableYears.map(year => (
-                              <button type="button" key={year} onClick={() => setEditActiveYearFilter(year)}
-                                style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '9999px', border: '1px solid var(--border-color)', cursor: 'pointer', transition: 'all 0.2s',
-                                  background: editActiveYearFilter === year ? 'var(--color-primary)' : 'transparent',
-                                  color: editActiveYearFilter === year ? '#fff' : 'var(--text-secondary)' }}>{year}</button>
-                            ))}
-                          </div>
                           {filteredCodes.length > 0 && (
                             <button type="button" onClick={() => {
                               if (allFilteredSelected) {
@@ -1315,20 +1397,53 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                             <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px', fontSize: '13px', width: '100%', margin: 0 }}>No subject codes match your search.</p>
                           ) : (
                             filteredCodes.map(({ code }) => {
+                              const cleanCode = code.replace(/[^A-Z0-9]/gi, '').toUpperCase();
                               const count = editExamDate ? (editRemainingCounts[code.toUpperCase()] || 0) : 1;
-                              const isDisabled = editExamDate && count === 0;
                               const isSelected = editSelectedSubjectCodes.includes(code);
+
+                              // Conflict checking for Edit Modal
+                              const candRegNos = studentRegNosBySubCode[cleanCode] || new Set();
+                              let conflictCount = 0;
+                              if (!isSelected && editSelectedSubjectCodes.length > 0) {
+                                candRegNos.forEach(r => {
+                                  if (editSelectedStudentsSet.has(r)) conflictCount++;
+                                });
+                              }
+                              const hasConflict = !isSelected && conflictCount > 0;
+                              const isDisabled = (editExamDate && count === 0) || hasConflict;
+
                               return (
                                 <button type="button" key={code}
                                   className={`checkbox-btn ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
-                                  onClick={() => handleEditSubjectCodeToggle(code)}
+                                  onClick={() => { if (!isDisabled) handleEditSubjectCodeToggle(code); }}
                                   disabled={isDisabled}
-                                  style={isDisabled ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: 'var(--bg-app)', borderColor: 'var(--border-color)', color: 'var(--text-muted)' } : { fontSize: '12px', padding: '7px 14px', borderRadius: '8px' }}
-                                  title={isDisabled ? 'No remaining students for this code' : editExamDate ? `${count} students remaining` : ''}
+                                  style={isDisabled ? {
+                                    opacity: 0.55,
+                                    cursor: 'not-allowed',
+                                    backgroundColor: hasConflict ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-app)',
+                                    borderColor: hasConflict ? 'rgba(239, 68, 68, 0.3)' : 'var(--border-color)',
+                                    color: hasConflict ? '#ef4444' : 'var(--text-muted)',
+                                    fontSize: '12px', padding: '7px 14px', borderRadius: '8px'
+                                  } : { fontSize: '12px', padding: '7px 14px', borderRadius: '8px' }}
+                                  title={
+                                    hasConflict
+                                      ? `⚠️ Cannot select: ${conflictCount} student(s) overlap with already selected subjects`
+                                      : isDisabled
+                                      ? 'No remaining students for this code'
+                                      : editExamDate
+                                      ? `${count} students remaining`
+                                      : ''
+                                  }
                                 >
                                   {isSelected && <Check size={11} style={{ marginRight: '4px' }} />}
                                   <span style={{ fontWeight: 700 }}>{code}</span>
-                                  {editExamDate && count > 0 && <span style={{ fontSize: '9.5px', marginLeft: '4px', opacity: 0.8, fontWeight: 600 }}>({count})</span>}
+                                  {hasConflict ? (
+                                    <span style={{ fontSize: '9.5px', marginLeft: '4px', color: '#ef4444', fontWeight: 800 }}>
+                                      ⚠️ Conflict ({conflictCount})
+                                    </span>
+                                  ) : editExamDate && count > 0 ? (
+                                    <span style={{ fontSize: '9.5px', marginLeft: '4px', opacity: 0.8, fontWeight: 600 }}>({count})</span>
+                                  ) : null}
                                 </button>
                               );
                             })
@@ -1530,7 +1645,10 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
               </p>
             ) : (
               locations.map((loc) => {
-                const depts = [...new Set(loc.classes.map(c => c.classCode.split('/')[0].trim()))].join(', ');
+                const depts = [...new Set(loc.classes.map(c => {
+                  const parts = c.classCode.split('/');
+                  return parts.length > 1 ? parts[0].trim() : c.classCode.trim();
+                }))].join(', ');
                 return (
                   <div key={loc.hallName} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '16px', background: 'var(--bg-card)' }}>
                     
@@ -1545,7 +1663,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                       borderLeft: '4px solid var(--color-primary)',
                       color: 'var(--text-primary)'
                     }}>
-                      {depts} - HALL NO. {loc.hallName}
+                      HALL NO. {loc.hallName}
                     </div>
 
                     {/* Table */}

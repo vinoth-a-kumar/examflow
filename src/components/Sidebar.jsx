@@ -13,11 +13,11 @@ import {
 function Sidebar({ currentTab, setCurrentTab, user, collegeDetails, onLogout, isOpen, onClose }) {
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
-    { id: 'upload',    name: 'Upload Data',      icon: Upload },
-    { id: 'halls',     name: 'Hall Management',  icon: Building2 },
-    { id: 'exams',     name: 'Exam Management',  icon: CalendarDays },
-    { id: 'seating',   name: 'Seating Plan',     icon: Grid3X3 },
-    { id: 'settings',  name: 'Settings',         icon: Settings },
+    { id: 'upload', name: 'Upload Students Data', icon: Upload },
+    { id: 'halls', name: 'Hall Upload', icon: Building2 },
+    { id: 'exams', name: 'Exam Schedule', icon: CalendarDays },
+    { id: 'seating', name: 'Seating Arrange', icon: Grid3X3 },
+    { id: 'settings', name: 'Settings', icon: Settings },
   ];
 
   const collegeName = collegeDetails?.name || 'ExamFlow';
@@ -31,9 +31,9 @@ function Sidebar({ currentTab, setCurrentTab, user, collegeDetails, onLogout, is
   return (
     <>
       {/* Mobile Drawer Overlay Backdrop */}
-      <div 
-        className={`sidebar-backdrop ${isOpen ? 'show' : ''}`} 
-        onClick={onClose} 
+      <div
+        className={`sidebar-backdrop ${isOpen ? 'show' : ''}`}
+        onClick={onClose}
       />
 
       <aside className={`sidebar ${isOpen ? 'mobile-open' : ''}`}>
@@ -57,10 +57,10 @@ function Sidebar({ currentTab, setCurrentTab, user, collegeDetails, onLogout, is
                 <span>{user ? `@${user.username}` : 'Admin Panel'}</span>
               </div>
             </div>
-            
+
             {/* Mobile Close X Button */}
-            <button 
-              className="sidebar-mobile-close-btn" 
+            <button
+              className="sidebar-mobile-close-btn"
               onClick={onClose}
               title="Close Menu"
             >
@@ -102,67 +102,67 @@ function Sidebar({ currentTab, setCurrentTab, user, collegeDetails, onLogout, is
           </nav>
         </div>
 
-      {/* ── Footer ───────────────────────────── */}
-      <div className="sidebar-footer">
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px 14px',
-          borderRadius: '12px',
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.07)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '13px',
-              fontWeight: 800,
-              color: 'white',
-              flexShrink: 0,
-            }}>
-              {user ? user.username.charAt(0).toUpperCase() : 'A'}
-            </div>
-            <div style={{ overflow: 'hidden' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#e2e8f0', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                {user ? user.username : 'Admin'}
-              </div>
-              <div style={{ fontSize: '10.5px', color: 'rgba(148,163,184,0.65)', fontWeight: 500 }}>
-                Administrator
-              </div>
-            </div>
-          </div>
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              title="Log Out"
-              style={{
-                background: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#f87171',
-                padding: '6px',
-                borderRadius: '8px',
-                cursor: 'pointer',
+        {/* ── Footer ───────────────────────────── */}
+        <div className="sidebar-footer">
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 14px',
+            borderRadius: '12px',
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.07)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #4f46e5, #8b5cf6)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'all 0.2s',
-                marginLeft: '6px'
-              }}
-            >
-              <LogOut size={16} />
-            </button>
-          )}
+                fontSize: '13px',
+                fontWeight: 800,
+                color: 'white',
+                flexShrink: 0,
+              }}>
+                {user ? user.username.charAt(0).toUpperCase() : 'A'}
+              </div>
+              <div style={{ overflow: 'hidden' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#e2e8f0', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                  {user ? user.username : 'Admin'}
+                </div>
+                <div style={{ fontSize: '10.5px', color: 'rgba(148,163,184,0.65)', fontWeight: 500 }}>
+                  Administrator
+                </div>
+              </div>
+            </div>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                title="Log Out"
+                style={{
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#f87171',
+                  padding: '6px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s',
+                  marginLeft: '6px'
+                }}
+              >
+                <LogOut size={16} />
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-    </aside>
-  </>
+      </aside>
+    </>
   );
 }
 

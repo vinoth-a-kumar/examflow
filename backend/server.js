@@ -32,9 +32,22 @@ function bufferToCsvText(buffer, originalname) {
   const isExcel = originalname && (/\.(xlsx|xls)$/i.test(originalname));
   if (isExcel) {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    return XLSX.utils.sheet_to_csv(sheet);
+    let bestCsv = '';
+    let maxDataRows = -1;
+
+    // Scan all sheets in the workbook and pick the sheet with the most valid data rows
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      if (!sheet) continue;
+      const csv = XLSX.utils.sheet_to_csv(sheet);
+      const lines = csv.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const validRowsCount = lines.filter(l => l.replace(/,/g, '').trim().length > 0).length;
+      if (validRowsCount > maxDataRows) {
+        maxDataRows = validRowsCount;
+        bestCsv = csv;
+      }
+    }
+    return bestCsv;
   }
   return buffer.toString('utf8');
 }
@@ -91,29 +104,42 @@ function parseCSV(csvText) {
   const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   if (lines.length === 0) return [];
 
-  // Parse header
+  // Find the header row (scanning top lines to skip title/metadata lines if any)
+  let headerRowIdx = 0;
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+    if (hasHeaders(lines[i])) {
+      headerRowIdx = i;
+      break;
+    }
+  }
+
+  const firstLine = lines[headerRowIdx];
   let headers;
-  let startIdx = 1;
-  const firstLine = lines[0];
+  let startIdx = headerRowIdx + 1;
 
   if (hasHeaders(firstLine)) {
     headers = splitCsvLine(firstLine).map(h => h.replace(/^["']|["']$/g, '').trim());
   } else {
-    headers = ['Register No', 'Name', 'Department'];
-    startIdx = 0;
+    const firstLineParts = splitCsvLine(firstLine);
+    headers = firstLineParts.map((_, idx) => {
+      if (idx === 0) return 'Register No';
+      if (idx === 1) return 'Name';
+      if (idx === 2) return 'Department';
+      if (idx === 3) return 'Batch';
+      return `Column_${idx + 1}`;
+    });
+    startIdx = headerRowIdx;
   }
 
   // Find column indexes
   let regIndex  = headers.findIndex(h => /reg|roll|number|id/i.test(h));
   let nameIndex = headers.findIndex(h => /name|student/i.test(h));
   let deptIndex = headers.findIndex(h => /dept|depart|branch|course/i.test(h));
-  if (deptIndex === -1) deptIndex = headers.findIndex(h => /subject/i.test(h));
   let batchIndex = headers.findIndex(h => /batch|year/i.test(h));
 
   // Fallbacks if not detected by regex
   if (regIndex  === -1) regIndex  = 0;
   if (nameIndex === -1) nameIndex = 1;
-  if (deptIndex === -1) deptIndex = 2;
 
   const records = [];
   for (let i = startIdx; i < lines.length; i++) {
@@ -122,10 +148,15 @@ function parseCSV(csvText) {
 
     const parts = splitCsvLine(line);
 
-    if (parts.length > Math.max(regIndex, nameIndex, deptIndex)) {
+    // Dynamically expand headers if a row contains more columns than initial headers
+    while (headers.length < parts.length) {
+      headers.push(`Column_${headers.length + 1}`);
+    }
+
+    if (parts.length > Math.max(regIndex, nameIndex)) {
       const registerNo = parts[regIndex];
       const name       = parts[nameIndex];
-      const department = parts[deptIndex];
+      const department = deptIndex !== -1 ? parts[deptIndex] : 'GENERAL';
       const batch      = batchIndex !== -1 ? parts[batchIndex] : '2024-25';
 
       // Keep dynamic original headers and data mapping
@@ -148,33 +179,198 @@ function parseCSV(csvText) {
   return records;
 }
 
-// Helper: Extract ALL subject codes from student csvData (supports sub_code_1, sub_code_2, ... columns)
-function getStudentAllSubCodes(student) {
-  if (!student.csvData) return [];
-  const codes = [];
-  const possibleKeys = Object.keys(student.csvData);
-  possibleKeys.forEach(k => {
-    if (/sub.*code|subject.*code|sub_code|subcode/i.test(k)) {
-      const val = student.csvData[k];
-      if (val && val.toString().trim()) {
-        codes.push(val.toString().trim().toUpperCase());
+// Helper: Safely extract YYYY-MM-DD from Date object or ISO string
+function getDateString(val) {
+  if (!val) return '';
+  if (typeof val === 'string') return val.split('T')[0];
+  if (val instanceof Date) return val.toISOString().split('T')[0];
+  return String(val).split('T')[0];
+}
+
+// Helper: Check if a token looks like a valid subject code
+function isValidSubjectCodeToken(token) {
+  if (!token) return false;
+  const trimmed = String(token).trim();
+  if (trimmed.length < 2 || trimmed.length > 25) return false;
+  // Alphanumeric with optional hyphens/underscores/slashes
+  if (!/^[A-Za-z0-9\-_/]+$/.test(trimmed)) return false;
+  // Exclude common long non-code words
+  if (/^[A-Za-z]+$/.test(trimmed) && trimmed.length > 12) return false;
+  return true;
+}
+
+// Helper: Clean class code so that raw subject codes or GENERAL in department aren't shown, returning clean Department/Class name
+function formatClassCode(department, subjectCode, registerNo = '') {
+  let dept = (department || '').trim().toUpperCase();
+  const sub = (subjectCode || '').trim().toUpperCase();
+  const reg = (registerNo || '').trim().toUpperCase();
+
+  const isSubjectCodePattern = (str) => {
+    if (!str) return false;
+    if (sub && str === sub) return true;
+    if (/^[A-Z0-9\-_/]{4,15}$/i.test(str) && (/\d/.test(str) || str.length >= 6)) {
+      const knownDepts = ['BBA', 'BCA', 'BCOM', 'BSC', 'BA', 'MA', 'MSC', 'MCOM', 'MATHS', 'PHYSICS', 'CHEMISTRY', 'ENGLISH', 'TAMIL', 'COMMERCE', 'COMPUTER SCIENCE', 'CS', 'IT', 'ENG', 'MAT', 'PHY', 'COM'];
+      if (!knownDepts.includes(str)) {
+        return true;
       }
     }
+    return false;
+  };
+
+  if (!dept || dept === 'GENERAL' || dept === 'UNKNOWN' || isSubjectCodePattern(dept)) {
+    // 1. Match leading letters (e.g. COM26001 -> COM, CS26001 -> CS, ENG26001 -> ENG, IT26001 -> IT, MAT26001 -> MAT)
+    const leadingLettersMatch = reg.match(/^([A-Z]{2,6})\d+/);
+    if (leadingLettersMatch && leadingLettersMatch[1]) {
+      return leadingLettersMatch[1];
+    }
+
+    // 2. Match digits then letters (e.g. 25BBA001 -> BBA, 24MAT001 -> MAT, C5S24001 -> CS)
+    const digitsLettersMatch = reg.match(/^(?:\d{2}|[A-Z]\d|[A-Z]{2}\d)([A-Z]{2,6})/);
+    if (digitsLettersMatch && digitsLettersMatch[1]) {
+      return digitsLettersMatch[1];
+    }
+
+    return 'GENERAL';
+  }
+
+  if (sub && dept.includes(sub)) {
+    dept = dept.replace(sub, '').trim().replace(/[\/\-_]+$/, '').trim();
+  }
+  if (dept.includes('/')) {
+    dept = dept.split('/')[0].trim();
+  }
+
+  return dept || 'GENERAL';
+}
+
+/**
+ * Dynamically detect the column key in student records (csvData) that contains multiple space-separated Subject Codes.
+ * Scans every column across student records without relying on fixed column names like "Subjects Appearing".
+ * Finds column whose cells contain multiple values separated by spaces.
+ * If multiple columns contain subject-code-like values, uses the column with highest number of valid subject codes.
+ */
+function detectSubjectCodeColumn(students) {
+  if (!Array.isArray(students) || students.length === 0) return null;
+
+  const columnKeys = new Set();
+  students.forEach(s => {
+    if (s && s.csvData && typeof s.csvData === 'object') {
+      Object.keys(s.csvData).forEach(k => columnKeys.add(k));
+    }
   });
-  return [...new Set(codes)];
+
+  if (columnKeys.size === 0) return null;
+
+  let bestColumn = null;
+  let maxValidCodesCount = 0;
+  let maxMultiValueCellCount = 0;
+
+  columnKeys.forEach(colKey => {
+    let validCodesCount = 0;
+    let multiValueCellCount = 0;
+
+    students.forEach(s => {
+      if (s && s.csvData && s.csvData[colKey] !== undefined && s.csvData[colKey] !== null) {
+        const rawVal = String(s.csvData[colKey]).trim();
+        if (!rawVal) return;
+
+        // Split cell by whitespace
+        const tokens = rawVal.split(/\s+/).map(t => t.trim()).filter(Boolean);
+
+        if (tokens.length >= 2) {
+          multiValueCellCount++;
+        }
+
+        tokens.forEach(tok => {
+          if (isValidSubjectCodeToken(tok)) {
+            validCodesCount++;
+          }
+        });
+      }
+    });
+
+    // Pick column with space-separated values, or highest valid subject codes count (Rule 10)
+    if (multiValueCellCount > 0) {
+      if (validCodesCount > maxValidCodesCount) {
+        maxValidCodesCount = validCodesCount;
+        maxMultiValueCellCount = multiValueCellCount;
+        bestColumn = colKey;
+      }
+    } else if (maxMultiValueCellCount === 0 && validCodesCount > maxValidCodesCount) {
+      maxValidCodesCount = validCodesCount;
+      bestColumn = colKey;
+    }
+  });
+
+  return bestColumn;
+}
+
+/**
+ * Extract ALL individual subject codes for a student.
+ * Reads from detected subject code column, splits cell by whitespace,
+ * trims extra spaces, ignores empty values, and deduplicates per student.
+ */
+function getStudentAllSubCodes(student, targetColumnKey = null) {
+  if (!student) return [];
+
+  const codes = [];
+
+  if (student.csvData && typeof student.csvData === 'object') {
+    let colKey = targetColumnKey;
+
+    if (!colKey) {
+      colKey = detectSubjectCodeColumn([student]);
+    }
+
+    if (colKey && student.csvData[colKey] !== undefined && student.csvData[colKey] !== null) {
+      const rawVal = String(student.csvData[colKey]).trim();
+      if (rawVal) {
+        const tokens = rawVal.split(/\s+/).map(t => t.trim()).filter(Boolean);
+        tokens.forEach(tok => {
+          if (isValidSubjectCodeToken(tok)) {
+            codes.push(tok.toUpperCase());
+          }
+        });
+      }
+    }
+
+    // Fallback: If no single space-separated column found (e.g. sub_code_1, sub_code_2 multi-column layout),
+    // scan all keys in csvData for valid subject code values
+    if (codes.length === 0) {
+      Object.keys(student.csvData).forEach(k => {
+        const val = student.csvData[k];
+        if (val !== undefined && val !== null) {
+          const rawVal = String(val).trim();
+          if (rawVal) {
+            const tokens = rawVal.split(/\s+/).map(t => t.trim()).filter(Boolean);
+            tokens.forEach(tok => {
+              if (isValidSubjectCodeToken(tok) && (/sub|code|paper|course/i.test(k) || tokens.length >= 2 || /^[A-Z0-9\-_]{3,12}$/i.test(tok))) {
+                codes.push(tok.toUpperCase());
+              }
+            });
+          }
+        }
+      });
+    }
+  }
+
+  // Deduplicate and trim
+  const uniqueCodes = [...new Set(codes.map(c => c.trim().toUpperCase()))].filter(Boolean);
+  return uniqueCodes;
 }
 
 // Helper: Extract primary subject code for a student
-function getStudentSubCode(student) {
+function getStudentSubCode(student, targetColumnKey = null) {
   if (!student) return '';
-  const codes = getStudentAllSubCodes(student);
+  const codes = getStudentAllSubCodes(student, targetColumnKey);
   return codes.length > 0 ? codes[0] : (student.department || '');
 }
 
 // Helper: Check if a student has any subject code matching the given list of codes
-function hasMatchingSubCode(student, examSubCodes) {
-  const studentCodes = getStudentAllSubCodes(student);
-  return studentCodes.some(code => examSubCodes.includes(code));
+function hasMatchingSubCode(student, examSubCodes, targetColumnKey = null) {
+  const studentCodes = getStudentAllSubCodes(student, targetColumnKey);
+  const upperExamSubCodes = examSubCodes.map(c => String(c).trim().toUpperCase());
+  return studentCodes.some(code => upperExamSubCodes.includes(code));
 }
 // Helper: System logs for dashboard recent activities
 // In a full app this might be in DB, we will use a JSON file or memory array that is persisted in memory/DB
@@ -629,28 +825,51 @@ app.delete('/api/halls/:id', async (req, res) => {
 
 app.put('/api/halls/:id', async (req, res) => {
   try {
-    const { name, rows, columns } = req.body;
-    if (!name || !rows || !columns) {
-      return res.status(400).json({ error: 'Name, rows, and columns are required.' });
+    const { name, rows, columns, benches, capacity } = req.body;
+
+    let existingHall = await Models.Hall.findById(req.params.id);
+    if (!existingHall) {
+      const allHalls = await Models.Hall.find();
+      existingHall = allHalls.find(h => String(h._id) === String(req.params.id) || h.name === req.params.id);
     }
-
-    const benches = parseInt(rows) * parseInt(columns);
-    const capacity = benches * 2;
-
-    const updated = await Models.Hall.findByIdAndUpdate(req.params.id, {
-      name,
-      rows: parseInt(rows),
-      columns: parseInt(columns),
-      benches,
-      capacity
-    });
-
-    if (!updated) {
+    if (!existingHall) {
       return res.status(404).json({ error: 'Hall not found.' });
     }
 
-    logActivity('hall', 'Hall Updated', `${name} configuration was updated.`);
-    res.json(updated);
+    const updatedName = name || existingHall.name;
+    const parsedRows = parseInt(rows) || existingHall.rows || 1;
+    const parsedCols = parseInt(columns) || existingHall.columns || 1;
+    const parsedBenches = benches !== undefined && benches !== null ? parseInt(benches) : (existingHall.benches || (parsedRows * parsedCols));
+    const parsedCapacity = capacity !== undefined && capacity !== null ? parseInt(capacity) : (existingHall.capacity || (parsedBenches * 2));
+
+    let updatedCsvData = existingHall.csvData ? { ...existingHall.csvData } : null;
+    if (updatedCsvData) {
+      Object.keys(updatedCsvData).forEach(key => {
+        if (/2\*seat|2_seat|2seat|capacity/i.test(key)) {
+          updatedCsvData[key] = parsedCapacity;
+        } else if (/3\*seat|3_seat|3seat/i.test(key)) {
+          updatedCsvData[key] = Math.round((parsedCapacity / 2) * 3);
+        } else if (/bench/i.test(key)) {
+          updatedCsvData[key] = parsedBenches;
+        } else if (/row/i.test(key)) {
+          updatedCsvData[key] = parsedRows;
+        } else if (/col/i.test(key)) {
+          updatedCsvData[key] = parsedCols;
+        }
+      });
+    }
+
+    const updated = await Models.Hall.findByIdAndUpdate(existingHall._id || req.params.id, {
+      name: updatedName,
+      rows: parsedRows,
+      columns: parsedCols,
+      benches: parsedBenches,
+      capacity: parsedCapacity,
+      csvData: updatedCsvData
+    });
+
+    logActivity('hall', 'Hall Updated', `${updatedName} capacity updated to ${parsedCapacity} seats (${parsedBenches} benches).`);
+    res.json(updated || { _id: existingHall._id || req.params.id, name: updatedName, rows: parsedRows, columns: parsedCols, benches: parsedBenches, capacity: parsedCapacity, csvData: updatedCsvData });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -838,12 +1057,7 @@ app.get('/api/exams', async (req, res) => {
 
       // Build assigned halls details with vacant seats
       const assignedHallsDetails = e.assignedHalls.map(hallName => {
-        const examIdsAtTime = exams.filter(other => 
-          other.date.split('T')[0] === dateStr && 
-          other.session === e.session
-        ).map(o => o._id);
-        
-        const plan = plans.find(p => examIdsAtTime.includes(p.examId) && (p.hallId === hallName || p.hallName === hallName));
+        const plan = plans.find(p => String(p.examId) === String(e._id) && (p.hallId === hallName || p.hallName === hallName));
         const hallObj = allHalls.find(h => h.name === hallName);
         
         return {
@@ -929,13 +1143,15 @@ app.post('/api/exams', async (req, res) => {
 
     logActivity('exam', 'Exam Scheduled', `${name} scheduled for ${date} (${session}). Assigned to ${assignedHalls?.length || 0} halls.`);
     
-    // Auto-generate seating plans for assigned halls
+    // Auto-generate seating plans for all assigned halls
     if (assignedHalls && assignedHalls.length > 0) {
       try {
         const allHalls = await Models.Hall.find();
-        const firstHall = allHalls.find(h => h.name === assignedHalls[0] || String(h._id) === String(assignedHalls[0]));
-        if (firstHall) {
-          await generateSeatingPlan(newExam._id, firstHall._id);
+        for (const hallName of assignedHalls) {
+          const hallObj = allHalls.find(h => h.name === hallName || String(h._id) === String(hallName));
+          if (hallObj) {
+            await generateSeatingPlan(newExam._id, hallObj._id);
+          }
         }
       } catch (e) {
         console.error('Auto seating generation error on create:', e);
@@ -1029,13 +1245,15 @@ app.put('/api/exams/:id', async (req, res) => {
     // Delete existing seating plans for this exam so they can be freshly generated
     await Models.SeatingPlan.deleteMany({ examId: req.params.id });
 
-    // Auto-generate seating plans for assigned halls
+    // Auto-generate seating plans for all assigned halls
     if (assignedHalls && assignedHalls.length > 0) {
       try {
         const allHalls = await Models.Hall.find();
-        const firstHall = allHalls.find(h => h.name === assignedHalls[0] || String(h._id) === String(assignedHalls[0]));
-        if (firstHall) {
-          await generateSeatingPlan(req.params.id, firstHall._id);
+        for (const hallName of assignedHalls) {
+          const hallObj = allHalls.find(h => h.name === hallName || String(h._id) === String(hallName));
+          if (hallObj) {
+            await generateSeatingPlan(req.params.id, hallObj._id);
+          }
         }
       } catch (e) {
         console.error('Auto seating generation error on update:', e);
@@ -1166,16 +1384,22 @@ app.get('/api/students/remaining', async (req, res) => {
   }
 });
 
-// Get all unique subject codes from student records
+// Get all unique subject codes from student records (dynamically detects subject code column)
 app.get('/api/students/subject-codes', async (req, res) => {
   try {
     const allStudents = await Models.Student.find();
+    const detectedColKey = detectSubjectCodeColumn(allStudents);
     const subCodeSet = new Set();
     allStudents.forEach(s => {
-      const codes = getStudentAllSubCodes(s);
-      codes.forEach(code => subCodeSet.add(code));
+      const codes = getStudentAllSubCodes(s, detectedColKey);
+      codes.forEach(code => {
+        if (code && code.trim()) {
+          subCodeSet.add(code.trim().toUpperCase());
+        }
+      });
     });
-    res.json([...subCodeSet].sort());
+    const uniqueCodes = [...subCodeSet].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    res.json(uniqueCodes);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1195,27 +1419,30 @@ app.get('/api/students/remaining-by-subject', async (req, res) => {
       e.date.split('T')[0] === targetDate && e.session === session
     );
     if (req.query.excludeExamId) {
-      examsAtSameTime = examsAtSameTime.filter(e => e._id !== req.query.excludeExamId);
+      examsAtSameTime = examsAtSameTime.filter(e => String(e._id) !== String(req.query.excludeExamId));
     }
-    const examIds = examsAtSameTime.map(e => e._id);
+    const examIds = examsAtSameTime.map(e => String(e._id));
     
     const allPlans = await Models.SeatingPlan.find();
-    const plansAtSameTime = allPlans.filter(p => examIds.includes(p.examId));
+    const plansAtSameTime = allPlans.filter(p => examIds.includes(String(p.examId)));
     
     const seatedStudentRegNos = new Set();
     plansAtSameTime.forEach(plan => {
-      plan.attendanceRoster.forEach(student => {
-        seatedStudentRegNos.add(student.registerNo);
-      });
+      if (plan.attendanceRoster) {
+        plan.attendanceRoster.forEach(student => {
+          seatedStudentRegNos.add(student.registerNo);
+        });
+      }
     });
 
     const allStudents = await Models.Student.find();
+    const detectedColKey = detectSubjectCodeColumn(allStudents);
     
-    // Count remaining students per subject code (supports multiple sub_code columns per student)
+    // Count remaining students per subject code
     const remainingCounts = {};
     allStudents.forEach(s => {
       if (!seatedStudentRegNos.has(s.registerNo)) {
-        const codes = getStudentAllSubCodes(s);
+        const codes = getStudentAllSubCodes(s, detectedColKey);
         codes.forEach(code => {
           remainingCounts[code] = (remainingCounts[code] || 0) + 1;
         });
@@ -1227,6 +1454,39 @@ app.get('/api/students/remaining-by-subject', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Helper: Calculate hall capacity based on bench config (2 or 3 seats/bench) & uploaded hall details (2*SEATS / 3*SEATS)
+function getHallCapacityForSeatsPerBench(hall, seatsPerBench = 2) {
+  if (!hall) return 0;
+  const spb = parseInt(seatsPerBench) || 2;
+
+  const benches = hall.benches || (hall.rows && hall.columns ? hall.rows * hall.columns : 0);
+  if (benches > 0) {
+    return benches * spb;
+  }
+  
+  if (hall.capacity !== undefined && hall.capacity !== null && !isNaN(parseInt(hall.capacity)) && parseInt(hall.capacity) > 0) {
+    if (spb === 2) return parseInt(hall.capacity);
+    if (spb === 3) return Math.round((parseInt(hall.capacity) / 2) * 3);
+  }
+
+  if (hall.csvData) {
+    const keys = Object.keys(hall.csvData);
+    if (spb === 2) {
+      const k2 = keys.find(k => /2\*seat|2_seat|2seat/i.test(k));
+      if (k2 && hall.csvData[k2] && !isNaN(parseInt(hall.csvData[k2]))) {
+        return parseInt(hall.csvData[k2]);
+      }
+    } else if (spb === 3) {
+      const k3 = keys.find(k => /3\*seat|3_seat|3seat/i.test(k));
+      if (k3 && hall.csvData[k3] && !isNaN(parseInt(hall.csvData[k3]))) {
+        return parseInt(hall.csvData[k3]);
+      }
+    }
+  }
+
+  return hall.capacity || 0;
+}
 
 app.get('/api/halls/availability', async (req, res) => {
   try {
@@ -1255,37 +1515,6 @@ app.get('/api/halls/availability', async (req, res) => {
     plansAtSameTime.forEach(p => {
       hallPlans[p.hallName] = p;
     });
-
-// Helper: Calculate hall capacity based on bench config (2 or 3 seats/bench) & uploaded hall details (2*SEATS / 3*SEATS)
-function getHallCapacityForSeatsPerBench(hall, seatsPerBench = 2) {
-  if (!hall) return 0;
-  const spb = parseInt(seatsPerBench) || 2;
-  
-  if (hall.csvData) {
-    const keys = Object.keys(hall.csvData);
-    if (spb === 2) {
-      const k2 = keys.find(k => /2\*seat|2_seat|2seat/i.test(k));
-      if (k2 && hall.csvData[k2] && !isNaN(parseInt(hall.csvData[k2]))) {
-        return parseInt(hall.csvData[k2]);
-      }
-    } else if (spb === 3) {
-      const k3 = keys.find(k => /3\*seat|3_seat|3seat/i.test(k));
-      if (k3 && hall.csvData[k3] && !isNaN(parseInt(hall.csvData[k3]))) {
-        return parseInt(hall.csvData[k3]);
-      }
-    }
-  }
-
-  const benches = hall.benches || (hall.rows && hall.columns ? hall.rows * hall.columns : 0);
-  if (benches > 0) {
-    return benches * spb;
-  }
-  
-  if (spb === 3 && hall.capacity) {
-    return Math.round((hall.capacity / 2) * 3);
-  }
-  return hall.capacity || 0;
-}
 
     const allHalls = await Models.Hall.find();
     const reqSpb = parseInt(req.query.seatsPerBench) || 2;
@@ -1338,62 +1567,7 @@ function getHallCapacityForSeatsPerBench(hall, seatsPerBench = 2) {
   }
 });
 
-// 6. Seating Plan Generation and Retrieval
-app.get('/api/seating/:examId/:hallId', async (req, res) => {
-  try {
-    const plan = await Models.SeatingPlan.findOne({ 
-      examId: req.params.examId, 
-      hallId: req.params.hallId 
-    });
-    if (!plan) {
-      return res.status(404).json({ message: 'Seating plan not generated yet.' });
-    }
 
-    // Recalculate unseated students dynamically based on all plans scheduled for the same time
-    const exam = await Models.Exam.findById(req.params.examId);
-    if (exam) {
-      const allExams = await Models.Exam.find();
-      const targetDate = exam.date.split('T')[0];
-      const examsAtSameTime = allExams.filter(e => 
-        e.date.split('T')[0] === targetDate && e.session === exam.session
-      );
-      const examIds = examsAtSameTime.map(e => e._id);
-      
-      const allPlans = await Models.SeatingPlan.find();
-      const plansAtSameTime = allPlans.filter(p => examIds.includes(p.examId));
-      
-      const seatedStudentRegNos = new Set();
-      plansAtSameTime.forEach(p => {
-        p.attendanceRoster.forEach(student => {
-          seatedStudentRegNos.add(student.registerNo);
-        });
-      });
-      
-      const allStudents = await Models.Student.find();
-      const examSubCodes = (exam.subjectCodes || []).map(c => c.toUpperCase());
-      const examDepts = (exam.departments || []).map(d => d.toUpperCase());
-      
-      const unseated = allStudents
-        .filter(s => {
-          // Filter by subject codes if available, else departments
-          if (examSubCodes.length > 0) {
-            if (!hasMatchingSubCode(s, examSubCodes)) return false;
-          } else {
-            if (!examDepts.includes(s.department.toUpperCase())) return false;
-          }
-          if (seatedStudentRegNos.has(s.registerNo)) return false;
-          return true;
-        })
-        .sort((a, b) => a.registerNo.localeCompare(b.registerNo));
-        
-      plan.unseatedStudents = unseated;
-    }
-
-    res.json(plan);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 app.get('/api/uploads', async (req, res) => {
   try {
@@ -1424,23 +1598,43 @@ async function resolveHall(hallIdOrName) {
   ) || null;
 }
 
-// Helper to sort attendance roster cleanly by Department -> Subject Code -> Register Number
-const sortAttendanceRoster = (roster) => {
+// Helper to sort attendance roster cleanly by Subject Code (in exam order) -> Register Number
+const sortAttendanceRoster = (roster, examSubCodes = []) => {
   if (!roster) return [];
-  return [...roster].sort((a, b) => {
-    const deptA = (a.department || '').toUpperCase();
-    const deptB = (b.department || '').toUpperCase();
-    const deptCompare = deptA.localeCompare(deptB);
-    if (deptCompare !== 0) return deptCompare;
+  const upperSubCodes = (examSubCodes || []).map(c => String(c).trim().toUpperCase());
 
-    const subA = (a.subjectCode || '').toUpperCase();
-    const subB = (b.subjectCode || '').toUpperCase();
+  return [...roster].sort((a, b) => {
+    const subA = String(a.subjectCode || a.department || '').trim().toUpperCase();
+    const subB = String(b.subjectCode || b.department || '').trim().toUpperCase();
+
+    const idxA = upperSubCodes.indexOf(subA);
+    const idxB = upperSubCodes.indexOf(subB);
+
+    if (idxA !== -1 && idxB !== -1 && idxA !== idxB) {
+      return idxA - idxB;
+    }
+    if (idxA !== -1 && idxB === -1) return -1;
+    if (idxA === -1 && idxB !== -1) return 1;
+
     const subCompare = subA.localeCompare(subB);
     if (subCompare !== 0) return subCompare;
 
     return (a.registerNo || '').localeCompare(b.registerNo || '');
   });
 };
+
+function getMatchingSubCodeForStudent(student, examSubCodes = []) {
+  if (!student) return '';
+  if (student.subjectCode) return student.subjectCode;
+  const studentCodes = getStudentAllSubCodes(student);
+  if (examSubCodes && examSubCodes.length > 0) {
+    const upperExams = examSubCodes.map(c => String(c).trim().toUpperCase());
+    const matched = studentCodes.find(c => upperExams.includes(c.toUpperCase()));
+    if (matched) return matched;
+  }
+  return studentCodes.length > 0 ? studentCodes[0] : (student.department || '');
+}
+
 
 // Helper to perform seating generation for a single exam and hall
 async function generateSeatingPlan(examId, hallId) {
@@ -1617,37 +1811,57 @@ async function generateSeatingPlan(examId, hallId) {
 
   // Allocate halls sequentially in their designated sequence
   for (const h of assignedHallsInOrder) {
-    const rowsCount = h.rows;
-    const colsCount = h.columns;
+    const rowsCount = h.rows || 0;
+    const colsCount = h.columns || 0;
     const seatsPerBench = exam.seatsPerBench || 2;
-    const totalSeats = rowsCount * colsCount * seatsPerBench;
+    const maxHallCap = getHallCapacityForSeatsPerBench(h, seatsPerBench);
+    const totalSeats = maxHallCap > 0 ? maxHallCap : (rowsCount * colsCount * seatsPerBench);
     const currentHallIdStr = String(h._id);
     const currentHallNameLower = (h.name || '').trim().toLowerCase();
 
-    // Select MAX 4 active pools (subject codes) for this hall, combining 1st, 2nd, 3rd year
+    // Select active pools (subject codes) for this hall
     const availablePools = activePools.filter(p => p.students && p.students.length > 0);
-    let hallPools = [];
+    
+    // Calculate equal/proportional quotas for each available pool for this hall
+    const numPools = availablePools.length;
+    const poolQuotas = new Map();
+    const poolSeatedCounts = new Map();
 
-    if (availablePools.length <= 4) {
-      hallPools = availablePools;
-    } else {
-      const yr1 = availablePools.filter(p => getYearCategory(p) === 1);
-      const yr2 = availablePools.filter(p => getYearCategory(p) === 2);
-      const yr3 = availablePools.filter(p => getYearCategory(p) === 3);
+    if (numPools > 0) {
+      let remainingCapacity = totalSeats;
+      const baseQuota = Math.floor(totalSeats / numPools);
+      let remainder = totalSeats % numPools;
 
-      const selected = [];
-      if (yr1.length > 0) selected.push(yr1[0]);
-      if (yr2.length > 0) selected.push(yr2[0]);
-      if (yr3.length > 0) selected.push(yr3[0]);
+      availablePools.forEach((pool, idx) => {
+        poolSeatedCounts.set(pool.code, 0);
+        let initialQuota = baseQuota + (idx < remainder ? 1 : 0);
+        let quota = Math.min(initialQuota, pool.students.length);
+        poolQuotas.set(pool.code, quota);
+        remainingCapacity -= quota;
+      });
 
-      const remainingPools = availablePools
-        .filter(p => !selected.includes(p))
-        .sort((a, b) => b.students.length - a.students.length);
+      // Redistribute surplus capacity among pools with remaining unallocated students
+      let activeForRedistribution = availablePools.filter(p => p.students.length > (poolQuotas.get(p.code) || 0));
+      while (remainingCapacity > 0 && activeForRedistribution.length > 0) {
+        let count = activeForRedistribution.length;
+        let addPerPool = Math.floor(remainingCapacity / count) || 1;
+        let redistRem = remainingCapacity % count;
 
-      while (selected.length < 4 && remainingPools.length > 0) {
-        selected.push(remainingPools.shift());
+        let allocatedThisRound = 0;
+        for (let i = 0; i < count && remainingCapacity > 0; i++) {
+          let pool = activeForRedistribution[i];
+          let currentQ = poolQuotas.get(pool.code) || 0;
+          let availStudents = pool.students.length - currentQ;
+          if (availStudents > 0) {
+            let toAdd = Math.min(availStudents, addPerPool + (i < redistRem ? 1 : 0));
+            poolQuotas.set(pool.code, currentQ + toAdd);
+            remainingCapacity -= toAdd;
+            allocatedThisRound += toAdd;
+          }
+        }
+        if (allocatedThisRound === 0) break;
+        activeForRedistribution = availablePools.filter(p => p.students.length > (poolQuotas.get(p.code) || 0));
       }
-      hallPools = selected;
     }
 
     let hallRotationIndex = 0;
@@ -1655,48 +1869,70 @@ async function generateSeatingPlan(examId, hallId) {
 
     function getNextStudent(excludeDepts = []) {
       const upperExcludeDepts = excludeDepts.map(d => d.toUpperCase());
-      let poolsToCheck = hallPools.filter(p => p && p.students && p.students.length > 0);
-      if (poolsToCheck.length === 0) {
-        poolsToCheck = activePools.filter(p => p && p.students && p.students.length > 0);
-      }
-      const numPools = poolsToCheck.length;
-      if (numPools > 0) {
-        for (let i = 0; i < numPools; i++) {
-          const currentIdx = (hallRotationIndex + i) % numPools;
-          const pool = poolsToCheck[currentIdx];
-          if (!pool || !pool.students || pool.students.length === 0) continue;
 
-          const idx = pool.students.findIndex(s => !upperExcludeDepts.includes(s.department.toUpperCase()));
+      // 1. Try pools under target quota excluding excludeDepts
+      for (let i = 0; i < availablePools.length; i++) {
+        const currentIdx = (hallRotationIndex + i) % availablePools.length;
+        const pool = availablePools[currentIdx];
+        if (!pool || !pool.students || pool.students.length === 0) continue;
+
+        const seatedInHall = poolSeatedCounts.get(pool.code) || 0;
+        const targetQuota = poolQuotas.get(pool.code) || 0;
+
+        if (seatedInHall < targetQuota) {
+          const idx = pool.students.findIndex(s => !upperExcludeDepts.includes((s.department || '').toUpperCase()));
           if (idx !== -1) {
             const student = pool.students.splice(idx, 1)[0];
-            hallRotationIndex = (currentIdx + 1) % numPools;
+            poolSeatedCounts.set(pool.code, seatedInHall + 1);
+            hallRotationIndex = (currentIdx + 1) % availablePools.length;
             return { student, code: pool.code };
           }
         }
+      }
 
-        for (let i = 0; i < numPools; i++) {
-          const currentIdx = (hallRotationIndex + i) % numPools;
-          const pool = poolsToCheck[currentIdx];
-          if (!pool || !pool.students || pool.students.length === 0) continue;
+      // 2. Try pools under target quota ignoring excludeDepts
+      for (let i = 0; i < availablePools.length; i++) {
+        const currentIdx = (hallRotationIndex + i) % availablePools.length;
+        const pool = availablePools[currentIdx];
+        if (!pool || !pool.students || pool.students.length === 0) continue;
+
+        const seatedInHall = poolSeatedCounts.get(pool.code) || 0;
+        const targetQuota = poolQuotas.get(pool.code) || 0;
+
+        if (seatedInHall < targetQuota) {
           const student = pool.students.splice(0, 1)[0];
-          hallRotationIndex = (currentIdx + 1) % numPools;
+          poolSeatedCounts.set(pool.code, seatedInHall + 1);
+          hallRotationIndex = (currentIdx + 1) % availablePools.length;
           return { student, code: pool.code };
         }
       }
 
-      // Secondary fallback: pull unseated balance students from OTHER exams at the same date/session!
+      // 3. Fallback: pick from any available activePool
+      for (let i = 0; i < activePools.length; i++) {
+        const currentIdx = (hallRotationIndex + i) % activePools.length;
+        const pool = activePools[currentIdx];
+        if (!pool || !pool.students || pool.students.length === 0) continue;
+
+        const idx = pool.students.findIndex(s => !upperExcludeDepts.includes((s.department || '').toUpperCase()));
+        const targetIdx = idx !== -1 ? idx : 0;
+        const student = pool.students.splice(targetIdx, 1)[0];
+        hallRotationIndex = (currentIdx + 1) % activePools.length;
+        return { student, code: pool.code };
+      }
+
+      // 4. Secondary fallback: pull unseated balance students from OTHER exams at the same date/session!
       if (secondaryPool.length > 0) {
-        const idx = secondaryPool.findIndex(s => !upperExcludeDepts.includes(s.department.toUpperCase()));
+        const idx = secondaryPool.findIndex(s => !upperExcludeDepts.includes((s.department || '').toUpperCase()));
         const targetIdx = idx !== -1 ? idx : 0;
         const student = secondaryPool.splice(targetIdx, 1)[0];
-        const sCode = getStudentSubCode(student) || student.department;
+        const sCode = getMatchingSubCodeForStudent(student, Array.from(otherExamsSubCodes));
 
         // Find matching exam for this student
         const matchingExam = otherExamsAtSameTime.find(e => {
           const eSubs = (e.subjectCodes || []).map(c => c.toUpperCase());
           const eDepts = (e.departments || []).map(d => d.toUpperCase());
           if (eSubs.length > 0 && hasMatchingSubCode(student, eSubs)) return true;
-          if (eDepts.includes(student.department.toUpperCase())) return true;
+          if (eDepts.includes((student.department || '').toUpperCase())) return true;
           return false;
         });
 
@@ -1766,8 +2002,10 @@ async function generateSeatingPlan(examId, hallId) {
 
     // Fill benches sequentially in order (Bench A1 -> Seat1, Seat2; Bench A2 -> Seat1, Seat2 ...)
     for (const bench of benchesList) {
+      if (maxHallCap > 0 && totalSeatedInThisHall >= maxHallCap) break;
+
       // 1. Seat 1 (Left)
-      if (!bench.seat1) {
+      if (!bench.seat1 && (maxHallCap <= 0 || totalSeatedInThisHall < maxHallCap)) {
         let res = getNextStudent([]);
         if (res) {
           bench.seat1 = res.student;
@@ -1784,7 +2022,7 @@ async function generateSeatingPlan(examId, hallId) {
       }
 
       // 2. Seat 2 (Right if 2-seat, Middle if 3-seat)
-      if (!bench.seat2) {
+      if (!bench.seat2 && (maxHallCap <= 0 || totalSeatedInThisHall < maxHallCap)) {
         let dept1 = bench.seat1 ? bench.seat1.department.toUpperCase() : null;
         let res = getNextStudent(dept1 ? [dept1] : []);
         if (!res) {
@@ -1805,7 +2043,7 @@ async function generateSeatingPlan(examId, hallId) {
       }
 
       // 3. Seat 3 (Right if 3-seat)
-      if (seatsPerBench === 3 && !bench.seat3) {
+      if (seatsPerBench === 3 && !bench.seat3 && (maxHallCap <= 0 || totalSeatedInThisHall < maxHallCap)) {
         let dept2 = bench.seat2 ? bench.seat2.department.toUpperCase() : null;
         let res = getNextStudent(dept2 ? [dept2] : []);
         if (!res) {
@@ -1989,6 +2227,15 @@ app.get('/api/seating/by-date-session', async (req, res) => {
       return res.json({ notFound: true, message: 'No seating plans generated for this hall on this date/session.' });
     }
 
+    const allExamSubCodes = [];
+    examsAtTime.forEach(e => {
+      if (e.subjectCodes) {
+        e.subjectCodes.forEach(sc => {
+          if (!allExamSubCodes.includes(sc)) allExamSubCodes.push(sc);
+        });
+      }
+    });
+
     // Merge complementary grids
     const mergedPlan = {
       date,
@@ -1996,6 +2243,7 @@ app.get('/api/seating/by-date-session', async (req, res) => {
       hallId,
       hallName: plansForHall[0].hallName,
       totalBenches: plansForHall[0].totalBenches,
+      subjectCodes: allExamSubCodes,
       seatingGrid: [],
       attendanceRoster: [],
       unseatedStudents: []
@@ -2027,7 +2275,7 @@ app.get('/api/seating/by-date-session', async (req, res) => {
             registerNo: bench.seat1.registerNo,
             name: bench.seat1.name || '',
             department: bench.seat1.department || '',
-            subjectCode: getStudentSubCode(bench.seat1) || bench.seat1.department || '',
+            subjectCode: getMatchingSubCodeForStudent(bench.seat1, allExamSubCodes),
             bench: bench.benchCode,
             seat: 'Left'
           });
@@ -2040,7 +2288,7 @@ app.get('/api/seating/by-date-session', async (req, res) => {
             registerNo: bench.seat2.registerNo,
             name: bench.seat2.name || '',
             department: bench.seat2.department || '',
-            subjectCode: getStudentSubCode(bench.seat2) || bench.seat2.department || '',
+            subjectCode: getMatchingSubCodeForStudent(bench.seat2, allExamSubCodes),
             bench: bench.benchCode,
             seat: bench.seat3 !== undefined ? 'Middle' : 'Right'
           });
@@ -2054,7 +2302,7 @@ app.get('/api/seating/by-date-session', async (req, res) => {
               registerNo: bench.seat3.registerNo,
               name: bench.seat3.name || '',
               department: bench.seat3.department || '',
-              subjectCode: getStudentSubCode(bench.seat3) || bench.seat3.department || '',
+              subjectCode: getMatchingSubCodeForStudent(bench.seat3, allExamSubCodes),
               bench: bench.benchCode,
               seat: 'Right'
             });
@@ -2065,7 +2313,7 @@ app.get('/api/seating/by-date-session', async (req, res) => {
       });
     }
 
-    mergedPlan.attendanceRoster = sortAttendanceRoster(rosterFromGrid);
+    mergedPlan.attendanceRoster = sortAttendanceRoster(rosterFromGrid, allExamSubCodes);
     mergedPlan.totalStudents = mergedPlan.attendanceRoster.length;
     mergedPlan.emptySeats = emptyCount;
 
@@ -2096,86 +2344,225 @@ app.get('/api/seating/by-date-session', async (req, res) => {
   }
 });
 
+// Helper to ensure all merged cells exist in worksheet XML and set correct !ref to prevent Excel file corruption warning
+function finalizeWorksheet(XLSXLib, ws, merges = []) {
+  if (merges && merges.length > 0) {
+    ws['!merges'] = merges;
+    merges.forEach(m => {
+      for (let r = m.s.r; r <= m.e.r; r++) {
+        for (let c = m.s.c; c <= m.e.c; c++) {
+          const cellRef = XLSXLib.utils.encode_cell({ r, c });
+          if (!ws[cellRef]) {
+            ws[cellRef] = { v: '', t: 's' };
+          }
+        }
+      }
+    });
+  }
+
+  let maxR = 0, maxC = 3;
+  let hasCells = false;
+  Object.keys(ws).forEach(key => {
+    if (key.startsWith('!')) return;
+    hasCells = true;
+    const decoded = XLSXLib.utils.decode_cell(key);
+    if (decoded.r > maxR) maxR = decoded.r;
+    if (decoded.c > maxC) maxC = decoded.c;
+  });
+
+  if (hasCells) {
+    for (let r = 0; r <= maxR; r++) {
+      for (let c = 0; c <= maxC; c++) {
+        const cellRef = XLSXLib.utils.encode_cell({ r, c });
+        if (!ws[cellRef]) {
+          ws[cellRef] = { v: '', t: 's' };
+        }
+      }
+    }
+    ws['!ref'] = XLSXLib.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
+  } else {
+    ws['!ref'] = 'A1:D1';
+  }
+}
+
+// Helper to build Department + Subject Code Attendance Roster pages (independent of hall seating)
+async function buildAttendanceRosterPages({ date, session, subjectCodesInput = [], departmentFilter = 'ALL', hallId = null }) {
+  const allExams = await Models.Exam.find();
+  const targetDate = date ? date.split('T')[0] : '';
+
+  // 1. Determine target subject codes
+  let targetSubCodes = [];
+  if (Array.isArray(subjectCodesInput) && subjectCodesInput.length > 0) {
+    targetSubCodes = subjectCodesInput.map(c => String(c).trim().toUpperCase()).filter(Boolean);
+  } else if (typeof subjectCodesInput === 'string' && subjectCodesInput.trim().length > 0) {
+    targetSubCodes = subjectCodesInput.split(',').map(c => c.trim().toUpperCase()).filter(Boolean);
+  }
+
+  // Find exams at target date & session if provided
+  let examsAtTime = [];
+  if (targetDate && session) {
+    examsAtTime = allExams.filter(e => e.date.split('T')[0] === targetDate && e.session === session);
+  } else if (targetSubCodes.length > 0) {
+    examsAtTime = allExams.filter(e => (e.subjectCodes || []).some(sc => targetSubCodes.includes(sc.toUpperCase())));
+  }
+
+  if (targetSubCodes.length === 0) {
+    examsAtTime.forEach(e => {
+      (e.subjectCodes || []).forEach(sc => {
+        const u = sc.trim().toUpperCase();
+        if (u && !targetSubCodes.includes(u)) {
+          targetSubCodes.push(u);
+        }
+      });
+    });
+  }
+
+  // 2. Fetch all student records
+  const allStudents = await Models.Student.find();
+  const detectedColKey = detectSubjectCodeColumn(allStudents);
+
+  // If hallId is specified, option to resolve hallName for header
+  let hallName = 'ALL';
+  if (hallId) {
+    const hallObj = await resolveHall(hallId);
+    if (hallObj && hallObj.name) hallName = hallObj.name;
+  }
+
+  // 3. For each Subject Code, collect matching students & group by Department
+  const allPages = [];
+  const allDepartmentsSet = new Set();
+
+  targetSubCodes.forEach(subCode => {
+    // Filter students for this subject code
+    const matchingStudents = allStudents.filter(s => {
+      const studentCodes = getStudentAllSubCodes(s, detectedColKey);
+      if (studentCodes.length > 0) {
+        if (studentCodes.includes(subCode)) return true;
+      } else {
+        const sSub = (s.subjectCode || '').trim().toUpperCase();
+        if (sSub && sSub === subCode) return true;
+        const matchingExam = examsAtTime.find(e => (e.subjectCodes || []).map(c => c.toUpperCase()).includes(subCode));
+        if (matchingExam) {
+          const eDepts = (matchingExam.departments || []).map(d => d.toUpperCase());
+          if (eDepts.includes((s.department || '').toUpperCase())) return true;
+        }
+      }
+      return false;
+    });
+
+    // Group students by clean Department name
+    const deptGroups = {};
+    matchingStudents.forEach(s => {
+      const cleanDept = formatClassCode(s.department, subCode, s.registerNo);
+      allDepartmentsSet.add(cleanDept);
+
+      // Apply department filter if not 'ALL'
+      if (departmentFilter && departmentFilter !== 'ALL' && departmentFilter.toUpperCase() !== cleanDept.toUpperCase()) {
+        return;
+      }
+
+      if (!deptGroups[cleanDept]) {
+        deptGroups[cleanDept] = [];
+      }
+      deptGroups[cleanDept].push({
+        registerNo: s.registerNo,
+        name: s.name || '',
+        department: cleanDept,
+        subjectCode: subCode
+      });
+    });
+
+    // Sort departments alphabetically
+    const sortedDepts = Object.keys(deptGroups).sort((a, b) => a.localeCompare(b));
+
+    sortedDepts.forEach(deptName => {
+      const deptStudents = deptGroups[deptName];
+      if (!deptStudents || deptStudents.length === 0) return;
+
+      // Sort students strictly by Register Number
+      deptStudents.sort((a, b) => (a.registerNo || '').localeCompare(b.registerNo || ''));
+
+      // Chunk into maximum 25 students per page
+      const chunkSize = 25;
+      const totalPages = Math.ceil(deptStudents.length / chunkSize);
+
+      for (let i = 0; i < deptStudents.length; i += chunkSize) {
+        const chunk = deptStudents.slice(i, i + chunkSize);
+        const pageNum = Math.floor(i / chunkSize) + 1;
+        const startIndex = i + 1;
+
+        allPages.push({
+          subjectCode: subCode,
+          deptName: deptName,
+          students: chunk,
+          totalDeptStudents: deptStudents.length,
+          pageNum: pageNum,
+          totalPages: totalPages,
+          startIndex: startIndex,
+          hallName: hallName
+        });
+      }
+    });
+  });
+
+  return {
+    date: targetDate,
+    session: session || '',
+    departments: Array.from(allDepartmentsSet).sort(),
+    pages: allPages
+  };
+}
+
+// GET attendance roster JSON data grouped by Department + Subject Code (max 25/page)
+app.get('/api/seating/attendance-roster', async (req, res) => {
+  try {
+    const { date, session, department, subjectCodes, hallId } = req.query;
+    const rosterData = await buildAttendanceRosterPages({
+      date,
+      session,
+      subjectCodesInput: subjectCodes,
+      departmentFilter: department || 'ALL',
+      hallId
+    });
+    res.json(rosterData);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET export attendance roster as formatted Excel file (.xlsx)
 app.get('/api/seating/download-roster', async (req, res) => {
   try {
-    const { date, session, hallId } = req.query;
-    if (!date || !session || !hallId) {
-      return res.status(400).json({ error: 'date, session, and hallId are required.' });
-    }
+    const { date, session, department, subjectCodes, hallId } = req.query;
 
-    const hall = await resolveHall(hallId);
-    const hallIdMatches = new Set();
-    if (hallId) hallIdMatches.add(String(hallId));
-    if (hall) {
-      hallIdMatches.add(String(hall._id));
-      if (hall.name) hallIdMatches.add(hall.name);
+    const rosterData = await buildAttendanceRosterPages({
+      date,
+      session,
+      subjectCodesInput: subjectCodes,
+      departmentFilter: department || 'ALL',
+      hallId
+    });
+
+    if (!rosterData.pages || rosterData.pages.length === 0) {
+      return res.status(404).json({ error: 'No matching attendance records found for the selected criteria.' });
     }
 
     const allExams = await Models.Exam.find();
-    const targetDate = date.split('T')[0];
-    const examsAtTime = allExams.filter(e => 
-      e.date.split('T')[0] === targetDate && e.session === session
-    );
-    const examIdsSet = new Set(examsAtTime.map(e => String(e._id)));
-
-    const allPlans = await Models.SeatingPlan.find();
-    const plansForHall = allPlans.filter(p => 
-      examIdsSet.has(String(p.examId)) && (hallIdMatches.has(String(p.hallId)) || hallIdMatches.has(p.hallName))
-    );
-
-    if (plansForHall.length === 0) {
-      return res.status(404).json({ error: 'No seating plans generated for this hall on this date/session.' });
-    }
-
-    const hallName = plansForHall[0].hallName;
-
-    // Merge rosters
-    const attendanceRoster = [];
-    plansForHall.forEach(p => {
-      if (p.attendanceRoster) {
-        attendanceRoster.push(...p.attendanceRoster);
-      }
-    });
-
-    if (attendanceRoster.length === 0) {
-      return res.status(404).json({ error: 'No attendance records found for this hall.' });
-    }
-
-    // Group students by subjectCode
-    const groups = {};
-    attendanceRoster.forEach(student => {
-      const code = (student.subjectCode || 'UNKNOWN').toUpperCase();
-      if (!groups[code]) {
-        groups[code] = [];
-      }
-      groups[code].push(student);
-    });
-
-    // Dynamic import of xlsx-js-style with fallback to xlsx
-    let XLSXLib;
-    try {
-      XLSXLib = require('xlsx-js-style');
-    } catch (e) {
-      XLSXLib = require('xlsx');
-    }
-
-    // Create workbook
-    const wb = XLSXLib.utils.book_new();
+    const targetDate = date ? date.split('T')[0] : rosterData.date;
+    const examsAtTime = allExams.filter(e => e.date.split('T')[0] === targetDate && e.session === session);
 
     // Format the date
-    let formattedDate = date;
+    let formattedDate = targetDate;
     try {
-      const d = new Date(date);
+      const d = new Date(targetDate);
       if (!isNaN(d.getTime())) {
         const dd = String(d.getDate()).padStart(2, '0');
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const yyyy = d.getFullYear();
         formattedDate = `${dd}/${mm}/${yyyy}`;
       }
-    } catch (err) {
-      // Use original date string
-    }
+    } catch (err) {}
 
     // Format session time
     let timeOfExam = session === 'FN' ? '10:00 AM - 01:00 PM' : '02:00 PM - 05:00 PM';
@@ -2184,15 +2571,20 @@ app.get('/api/seating/download-roster', async (req, res) => {
       timeOfExam = firstExamWithTime.time;
     }
 
-    // Populate sheets
-    for (const [subCode, students] of Object.entries(groups)) {
-      // Sort students by Register Number
-      students.sort((a, b) => a.registerNo.localeCompare(b.registerNo));
+    let XLSXLib;
+    try {
+      XLSXLib = require('xlsx-js-style');
+    } catch (e) {
+      XLSXLib = require('xlsx');
+    }
 
-      // Get unique departments/degrees for this subject group
-      const uniqueDepts = [...new Set(students.map(s => s.department).filter(Boolean))].join(', ');
+    const wb = XLSXLib.utils.book_new();
+    const usedSheetNames = new Set();
 
+    rosterData.pages.forEach(page => {
+      const { deptName, subjectCode, students, pageNum, totalPages, startIndex, hallName } = page;
       const ws = {};
+
       const borderStyle = {
         top: { style: 'thin', color: { rgb: '000000' } },
         bottom: { style: 'thin', color: { rgb: '000000' } },
@@ -2206,87 +2598,104 @@ app.get('/api/seating/download-roster', async (req, res) => {
           v: val,
           t: typeof val === 'number' ? 'n' : 's',
           s: {
-            font: {
-              name: 'Times New Roman',
-              size: fontSize,
-              bold: bold,
-              underline: underline
-            },
-            alignment: {
-              horizontal: align,
-              vertical: 'center',
-              wrapText: true
-            }
+            font: { name: 'Times New Roman', size: fontSize, bold: bold, underline: underline },
+            alignment: { horizontal: align, vertical: 'center', wrapText: true }
           }
         };
-
-        if (border) {
-          ws[cellRef].s.border = borderStyle;
-        }
-
+        if (border) ws[cellRef].s.border = borderStyle;
         if (isHeader) {
-          ws[cellRef].s.fill = {
-            patternType: 'solid',
-            fgColor: { rgb: 'EAEAEA' }
-          };
+          ws[cellRef].s.fill = { patternType: 'solid', fgColor: { rgb: 'EAEAEA' } };
         }
       };
 
-      // Header rows
-      writeCell(0, 0, 'MADURAI KAMARAJ UNIVERSITY EXAMINATIONS', true, 'center', 14, false, false, true);
-      writeCell(1, 0, 'RAJAPALAYAM RAJUS\' COLLEGE, RAJAPALAYAM', true, 'center', 12, false, false, true);
+      const isContinuation = pageNum > 1;
 
-      // Meta rows
-      writeCell(2, 0, `DATE OF EXAM: ${formattedDate}`, true, 'left', 10);
-      writeCell(2, 3, `TIME OF EXAM : ${timeOfExam}`, true, 'right', 10);
-      writeCell(3, 0, `HALL NO: ${hallName}`, true, 'left', 10);
-      writeCell(3, 3, `TOTAL STUDENTS: ${students.length}`, true, 'right', 10);
+      if (!isContinuation) {
+        // Page 1: Full University Header & Meta
+        writeCell(0, 0, 'MADURAI KAMARAJ UNIVERSITY EXAMINATIONS', true, 'center', 14, false, false, true);
+        writeCell(1, 0, 'RAJAPALAYAM RAJUS\' COLLEGE, RAJAPALAYAM', true, 'center', 12, false, false, true);
 
-      // Row 4: Empty
-      // Row 5: Table Header
-      writeCell(5, 0, 'SL NO', true, 'center', 10, true, true);
-      writeCell(5, 1, 'REGISTER NUMBER', true, 'center', 10, true, true);
-      writeCell(5, 2, 'NAME OF THE CANDIDATE', true, 'center', 10, true, true);
-      writeCell(5, 3, 'SIGNATURE OF THE CANDIDATE', true, 'center', 10, true, true);
+        writeCell(2, 0, `DATE OF EXAM: ${formattedDate}`, true, 'left', 10);
+        writeCell(2, 3, `TIME OF EXAM : ${timeOfExam}`, true, 'right', 10);
+        writeCell(3, 0, `DEPARTMENT: ${deptName.toUpperCase()} | SUBJECT CODE: ${subjectCode.toUpperCase()}`, true, 'left', 10);
+        writeCell(3, 3, `STUDENTS: ${students.length} (Page ${pageNum}/${totalPages})`, true, 'right', 10);
 
-      // Student rows
-      students.forEach((s, idx) => {
-        const row = 6 + idx;
-        writeCell(row, 0, idx + 1, false, 'center', 10, true);
-        writeCell(row, 1, s.registerNo, true, 'center', 10, true);
-        writeCell(row, 2, (s.name || '').toUpperCase(), false, 'left', 10, true);
-        writeCell(row, 3, '', false, 'left', 10, true); // Empty signature column
-      });
+        // Row 5: Table Header
+        writeCell(5, 0, 'SL NO', true, 'center', 10, true, true);
+        writeCell(5, 1, 'REGISTER NUMBER', true, 'center', 10, true, true);
+        writeCell(5, 2, 'NAME OF THE CANDIDATE', true, 'center', 10, true, true);
+        writeCell(5, 3, 'SIGNATURE OF THE CANDIDATE', true, 'center', 10, true, true);
 
-      const totalRowsCount = 6 + students.length;
+        // Student rows
+        students.forEach((s, idx) => {
+          const row = 6 + idx;
+          const currentSlNo = startIndex + idx;
+          writeCell(row, 0, currentSlNo, false, 'center', 10, true);
+          writeCell(row, 1, s.registerNo || '', true, 'center', 10, true);
+          writeCell(row, 2, (s.name || '').toUpperCase(), false, 'left', 10, true);
+          writeCell(row, 3, '', false, 'left', 10, true);
+        });
 
-      // Footer rows
-      const fStart = totalRowsCount + 1;
-      writeCell(fStart, 0, 'Absentees Reg. No.:', true, 'left', 10);
-      writeCell(fStart, 3, `Hall No.: ${hallName}`, true, 'right', 10);
+        const totalRowsCount = 6 + students.length;
+        const fStart = totalRowsCount + 1;
 
-      writeCell(fStart + 1, 0, 'Total No. of Absentees:', true, 'left', 10);
-      writeCell(fStart + 1, 3, 'Name of the Invigilator and College:', true, 'right', 10);
+        // Footer rows
+        writeCell(fStart, 0, 'Absentees Reg. No.:', true, 'left', 10);
+        writeCell(fStart, 3, `Hall No.: ${hallName || 'ALL'}`, true, 'right', 10);
 
-      writeCell(fStart + 3, 0, 'Signature of the Chief Superintendent', true, 'left', 10);
-      writeCell(fStart + 3, 3, 'Signature of the Invigilator', true, 'right', 10);
+        writeCell(fStart + 1, 0, 'Total No. of Absentees:', true, 'left', 10);
+        writeCell(fStart + 1, 3, 'Name of the Invigilator and College:', true, 'right', 10);
 
-      // Apply Merges
-      ws['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }, // Title
-        { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }, // College
-        { s: { r: 2, c: 0 }, e: { r: 2, c: 2 } }, // Date of Exam (A-C)
-        { s: { r: 3, c: 0 }, e: { r: 3, c: 2 } }, // Subject Code (A-C)
-        { s: { r: fStart, c: 0 }, e: { r: fStart, c: 2 } }, // Absentees Reg (A-C)
-        { s: { r: fStart + 1, c: 0 }, e: { r: fStart + 1, c: 2 } }, // Total Absentees (A-C)
-        { s: { r: fStart + 3, c: 0 }, e: { r: fStart + 3, c: 1 } } // Superintendent Sig (A-B)
-      ];
+        writeCell(fStart + 3, 0, 'Signature of the Chief Superintendent', true, 'left', 10);
+        writeCell(fStart + 3, 3, 'Signature of the Invigilator', true, 'right', 10);
 
-      // Define row range
-      const endRowIdx = fStart + 4;
-      ws['!ref'] = `A1:D${endRowIdx}`;
+        const pageMerges = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } },
+          { s: { r: 2, c: 0 }, e: { r: 2, c: 2 } },
+          { s: { r: 3, c: 0 }, e: { r: 3, c: 2 } },
+          { s: { r: fStart, c: 0 }, e: { r: fStart, c: 2 } },
+          { s: { r: fStart + 1, c: 0 }, e: { r: fStart + 1, c: 2 } },
+          { s: { r: fStart + 3, c: 0 }, e: { r: fStart + 3, c: 1 } }
+        ];
 
-      // Set column widths
+        ws['!rows'] = [];
+        ws['!rows'][0] = { hpt: 25 };
+        ws['!rows'][1] = { hpt: 22 };
+        ws['!rows'][2] = { hpt: 20 };
+        ws['!rows'][3] = { hpt: 20 };
+        ws['!rows'][5] = { hpt: 22 };
+        for (let i = 0; i < students.length; i++) {
+          ws['!rows'][6 + i] = { hpt: 26 };
+        }
+
+        finalizeWorksheet(XLSXLib, ws, pageMerges);
+      } else {
+        // Page 2+: Continuation Sheet
+        writeCell(0, 0, 'SL NO', true, 'center', 10, true, true);
+        writeCell(0, 1, 'REGISTER NUMBER', true, 'center', 10, true, true);
+        writeCell(0, 2, 'NAME OF THE CANDIDATE', true, 'center', 10, true, true);
+        writeCell(0, 3, 'SIGNATURE OF THE CANDIDATE', true, 'center', 10, true, true);
+
+        students.forEach((s, idx) => {
+          const row = 1 + idx;
+          const currentSlNo = startIndex + idx;
+          writeCell(row, 0, currentSlNo, false, 'center', 10, true);
+          writeCell(row, 1, s.registerNo || '', true, 'center', 10, true);
+          writeCell(row, 2, (s.name || '').toUpperCase(), false, 'left', 10, true);
+          writeCell(row, 3, '', false, 'left', 10, true);
+        });
+
+        ws['!rows'] = [];
+        ws['!rows'][0] = { hpt: 22 };
+        for (let i = 0; i < students.length; i++) {
+          ws['!rows'][1 + i] = { hpt: 26 };
+        }
+
+        finalizeWorksheet(XLSXLib, ws, []);
+      }
+
+      // Column widths
       ws['!cols'] = [
         { wch: 8 },  // SL NO
         { wch: 22 }, // REGISTER NUMBER
@@ -2294,29 +2703,423 @@ app.get('/api/seating/download-roster', async (req, res) => {
         { wch: 35 }  // SIGNATURE OF THE CANDIDATE
       ];
 
-      // Set row heights
-      ws['!rows'] = [];
-      ws['!rows'][0] = { hpt: 25 }; // Title
-      ws['!rows'][1] = { hpt: 22 }; // College
-      ws['!rows'][2] = { hpt: 20 }; // Date/Time
-      ws['!rows'][3] = { hpt: 20 }; // Sub/Deg
-      ws['!rows'][5] = { hpt: 22 }; // Table Header
-      for (let i = 0; i < students.length; i++) {
-        ws['!rows'][6 + i] = { hpt: 26 }; // Student Row Height
+      const cleanDept = deptName.replace(/[^A-Z0-9]/gi, '').substring(0, 8);
+      const cleanSub = subjectCode.replace(/[^A-Z0-9]/gi, '').substring(0, 8);
+      let baseSheetName = `${cleanDept}_${cleanSub}_P${pageNum}`.substring(0, 30);
+      let sheetName = baseSheetName;
+      let counter = 1;
+      while (usedSheetNames.has(sheetName)) {
+        sheetName = `${baseSheetName.substring(0, 25)}_${counter}`;
+        counter++;
       }
+      usedSheetNames.add(sheetName);
+      XLSXLib.utils.book_append_sheet(wb, ws, sheetName);
+    });
 
-      // Add sheet to workbook
-      const safeSheetName = subCode.replace(/[\\\/?*:[\]]/g, '_').substring(0, 30);
-      XLSXLib.utils.book_append_sheet(wb, ws, safeSheetName);
+    const buffer = XLSXLib.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const filename = `Attendance_Roster_${(department || 'ALL').replace(/[^A-Z0-9]/gi, '_')}_${targetDate || 'Exam'}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Helper to extract complete seating arrangement student sequence across ALL halls for a selected Date and Session, ordered strictly by Department -> Register Number (Ascending)
+async function getAllHallsSeatingStudentSequence(date, session) {
+  if (!date || !session) return { studentRegNos: [], totalStudents: 0, departmentCounts: {}, hallsProcessed: 0 };
+
+  const targetDate = date.split('T')[0];
+  const allExams = await Models.Exam.find();
+  const examsAtTime = allExams.filter(e => e.date.split('T')[0] === targetDate && e.session === session);
+  if (examsAtTime.length === 0) {
+    return { studentRegNos: [], totalStudents: 0, departmentCounts: {}, hallsProcessed: 0 };
+  }
+
+  // Auto-generate plans for all assigned halls of these exams if not yet generated
+  for (const exam of examsAtTime) {
+    if (exam.assignedHalls && exam.assignedHalls.length > 0) {
+      for (const hId of exam.assignedHalls) {
+        try {
+          const hall = await resolveHall(hId);
+          if (hall) {
+            await generateSeatingPlan(exam._id, hall._id || hId);
+          }
+        } catch (e) {
+          console.error('Error auto-generating plan in getAllHallsSeatingStudentSequence:', e);
+        }
+      }
+    }
+  }
+
+  const examIdsSet = new Set(examsAtTime.map(e => String(e._id)));
+  const allPlans = await Models.SeatingPlan.find();
+  const plansForTime = allPlans.filter(p => {
+    const matchesExamId = examIdsSet.has(String(p.examId));
+    const matchesDateSession = p.date && p.date.split('T')[0] === targetDate && p.session === session;
+    return matchesExamId || matchesDateSession;
+  });
+  const hallsProcessedSet = new Set();
+
+  // Fetch all students to resolve true department if missing in roster/grid
+  const allStudents = await Models.Student.find();
+  const studentMapByReg = new Map();
+  allStudents.forEach(s => {
+    if (s.registerNo) studentMapByReg.set(s.registerNo.trim().toUpperCase(), s);
+  });
+
+  const studentObjList = [];
+  const seenRegNos = new Set();
+
+  plansForTime.forEach(p => {
+    if (p.hallName) hallsProcessedSet.add(p.hallName);
+    if (p.hallId) hallsProcessedSet.add(String(p.hallId));
+
+    const processStudentRecord = (stdObj) => {
+      if (!stdObj || !stdObj.registerNo) return;
+      const cleanReg = stdObj.registerNo.trim().toUpperCase();
+      if (seenRegNos.has(cleanReg)) return;
+      seenRegNos.add(cleanReg);
+
+      const dbStudent = studentMapByReg.get(cleanReg);
+      const rawDept = (stdObj.department || (dbStudent ? dbStudent.department : '') || '').trim();
+      const cleanDept = formatClassCode(rawDept, stdObj.subjectCode || (dbStudent ? dbStudent.subjectCode : ''), cleanReg);
+
+      studentObjList.push({
+        registerNo: cleanReg,
+        name: stdObj.name || (dbStudent ? dbStudent.name : ''),
+        department: cleanDept
+      });
+    };
+
+    if (Array.isArray(p.seatingGrid) && p.seatingGrid.length > 0) {
+      p.seatingGrid.forEach(bench => {
+        if (bench.seat1) processStudentRecord(bench.seat1);
+        if (bench.seat2) processStudentRecord(bench.seat2);
+        if (bench.seat3) processStudentRecord(bench.seat3);
+      });
+    } else if (Array.isArray(p.attendanceRoster)) {
+      p.attendanceRoster.forEach(s => {
+        processStudentRecord(s);
+      });
+    }
+  });
+
+  // Group by Department
+  const deptGroups = {};
+  studentObjList.forEach(s => {
+    const deptKey = s.department || 'GENERAL';
+    if (!deptGroups[deptKey]) {
+      deptGroups[deptKey] = [];
+    }
+    deptGroups[deptKey].push(s);
+  });
+
+  // Sort Departments alphabetically
+  const sortedDepts = Object.keys(deptGroups).sort((a, b) => a.localeCompare(b));
+
+  const finalRegNos = [];
+  const departmentCounts = {};
+
+  sortedDepts.forEach(deptName => {
+    const group = deptGroups[deptName];
+    // Sort students within department strictly by Register Number ascending
+    group.sort((a, b) => a.registerNo.localeCompare(b.registerNo));
+    departmentCounts[deptName] = group.length;
+
+    group.forEach(s => {
+      finalRegNos.push(s.registerNo);
+    });
+  });
+
+  return {
+    studentRegNos: finalRegNos,
+    totalStudents: finalRegNos.length,
+    departmentCounts,
+    hallsProcessed: hallsProcessedSet.size
+  };
+}
+
+// Helper to extract exact seating arrangement student sequence for a selected Hall, Date, and Session
+async function getHallSeatingStudentSequence(date, session, hallId) {
+  if (!date || !session || !hallId) return { hallName: 'HALL', studentRegNos: [] };
+
+  const hall = await resolveHall(hallId);
+  const hallIdMatches = new Set();
+  if (hallId) hallIdMatches.add(String(hallId));
+  if (hall) {
+    hallIdMatches.add(String(hall._id));
+    if (hall.name) hallIdMatches.add(hall.name);
+  }
+
+  const targetDate = date.split('T')[0];
+  const allExams = await Models.Exam.find();
+  const examsAtTime = allExams.filter(e => e.date.split('T')[0] === targetDate && e.session === session);
+  const examIdsSet = new Set(examsAtTime.map(e => String(e._id)));
+
+  // Auto-generate plans for these exams to guarantee fresh allocation if missing
+  for (const exam of examsAtTime) {
+    if (exam.assignedHalls && exam.assignedHalls.length > 0) {
+      try {
+        const firstHall = hall || (await resolveHall(exam.assignedHalls[0]));
+        if (firstHall) {
+          await generateSeatingPlan(exam._id, firstHall._id || exam.assignedHalls[0]);
+        }
+      } catch (e) {
+        console.error('Error auto-generating plan in getHallSeatingStudentSequence:', e);
+      }
+    }
+  }
+
+  const allPlans = await Models.SeatingPlan.find();
+  const plansForHall = allPlans.filter(p => 
+    examIdsSet.has(String(p.examId)) && (hallIdMatches.has(String(p.hallId)) || hallIdMatches.has(p.hallName))
+  );
+
+  let hallName = hall ? hall.name : (plansForHall.length > 0 ? plansForHall[0].hallName : 'HALL');
+  const studentRegNos = [];
+
+  plansForHall.forEach(p => {
+    if (Array.isArray(p.seatingGrid) && p.seatingGrid.length > 0) {
+      p.seatingGrid.forEach(bench => {
+        if (bench.seat1 && bench.seat1.registerNo) studentRegNos.push(bench.seat1.registerNo);
+        if (bench.seat2 && bench.seat2.registerNo) studentRegNos.push(bench.seat2.registerNo);
+        if (bench.seat3 && bench.seat3.registerNo) studentRegNos.push(bench.seat3.registerNo);
+      });
+    } else if (Array.isArray(p.attendanceRoster)) {
+      p.attendanceRoster.forEach(s => {
+        if (s && s.registerNo) studentRegNos.push(s.registerNo);
+      });
+    }
+  });
+
+  return { hallName, studentRegNos };
+}
+
+// GET export seat labels as styled Excel file (.xlsx) - Overall All-Halls Export (7 cols x 12 rows per page block)
+app.get('/api/seating/labels/download-excel', async (req, res) => {
+  try {
+    const { date, session, hallId } = req.query;
+    let studentRegNos = [];
+    let fileSuffix = 'All_Halls';
+
+    if (date && session) {
+      const seq = await getAllHallsSeatingStudentSequence(date, session);
+      studentRegNos = seq.studentRegNos;
+    } else if (hallId) {
+      const seq = await getHallSeatingStudentSequence(date, session, hallId);
+      studentRegNos = seq.studentRegNos;
+      fileSuffix = seq.hallName || 'HALL';
     }
 
-    // Write to buffer
-    const buf = XLSXLib.write(wb, { bookType: 'xlsx', type: 'buffer' });
+    if (studentRegNos.length === 0) {
+      return res.status(404).json({ error: 'No student seating allocation found for the selected Date and Session.' });
+    }
 
-    res.setHeader('Content-Disposition', `attachment; filename="Attendance_Roster_${hallName.replace(/\s+/g, '_')}_${targetDate}.xlsx"`);
+    let XLSXLib;
+    try {
+      XLSXLib = require('xlsx-js-style');
+    } catch (e) {
+      XLSXLib = require('xlsx');
+    }
+
+    const wb = XLSXLib.utils.book_new();
+    const ws = {};
+
+    const borderStyle = {
+      top: { style: 'thin', color: { rgb: '000000' } },
+      bottom: { style: 'thin', color: { rgb: '000000' } },
+      left: { style: 'thin', color: { rgb: '000000' } },
+      right: { style: 'thin', color: { rgb: '000000' } }
+    };
+
+    const labelsPerPage = 84;
+    const totalPages = Math.ceil(studentRegNos.length / labelsPerPage);
+    const merges = [];
+
+    let currentExcelRow = 0;
+
+    for (let p = 0; p < totalPages; p++) {
+      const pageStudents = studentRegNos.slice(p * labelsPerPage, (p + 1) * labelsPerPage);
+
+      // Write 12 rows x 7 cols
+      for (let r = 0; r < 12; r++) {
+        const rowIdx = currentExcelRow + r;
+        for (let c = 0; c < 7; c++) {
+          const studentIdx = r * 7 + c;
+          const regNo = studentIdx < pageStudents.length ? pageStudents[studentIdx] : '';
+          const cellRef = XLSXLib.utils.encode_cell({ r: rowIdx, c });
+
+          ws[cellRef] = {
+            v: regNo,
+            t: 's',
+            s: {
+              font: { name: 'Times New Roman', size: 12, bold: true },
+              alignment: { horizontal: 'center', vertical: 'center' },
+              border: borderStyle
+            }
+          };
+        }
+      }
+
+      currentExcelRow += 12;
+      if (p < totalPages - 1) {
+        currentExcelRow += 1;
+      }
+    }
+
+    ws['!cols'] = [
+      { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }
+    ];
+
+    ws['!rows'] = [];
+    for (let r = 0; r < currentExcelRow; r++) {
+      ws['!rows'][r] = { hpt: 28 };
+    }
+
+    ws['!pageSetup'] = { paperSize: 9, orientation: 'portrait', fitToWidth: 1, fitToHeight: 0 };
+    finalizeWorksheet(XLSXLib, ws, merges);
+
+    const sheetName = 'Seat_Labels_All';
+    XLSXLib.utils.book_append_sheet(wb, ws, sheetName);
+
+    const buffer = XLSXLib.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const targetDate = date ? date.split('T')[0] : 'Date';
+    const filename = `Seat_Labels_All_${targetDate}_${session || ''}.xlsx`;
+
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.send(buf);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
+// GET export seat labels as CSV file (.csv) - Overall All-Halls Export (7 columns per row)
+app.get('/api/seating/labels/download-csv', async (req, res) => {
+  try {
+    const { date, session, hallId } = req.query;
+    let studentRegNos = [];
+    let fileSuffix = 'All_Halls';
+
+    if (date && session) {
+      const seq = await getAllHallsSeatingStudentSequence(date, session);
+      studentRegNos = seq.studentRegNos;
+    } else if (hallId) {
+      const seq = await getHallSeatingStudentSequence(date, session, hallId);
+      studentRegNos = seq.studentRegNos;
+      fileSuffix = seq.hallName || 'HALL';
+    }
+
+    if (studentRegNos.length === 0) {
+      return res.status(404).json({ error: 'No student seating allocation found for the selected Date and Session.' });
+    }
+
+    const csvRows = [];
+    for (let i = 0; i < studentRegNos.length; i += 7) {
+      const chunk = studentRegNos.slice(i, i + 7);
+      csvRows.push(chunk.join(','));
+    }
+
+    const csvContent = csvRows.join('\n');
+    const targetDate = date ? date.split('T')[0] : 'Date';
+    const filename = `Seat_Labels_${fileSuffix}_${targetDate}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csvContent);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET export seat labels as printable A4 PDF file (.pdf) - Overall All-Halls Export (7 cols x 12 rows per page)
+app.get('/api/seating/labels/download-pdf', async (req, res) => {
+  try {
+    const { date, session, hallId } = req.query;
+    let studentRegNos = [];
+    let fileSuffix = 'All_Halls';
+
+    if (date && session) {
+      const seq = await getAllHallsSeatingStudentSequence(date, session);
+      studentRegNos = seq.studentRegNos;
+    } else if (hallId) {
+      const seq = await getHallSeatingStudentSequence(date, session, hallId);
+      studentRegNos = seq.studentRegNos;
+      fileSuffix = seq.hallName || 'HALL';
+    }
+
+    if (studentRegNos.length === 0) {
+      return res.status(404).json({ error: 'No student seating allocation found for the selected Date and Session.' });
+    }
+
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: 0
+    });
+
+    const buffers = [];
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => {
+      const pdfData = Buffer.concat(buffers);
+      const targetDate = date ? date.split('T')[0] : 'Date';
+      const filename = `Seat_Labels_${fileSuffix}_${targetDate}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(pdfData);
+    });
+
+    const pageW = 595.28;
+    const pageH = 841.89;
+    const marginX = 14;
+    const marginY = 14;
+    const cols = 7;
+    const rows = 12;
+    const gapX = 3;
+    const gapY = 3;
+
+    const labelW = (pageW - (2 * marginX) - ((cols - 1) * gapX)) / cols;
+    const labelH = (pageH - (2 * marginY) - ((rows - 1) * gapY)) / rows;
+
+    const labelsPerPage = cols * rows;
+    const totalPages = Math.ceil(studentRegNos.length / labelsPerPage);
+
+    for (let p = 0; p < totalPages; p++) {
+      if (p > 0) doc.addPage();
+
+      const pageStudents = studentRegNos.slice(p * labelsPerPage, (p + 1) * labelsPerPage);
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const idx = r * cols + c;
+          const regNo = idx < pageStudents.length ? pageStudents[idx] : '';
+          const x = marginX + c * (labelW + gapX);
+          const y = marginY + r * (labelH + gapY);
+
+          // Draw thin border for cutting
+          doc.lineWidth(0.5).rect(x, y, labelW, labelH).stroke('#000000');
+
+          if (regNo) {
+            doc.font('Helvetica-Bold')
+               .fontSize(11)
+               .fillColor('#000000')
+               .text(regNo, x, y + (labelH / 2) - 6, {
+                 width: labelW,
+                 align: 'center'
+               });
+          }
+        }
+      }
+    }
+
+    doc.end();
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });
@@ -2453,14 +3256,14 @@ app.get('/api/seating/locations-by-date-session', async (req, res) => {
     }
 
     const allExams = await Models.Exam.find();
-    const targetDate = date.split('T')[0];
+    const targetDate = getDateString(date);
     const examsAtTime = allExams.filter(e => 
-      e.date.split('T')[0] === targetDate && e.session === session
+      getDateString(e.date) === targetDate && e.session === session
     );
-    const examIds = examsAtTime.map(e => e._id);
+    const examIds = examsAtTime.map(e => String(e._id));
 
     const allPlans = await Models.SeatingPlan.find();
-    const plansForTime = allPlans.filter(p => examIds.includes(p.examId));
+    const plansForTime = allPlans.filter(p => examIds.includes(String(p.examId)));
 
     // Group plans by hallId / hallName
     const hallPlans = {};
@@ -2485,12 +3288,10 @@ app.get('/api/seating/locations-by-date-session', async (req, res) => {
         }
       });
 
-      // Group students by department + subjectCode
+      // Group students by department / subjectCode
       const classGroups = {};
       attendanceRoster.forEach(s => {
-        const dept = (s.department || 'UNKNOWN').toUpperCase();
-        const sub = (s.subjectCode || 'UNKNOWN').toUpperCase();
-        const classKey = `${dept}/ ${sub}`;
+        const classKey = formatClassCode(s.department, s.subjectCode, s.registerNo);
         if (!classGroups[classKey]) {
           classGroups[classKey] = [];
         }
@@ -2540,14 +3341,14 @@ app.get('/api/seating/download-locations', async (req, res) => {
     }
 
     const allExams = await Models.Exam.find();
-    const targetDate = date.split('T')[0];
+    const targetDate = getDateString(date);
     const examsAtTime = allExams.filter(e => 
-      e.date.split('T')[0] === targetDate && e.session === session
+      getDateString(e.date) === targetDate && e.session === session
     );
-    const examIds = examsAtTime.map(e => e._id);
+    const examIds = examsAtTime.map(e => String(e._id));
 
     const allPlans = await Models.SeatingPlan.find();
-    const plansForTime = allPlans.filter(p => examIds.includes(p.examId));
+    const plansForTime = allPlans.filter(p => examIds.includes(String(p.examId)));
 
     if (plansForTime.length === 0) {
       return res.status(404).json({ error: 'No seating plans generated for this date and session.' });
@@ -2577,9 +3378,7 @@ app.get('/api/seating/download-locations', async (req, res) => {
 
       const classGroups = {};
       attendanceRoster.forEach(s => {
-        const dept = (s.department || 'UNKNOWN').toUpperCase();
-        const sub = (s.subjectCode || 'UNKNOWN').toUpperCase();
-        const classKey = `${dept}/ ${sub}`;
+        const classKey = formatClassCode(s.department, s.subjectCode, s.registerNo);
         if (!classGroups[classKey]) {
           classGroups[classKey] = [];
         }
@@ -2685,9 +3484,7 @@ app.get('/api/seating/download-locations', async (req, res) => {
     let currentRow = 5;
 
     result.forEach(hall => {
-      // Find all unique departments in this hall
-      const depts = [...new Set(hall.classes.map(c => c.classCode.split('/')[0].trim()))].join(', ');
-      const hallTitle = `${depts} - HALL NO. ${hall.hallName}`;
+      const hallTitle = `HALL NO. ${hall.hallName}`;
 
       // Write Hall Title Row
       writeCell(currentRow, 0, hallTitle, true, 'left', 11);
@@ -2727,8 +3524,7 @@ app.get('/api/seating/download-locations', async (req, res) => {
       currentRow++;
     });
 
-    ws['!merges'] = merges;
-    ws['!ref'] = `A1:D${currentRow}`;
+    finalizeWorksheet(XLSXLib, ws, merges);
 
     // Set column widths
     ws['!cols'] = [
@@ -2798,12 +3594,22 @@ app.post('/api/seating/generate-by-date-session', async (req, res) => {
       examIdsSet.has(String(p.examId)) && (hallIdMatches.has(String(p.hallId)) || hallIdMatches.has(p.hallName))
     );
 
+    const allExamSubCodesGen = [];
+    examsAtTime.forEach(e => {
+      if (e.subjectCodes) {
+        e.subjectCodes.forEach(sc => {
+          if (!allExamSubCodesGen.includes(sc)) allExamSubCodesGen.push(sc);
+        });
+      }
+    });
+
     const mergedPlan = {
       date,
       session,
       hallId,
       hallName: plansForHall.length > 0 ? plansForHall[0].hallName : (hall ? hall.name : ''),
       totalBenches: plansForHall.length > 0 ? plansForHall[0].totalBenches : (hall ? hall.benches : 0),
+      subjectCodes: allExamSubCodesGen,
       seatingGrid: [],
       attendanceRoster: [],
       unseatedStudents: []
@@ -2835,7 +3641,7 @@ app.post('/api/seating/generate-by-date-session', async (req, res) => {
             registerNo: bench.seat1.registerNo,
             name: bench.seat1.name || '',
             department: bench.seat1.department || '',
-            subjectCode: getStudentSubCode(bench.seat1) || bench.seat1.department || '',
+            subjectCode: getMatchingSubCodeForStudent(bench.seat1, allExamSubCodesGen),
             bench: bench.benchCode,
             seat: 'Left'
           });
@@ -2848,7 +3654,7 @@ app.post('/api/seating/generate-by-date-session', async (req, res) => {
             registerNo: bench.seat2.registerNo,
             name: bench.seat2.name || '',
             department: bench.seat2.department || '',
-            subjectCode: getStudentSubCode(bench.seat2) || bench.seat2.department || '',
+            subjectCode: getMatchingSubCodeForStudent(bench.seat2, allExamSubCodesGen),
             bench: bench.benchCode,
             seat: bench.seat3 !== undefined ? 'Middle' : 'Right'
           });
@@ -2862,7 +3668,7 @@ app.post('/api/seating/generate-by-date-session', async (req, res) => {
               registerNo: bench.seat3.registerNo,
               name: bench.seat3.name || '',
               department: bench.seat3.department || '',
-              subjectCode: getStudentSubCode(bench.seat3) || bench.seat3.department || '',
+              subjectCode: getMatchingSubCodeForStudent(bench.seat3, allExamSubCodesGen),
               bench: bench.benchCode,
               seat: 'Right'
             });
@@ -2873,7 +3679,7 @@ app.post('/api/seating/generate-by-date-session', async (req, res) => {
       });
     }
 
-    mergedPlan.attendanceRoster = sortAttendanceRoster(rosterFromGridGen);
+    mergedPlan.attendanceRoster = sortAttendanceRoster(rosterFromGridGen, allExamSubCodesGen);
     mergedPlan.totalStudents = mergedPlan.attendanceRoster.length;
     mergedPlan.emptySeats = emptyCountGen;
 
@@ -2967,19 +3773,97 @@ async function ensureAdminUser() {
   }
 }
 
-// Start Server with Graceful EADDRINUSE Startup Protection
+// Generic parameterized Seating Plan Retrieval (Must be placed AFTER all static /api/seating/... routes)
+app.get('/api/seating/:examId/:hallId', async (req, res) => {
+  try {
+    const plan = await Models.SeatingPlan.findOne({ 
+      examId: req.params.examId, 
+      hallId: req.params.hallId 
+    });
+    if (!plan) {
+      return res.status(404).json({ message: 'Seating plan not generated yet.' });
+    }
+
+    // Recalculate unseated students dynamically based on all plans scheduled for the same time
+    const exam = await Models.Exam.findById(req.params.examId);
+    if (exam) {
+      const allExams = await Models.Exam.find();
+      const targetDate = exam.date.split('T')[0];
+      const examsAtSameTime = allExams.filter(e => 
+        e.date.split('T')[0] === targetDate && e.session === exam.session
+      );
+      const examIds = examsAtSameTime.map(e => e._id);
+      
+      const allPlans = await Models.SeatingPlan.find();
+      const plansAtSameTime = allPlans.filter(p => examIds.includes(p.examId));
+      
+      const seatedStudentRegNos = new Set();
+      plansAtSameTime.forEach(p => {
+        p.attendanceRoster.forEach(student => {
+          seatedStudentRegNos.add(student.registerNo);
+        });
+      });
+      
+      const allStudents = await Models.Student.find();
+      const examSubCodes = (exam.subjectCodes || []).map(c => c.toUpperCase());
+      const examDepts = (exam.departments || []).map(d => d.toUpperCase());
+      
+      const unseated = allStudents
+        .filter(s => {
+          if (examSubCodes.length > 0) {
+            if (!hasMatchingSubCode(s, examSubCodes)) return false;
+          } else {
+            if (!examDepts.includes(s.department.toUpperCase())) return false;
+          }
+          if (seatedStudentRegNos.has(s.registerNo)) return false;
+          return true;
+        })
+        .sort((a, b) => a.registerNo.localeCompare(b.registerNo));
+        
+      plan.unseatedStudents = unseated;
+    }
+
+    res.json(plan);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Auto-seed default admin user if no users exist or update existing admin
+async function ensureAdminUser() {
+  try {
+    const existingUsers = await Models.User.find();
+    const adminUser = existingUsers.find(u => u.username && u.username.toLowerCase() === 'admin');
+    const hashedPassword = hashPassword('admin');
+    if (!adminUser) {
+      await Models.User.create({
+        username: 'admin',
+        email: 'admin@examflow.com',
+        password: hashedPassword
+      });
+      console.log('Default Admin user initialized (Username: admin, Password: admin)');
+    }
+  } catch (err) {
+    console.error('Error seeding admin user:', err);
+  }
+}
+
+// Start Server
 const server = app.listen(PORT, async () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`\n==================================================`);
+  console.log(`ExamFlow Backend Server running on port ${PORT}`);
+  console.log(`Database connected successfully`);
+  console.log(`==================================================\n`);
   await ensureAdminUser();
 });
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.log(`\n==================================================`);
-    console.log(`ExamFlow backend is already running on port ${PORT}.`);
-    console.log(`No duplicate server started.`);
-    console.log(`==================================================\n`);
-    process.exit(0);
+    console.error(`\n==================================================`);
+    console.error(`ERROR: Port ${PORT} is already in use by another process.`);
+    console.error(`Please stop the existing process on port ${PORT} before running npm start.`);
+    console.error(`==================================================\n`);
+    process.exit(1);
   } else {
     console.error('Server startup error:', err);
     process.exit(1);

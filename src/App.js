@@ -420,6 +420,7 @@ function App() {
             onAddExam={handleAddExam}
             onDeleteExam={handleDeleteExam}
             onUpdateExam={handleUpdateExam}
+            refreshData={fetchAllData}
           />
         );
       case 'seating':

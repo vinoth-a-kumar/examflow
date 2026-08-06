@@ -2388,3 +2388,70 @@ button, input, select {
   }
 }
 
+/* ==========================================================================
+   SEAT LABELS A4 PRINT STYLES (7 Cols x 12 Rows = 84 Labels per A4 Page)
+   ========================================================================== */
+.seat-labels-print-wrapper {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 4mm 5mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .seat-labels-print-wrapper,
+  .seat-labels-print-wrapper * {
+    visibility: visible !important;
+  }
+
+  .seat-labels-print-wrapper {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 200mm;
+  }
+
+  .seat-labels-page {
+    width: 200mm;
+    height: 288mm;
+    page-break-after: always;
+    break-after: page;
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+  }
+
+  .seat-labels-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 27.8mm);
+    grid-auto-rows: 23mm;
+    gap: 1mm;
+    box-sizing: border-box;
+  }
+
+  .seat-label-box {
+    border: 1px solid #000000;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    padding: 2px;
+  }
+
+  .label-regno {
+    font-family: 'Times New Roman', serif;
+    font-size: 13px;
+    font-weight: bold;
+    color: #000000;
+    text-align: center;
+  }
+}
+
