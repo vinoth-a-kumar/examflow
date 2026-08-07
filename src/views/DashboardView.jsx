@@ -292,31 +292,33 @@ function DashboardView({ stats, activities, setTab, onClearActivities }) {
           )}
         </div>
 
-        <div className="activity-list">
-          {activities.length === 0 ? (
-            <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px', padding: '24px 0', fontWeight: 500 }}>
-              No recent activities yet.
-            </p>
-          ) : (
-            activities.slice(0, 6).map((act, index) => {
-              let dotColor = '#94a3b8';
-              if (act.type === 'student') dotColor = 'var(--color-primary)';
-              if (act.type === 'hall') dotColor = 'var(--color-success)';
-              if (act.type === 'exam') dotColor = 'var(--color-draft)';
-              return (
-                <div className="activity-item" key={`${act.id || 'act'}-${index}`}>
-                  <div className="activity-dot" style={{ backgroundColor: dotColor }} />
-                  <div className="activity-content">
-                    <span className="activity-title">{act.message}</span>
-                    <span className="activity-desc">{act.detail}</span>
-                    <span className="activity-time">
-                      {new Date(act.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+        <div className="activity-list-scroll-container">
+          <div className="activity-list">
+            {activities.length === 0 ? (
+              <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px', padding: '24px 0', fontWeight: 500 }}>
+                No recent activities yet.
+              </p>
+            ) : (
+              activities.map((act, index) => {
+                let dotColor = '#94a3b8';
+                if (act.type === 'student') dotColor = 'var(--color-primary)';
+                if (act.type === 'hall') dotColor = 'var(--color-success)';
+                if (act.type === 'exam') dotColor = 'var(--color-draft)';
+                return (
+                  <div className="activity-item" key={`${act.id || 'act'}-${index}`}>
+                    <div className="activity-dot" style={{ backgroundColor: dotColor }} />
+                    <div className="activity-content">
+                      <span className="activity-title">{act.message}</span>
+                      <span className="activity-desc">{act.detail}</span>
+                      <span className="activity-time">
+                        {new Date(act.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
 
         <button className="view-all-btn" onClick={() => setTab('upload')}>

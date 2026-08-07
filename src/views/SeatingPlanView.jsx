@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Armchair, 
   Info, 
@@ -26,7 +26,7 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
   const [allHallsLabelSequence, setAllHallsLabelSequence] = useState([]);
 
   // Fetch overall all-halls student sequence for printing
-  const fetchAllHallsLabelSequence = async () => {
+  const fetchAllHallsLabelSequence = useCallback(async () => {
     if (!selectedDate || !selectedSession) return;
     try {
       const response = await fetch(`http://localhost:5000/api/seating/labels/download-csv?date=${selectedDate}&session=${selectedSession}`);
@@ -38,13 +38,13 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
     } catch (err) {
       console.error('Error fetching all halls label sequence:', err);
     }
-  };
+  }, [selectedDate, selectedSession]);
 
   useEffect(() => {
     if (selectedDate && selectedSession) {
       fetchAllHallsLabelSequence();
     }
-  }, [selectedDate, selectedSession]);
+  }, [selectedDate, selectedSession, fetchAllHallsLabelSequence]);
 
   // Overall Seat Label export handlers (All Halls for selected Date + Session)
   const handlePrintLabels = () => {
@@ -159,7 +159,17 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
     window.open(url, '_blank');
   };
 
-  const fetchRosterData = async () => {
+  // Handle download PDF action
+  const handleDownloadRosterPdf = () => {
+    if (!selectedDate || !selectedSession) return;
+    let url = `http://localhost:5000/api/seating/roster/download-pdf?date=${selectedDate}&session=${selectedSession}&department=${selectedDeptFilter}`;
+    if (selectedHallId) {
+      url += `&hallId=${selectedHallId}`;
+    }
+    window.open(url, '_blank');
+  };
+
+  const fetchRosterData = useCallback(async () => {
     if (!selectedDate || !selectedSession) return;
     try {
       let url = `http://localhost:5000/api/seating/attendance-roster?date=${selectedDate}&session=${selectedSession}&department=${selectedDeptFilter}`;
@@ -172,13 +182,13 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [selectedDate, selectedSession, selectedDeptFilter, selectedHallId]);
 
   useEffect(() => {
     if (selectedDate && selectedSession) {
       fetchRosterData();
     }
-  }, [selectedDate, selectedSession, selectedDeptFilter, selectedHallId]);
+  }, [selectedDate, selectedSession, fetchRosterData]);
 
   const selectedHall = halls.find(h => h._id === selectedHallId);
   const colsCount = selectedHall ? selectedHall.columns : 4;
@@ -687,10 +697,11 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
                   </div>
                 </div>
                 
-                <div 
-                  className="seating-layout-grid" 
-                  style={{ gridTemplateColumns: `repeat(${colsCount}, minmax(${seatingPlan?.seatingGrid?.[0]?.seat3 !== undefined ? '250px' : '180px'}, 1fr))` }}
-                >
+                <div className="seating-grid-scroll-container">
+                  <div 
+                    className="seating-layout-grid" 
+                    style={{ gridTemplateColumns: `repeat(${colsCount}, minmax(${seatingPlan?.seatingGrid?.[0]?.seat3 !== undefined ? '250px' : '180px'}, 1fr))` }}
+                  >
                   {displayedBenches.map((bench, bIdx) => (
                     <div className="bench-card" key={`${bench.benchCode || 'bench'}-${bIdx}`}>
                       <span className="bench-code">{bench.benchCode}</span>
@@ -717,6 +728,7 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
                       </div>
                     </div>
                   ))}
+                  </div>
                 </div>
 
                 {hasMoreBenches && (
@@ -779,9 +791,13 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
                   <Download size={16} />
                   <span>Download Excel (.xlsx)</span>
                 </button>
+                <button className="btn-secondary" onClick={handleDownloadRosterPdf} style={{ gap: '8px', display: 'flex', alignItems: 'center' }}>
+                  <Download size={16} />
+                  <span>Download PDF (.pdf)</span>
+                </button>
                 <button className="btn-primary" onClick={handlePrint} style={{ gap: '8px', display: 'flex', alignItems: 'center' }}>
                   <Printer size={16} />
-                  <span>Download PDF / Print</span>
+                  <span>Print Roster</span>
                 </button>
               </div>
             </div>
@@ -804,8 +820,8 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
 
             {/* Standard Table View */}
             {viewFormat === 'standard' && (
-              <div className="table-wrapper no-print">
-                <table className="data-table">
+              <div className="table-wrapper table-wrapper-scrollable no-print">
+                <table className="data-table sticky-header-table">
                   <thead>
                     <tr>
                       <th>Register No</th>
@@ -840,7 +856,7 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
               </div>
             )}
 
-            {/* University Sheet Format View - Department + Subject Code, 25 Students Max per Page */}
+            {/* University Sheet Format View - Department + Subject Code, EXACTLY 25 Students per Page */}
             <div className={viewFormat === 'university' ? '' : 'only-print'}>
               {(!rosterData || !rosterData.pages || rosterData.pages.length === 0) ? (
                 <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
@@ -850,9 +866,10 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
                 const pages = rosterData.pages;
 
                 return (
-                  <div className="university-rosters-wrapper">
+                  <div className="university-rosters-scroll-container">
+                    <div className="university-rosters-wrapper">
                     {pages.map((page, pIdx) => {
-                      const isContinuationPage = page.pageNum > 1;
+                      const blankRowsCount = Math.max(0, 25 - (page.students ? page.students.length : 0));
 
                       return (
                         <div
@@ -864,43 +881,29 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
                             marginBottom: '32px'
                           }}
                         >
-                          {!isContinuationPage ? (
-                            <>
-                              {/* Header */}
-                              <div className="uni-roster-header">
-                                <h1 className="uni-title">MADURAI KAMARAJ UNIVERSITY EXAMINATIONS</h1>
-                                <h2 className="college-title">RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM</h2>
-                              </div>
+                          {/* Official Header - Repeated on Every Page */}
+                          <div className="uni-roster-header">
+                            <h1 className="uni-title">MADURAI KAMARAJ UNIVERSITY EXAMINATIONS</h1>
+                            <h2 className="college-title">RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM</h2>
+                          </div>
 
-                              {/* Info Meta Grid */}
-                              <div className="uni-roster-meta">
-                                <div className="meta-row">
-                                  <div className="meta-cell"><strong>DATE OF EXAM:</strong> {formattedExamDate}</div>
-                                  <div className="meta-cell text-right"><strong>TIME OF EXAM:</strong> {examTime}</div>
-                                </div>
-                                <div className="meta-row">
-                                  <div className="meta-cell">
-                                    <strong>DEPARTMENT:</strong> {page.deptName.toUpperCase()} &nbsp;|&nbsp; <strong>SUBJECT CODE:</strong> {page.subjectCode.toUpperCase()}
-                                  </div>
-                                  <div className="meta-cell text-right">
-                                    <strong>STUDENTS:</strong> {page.students.length} (Page {page.pageNum} of {page.totalPages})
-                                  </div>
-                                </div>
+                          {/* Info Meta Grid - Repeated on Every Page */}
+                          <div className="uni-roster-meta">
+                            <div className="meta-row">
+                              <div className="meta-cell"><strong>DATE OF EXAM:</strong> {formattedExamDate}</div>
+                              <div className="meta-cell text-right"><strong>TIME OF EXAM:</strong> {examTime}</div>
+                            </div>
+                            <div className="meta-row">
+                              <div className="meta-cell">
+                                <strong>SUBJECT CODE:</strong> {page.subjectCode.toUpperCase()}
                               </div>
-                            </>
-                          ) : (
-                            /* Minimal Continuation Header for Page 2+ */
-                            <div className="uni-roster-continuation-header" style={{ marginBottom: '16px', borderBottom: '2px solid var(--text-primary)', paddingBottom: '8px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px', flexWrap: 'wrap', gap: '8px' }}>
-                                <span><strong>DEPARTMENT:</strong> {page.deptName.toUpperCase()}</span>
-                                <span><strong>SUBJECT CODE:</strong> {page.subjectCode.toUpperCase()}</span>
-                                <span><strong>DATE:</strong> {formattedExamDate} ({examTime})</span>
-                                <span><strong>STUDENTS:</strong> {page.students.length} (Page {page.pageNum} of {page.totalPages} - Continuation Sheet)</span>
+                              <div className="meta-cell text-right">
+                                <strong>DEGREE:</strong> {page.degree || page.deptName}
                               </div>
                             </div>
-                          )}
+                          </div>
 
-                          {/* Roster Table */}
+                          {/* Roster Table - EXACTLY 25 Rows (filled + padded) */}
                           <table className="uni-roster-table">
                             <thead>
                               <tr>
@@ -919,47 +922,54 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
                                   <td className="empty-sig-cell"></td>
                                 </tr>
                               ))}
+                              {Array.from({ length: blankRowsCount }).map((_, bIdx) => (
+                                <tr key={`blank-row-${bIdx}`}>
+                                  <td className="text-center" style={{ fontWeight: 'bold' }}>{page.startIndex + page.students.length + bIdx}</td>
+                                  <td></td>
+                                  <td></td>
+                                  <td className="empty-sig-cell"></td>
+                                </tr>
+                              ))}
                             </tbody>
                           </table>
 
-                          {!isContinuationPage && (
-                            /* Footer on Page 1 */
-                            <div className="uni-roster-footer">
-                              <div className="footer-row">
-                                <div className="footer-cell">
-                                  <strong>Absentees Reg. No.:</strong>
-                                  <span className="bottom-line"></span>
-                                </div>
-                                <div className="footer-cell text-right">
-                                  <strong>Hall No.:</strong> {page.hallName || 'ALL'}
-                                </div>
+                          {/* Official Footer Section - Repeated on Every Page */}
+                          <div className="uni-roster-footer">
+                            <div className="footer-row">
+                              <div className="footer-cell">
+                                <strong>Absentees Reg. No.:</strong>
+                                <span className="bottom-line"></span>
                               </div>
-                              <div className="footer-row">
-                                <div className="footer-cell">
-                                  <strong>Total No. of Absentees:</strong>
-                                  <span className="bottom-line" style={{ maxWidth: '80px', minWidth: '60px' }}></span>
-                                </div>
-                                <div className="footer-cell text-right">
-                                  <strong>Name of the Invigilator and College:</strong>
-                                  <span className="bottom-line" style={{ minWidth: '220px' }}></span>
-                                </div>
-                              </div>
-                              <div className="footer-row sig-row">
-                                <div className="footer-cell" style={{ fontWeight: 'bold', fontSize: '13px' }}>
-                                  Signature of the Chief Superintendent
-                                </div>
-                                <div className="footer-cell text-right" style={{ fontWeight: 'bold', fontSize: '13px' }}>
-                                  Signature of the Invigilator
-                                </div>
+                              <div className="footer-cell text-right">
+                                <strong>Hall No.:</strong> {page.hallName || 'ALL'}
                               </div>
                             </div>
-                          )}
+                            <div className="footer-row">
+                              <div className="footer-cell">
+                                <strong>Total No. of Absentees:</strong>
+                                <span className="bottom-line" style={{ maxWidth: '80px', minWidth: '60px' }}></span>
+                              </div>
+                              <div className="footer-cell text-right">
+                                <strong>Name of the Invigilator and College:</strong>
+                                <span className="bottom-line" style={{ minWidth: '220px' }}></span>
+                              </div>
+                            </div>
+                            <div className="footer-row sig-row">
+                              <div className="footer-cell" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                                Signature of the Chief Superintendent
+                              </div>
+                              <div className="footer-cell text-right" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                                Signature of the Invigilator
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
                   </div>
-                );
-              })()}
+                </div>
+              );
+            })()}
             </div>
           </div>
         </div>

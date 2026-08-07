@@ -420,9 +420,9 @@ function UploadDataView({ students, uploads, onClear, refreshData, onClearUpload
         </div>
 
         {/* Students Table */}
-        <div className="table-wrapper" style={{ maxHeight: isTableExpanded ? '600px' : 'none', overflowY: isTableExpanded ? 'auto' : 'visible' }}>
-          <table className="data-table">
-            <thead style={{ position: isTableExpanded ? 'sticky' : 'static', top: 0, zIndex: 2 }}>
+        <div className="table-wrapper table-wrapper-scrollable">
+          <table className="data-table sticky-header-table">
+            <thead>
               <tr>
                 <th>#</th>
                 {tableHeaders.map((header) => <th key={header} style={{ whiteSpace: 'nowrap' }}>{header}</th>)}

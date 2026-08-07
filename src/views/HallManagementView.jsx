@@ -9,7 +9,8 @@ import {
   Database,
   Plus,
   Edit2,
-  X
+  X,
+  Search
 } from 'lucide-react';
 
 function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
@@ -21,7 +22,22 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
   const [editingHall,    setEditingHall]    = useState(null);
   const [editFormData,   setEditFormData]   = useState({ name: '', rows: 0, columns: 0, benches: 0, capacity: 0 });
   const [isSaving,       setIsSaving]       = useState(false);
+  const [searchQuery,    setSearchQuery]    = useState('');
   const fileInputRef = useRef(null);
+
+  const filteredHalls = React.useMemo(() => {
+    if (!searchQuery.trim()) return halls;
+    const q = searchQuery.toLowerCase().trim();
+    return halls.filter(h => {
+      if (h.name && h.name.toLowerCase().includes(q)) return true;
+      if (h.capacity && String(h.capacity).includes(q)) return true;
+      if (h.benches && String(h.benches).includes(q)) return true;
+      if (h.csvData && typeof h.csvData === 'object') {
+        return Object.values(h.csvData).some(val => String(val).toLowerCase().includes(q));
+      }
+      return false;
+    });
+  }, [halls, searchQuery]);
 
   const handleStartEdit = (hall) => {
     setEditingHall(hall);
@@ -332,7 +348,7 @@ Lab Block,6,4`}
         </div>
 
         {/* RIGHT — Hall Records Table */}
-        <div className="card-container">
+        <div className="card-container hall-records-card">
           <div className="card-title-bar">
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
@@ -351,7 +367,7 @@ Lab Block,6,4`}
                   background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.2)',
                   padding: '3px 9px', borderRadius: '9999px',
                 }}>
-                  {halls.length} hall{halls.length !== 1 ? 's' : ''}
+                  {filteredHalls.length !== halls.length ? `${filteredHalls.length} / ${halls.length}` : halls.length} hall{halls.length !== 1 ? 's' : ''}
                 </span>
               )}
             </div>
@@ -370,6 +386,28 @@ Lab Block,6,4`}
               </button>
             </div>
           </div>
+
+          {halls.length > 0 && (
+            <div style={{ position: 'relative' }}>
+              <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                placeholder="Search hall name, capacity..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="form-control"
+                style={{ paddingLeft: '34px', paddingRight: searchQuery ? '30px' : '12px', fontSize: '13px', height: '36px' }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          )}
 
           {halls.length === 0 ? (
             <div style={{
@@ -392,9 +430,13 @@ Lab Block,6,4`}
                 Import a CSV file to register halls
               </p>
             </div>
+          ) : filteredHalls.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '13px' }}>
+              No halls match "{searchQuery}"
+            </div>
           ) : (
-            <div className="table-wrapper">
-              <table className="data-table">
+            <div className="table-wrapper hall-records-table-wrapper">
+              <table className="data-table sticky-header-table">
                 <thead>
                   <tr>
                     {csvHeaders ? (
@@ -412,7 +454,7 @@ Lab Block,6,4`}
                   </tr>
                 </thead>
                 <tbody>
-                  {halls.map((h) => (
+                  {filteredHalls.map((h) => (
                     <tr key={h._id}>
                       {csvHeaders ? (
                         csvHeaders.map((col, idx) => (

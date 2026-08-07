@@ -499,47 +499,49 @@ function SettingsView({ dbStatus, onClearAll, refreshData, setTab }) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {recentActivities.length > 0 ? (
-              recentActivities.map((act) => (
-                <div key={act.id} style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '12px',
-                  padding: '10px 12px',
-                  background: 'var(--bg-app)',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border-color)'
-                }}>
-                  <div style={{
-                    width: '28px', height: '28px', borderRadius: '50%',
-                    background: 'rgba(79,70,229,0.1)', color: 'var(--color-primary)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0, marginTop: '2px'
+          <div className="activity-list-scroll-container">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {recentActivities.length > 0 ? (
+                recentActivities.map((act) => (
+                  <div key={act.id} style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                    padding: '10px 12px',
+                    background: 'var(--bg-app)',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-color)'
                   }}>
-                    <Activity size={14} />
-                  </div>
-                  <div style={{ flex: 1, overflow: 'hidden' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                      {act.message}
+                    <div style={{
+                      width: '28px', height: '28px', borderRadius: '50%',
+                      background: 'rgba(79,70,229,0.1)', color: 'var(--color-primary)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0, marginTop: '2px'
+                    }}>
+                      <Activity size={14} />
                     </div>
-                    {act.detail && (
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                        {act.detail}
+                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {act.message}
                       </div>
-                    )}
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Clock size={11} />
-                      <span>{new Date(act.time).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                      {act.detail && (
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                          {act.detail}
+                        </div>
+                      )}
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Clock size={11} />
+                        <span>{new Date(act.time).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
                     </div>
                   </div>
+                ))
+              ) : (
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                  No recent administrative activity logged.
                 </div>
-              ))
-            ) : (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-                No recent administrative activity logged.
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 

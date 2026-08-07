@@ -606,8 +606,8 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
 
       {/* Exams list card */}
       <div className="card-container">
-        <div className="table-wrapper">
-          <table className="data-table">
+        <div className="table-wrapper table-wrapper-scrollable">
+          <table className="data-table sticky-header-table">
             <thead>
               <tr>
                 <th>Exam Name</th>
@@ -1667,8 +1667,8 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                     </div>
 
                     {/* Table */}
-                    <div className="table-wrapper">
-                      <table className="data-table" style={{ borderCollapse: 'collapse', width: '100%' }}>
+                    <div className="table-wrapper table-wrapper-scrollable">
+                      <table className="data-table sticky-header-table" style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%' }}>
                         <thead>
                           <tr>
                             <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '20%' }}>CLASS/ CODE NO</th>

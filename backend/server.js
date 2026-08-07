@@ -243,6 +243,90 @@ function formatClassCode(department, subjectCode, registerNo = '') {
   return dept || 'GENERAL';
 }
 
+// Helper: Resolve dynamic degree name from student record or department code
+function resolveStudentDegree(student, defaultDept = '') {
+  if (!student) return expandDegreeCode(defaultDept, '');
+
+  // 1. Check direct degree field
+  if (student.degree && typeof student.degree === 'string' && student.degree.trim()) {
+    return student.degree.trim();
+  }
+
+  // 2. Check student's uploaded csvData for explicit Degree/Programme/Course column
+  if (student.csvData && typeof student.csvData === 'object') {
+    const keys = Object.keys(student.csvData);
+    const degreeKey = keys.find(k => /degree|programme|prog/i.test(k));
+    if (degreeKey && student.csvData[degreeKey] && String(student.csvData[degreeKey]).trim()) {
+      return String(student.csvData[degreeKey]).trim();
+    }
+    const deptKey = keys.find(k => /dept|depart|branch|course/i.test(k));
+    if (deptKey && student.csvData[deptKey] && String(student.csvData[deptKey]).trim()) {
+      const val = String(student.csvData[deptKey]).trim();
+      if (val !== 'GENERAL' && val !== 'UNKNOWN') {
+        return expandDegreeCode(val, student.registerNo);
+      }
+    }
+  }
+
+  // 3. Fallback to student.department or defaultDept
+  const dept = (student.department || defaultDept || '').trim();
+  return expandDegreeCode(dept, student.registerNo || '');
+}
+
+function expandDegreeCode(deptOrCode, regNo = '') {
+  let code = (deptOrCode || '').trim();
+  if (!code || code === 'GENERAL' || code === 'UNKNOWN') {
+    const match = (regNo || '').trim().match(/^([A-Z]{2,6})\d+/i);
+    if (match) {
+      code = match[1].toUpperCase();
+    }
+  }
+
+  const u = code.toUpperCase();
+
+  const degreeMap = {
+    'CA': 'B.Sc. Computer Applications',
+    'CS': 'B.Sc. Computer Science',
+    'BCA': 'B.C.A.',
+    'BSC CS': 'B.Sc. Computer Science',
+    'BSC CA': 'B.Sc. Computer Applications',
+    'COM': 'B.Com.',
+    'BCOM': 'B.Com.',
+    'COMMERCE': 'B.Com.',
+    'MAT': 'B.Sc. Mathematics',
+    'MATHS': 'B.Sc. Mathematics',
+    'MATHEMATICS': 'B.Sc. Mathematics',
+    'PHY': 'B.Sc. Physics',
+    'PHYSICS': 'B.Sc. Physics',
+    'CHE': 'B.Sc. Chemistry',
+    'CHEMISTRY': 'B.Sc. Chemistry',
+    'ENG': 'B.A. English',
+    'ENGLISH': 'B.A. English',
+    'TAM': 'B.A. Tamil',
+    'TAMIL': 'B.A. Tamil',
+    'BBA': 'B.B.A.',
+    'IT': 'B.Sc. Information Technology',
+    'HIS': 'B.A. History',
+    'HISTORY': 'B.A. History',
+    'ECO': 'B.A. Economics',
+    'ECONOMICS': 'B.A. Economics',
+    'ZOO': 'B.Sc. Zoology',
+    'ZOOLOGY': 'B.Sc. Zoology',
+    'BOT': 'B.Sc. Botany',
+    'BOTANY': 'B.Sc. Botany'
+  };
+
+  if (degreeMap[u]) return degreeMap[u];
+
+  // If code is already descriptive
+  if (code.length > 5 || /\./.test(code) || /\s/.test(code)) {
+    return code;
+  }
+
+  return code;
+}
+
+
 /**
  * Dynamically detect the column key in student records (csvData) that contains multiple space-separated Subject Codes.
  * Scans every column across student records without relying on fixed column names like "Subjects Appearing".
@@ -2468,6 +2552,8 @@ async function buildAttendanceRosterPages({ date, session, subjectCodesInput = [
         registerNo: s.registerNo,
         name: s.name || '',
         department: cleanDept,
+        degree: resolveStudentDegree(s, cleanDept),
+        csvData: s.csvData,
         subjectCode: subCode
       });
     });
@@ -2491,9 +2577,13 @@ async function buildAttendanceRosterPages({ date, session, subjectCodesInput = [
         const pageNum = Math.floor(i / chunkSize) + 1;
         const startIndex = i + 1;
 
+        const sampleStudent = chunk[0] || deptStudents[0];
+        const pageDegree = (sampleStudent && sampleStudent.degree) || resolveStudentDegree(sampleStudent, deptName);
+
         allPages.push({
           subjectCode: subCode,
           deptName: deptName,
+          degree: pageDegree,
           students: chunk,
           totalDeptStudents: deptStudents.length,
           pageNum: pageNum,
@@ -2582,7 +2672,8 @@ app.get('/api/seating/download-roster', async (req, res) => {
     const usedSheetNames = new Set();
 
     rosterData.pages.forEach(page => {
-      const { deptName, subjectCode, students, pageNum, totalPages, startIndex, hallName } = page;
+      const { deptName, degree, subjectCode, students, pageNum, totalPages, startIndex, hallName } = page;
+      const pageDegree = degree || resolveStudentDegree((students && students[0]), deptName);
       const ws = {};
 
       const borderStyle = {
@@ -2608,92 +2699,73 @@ app.get('/api/seating/download-roster', async (req, res) => {
         }
       };
 
-      const isContinuation = pageNum > 1;
+      // Always write Full Official University Header & Footer on every page
+      writeCell(0, 0, 'MADURAI KAMARAJ UNIVERSITY EXAMINATIONS', true, 'center', 14, false, false, true);
+      writeCell(1, 0, 'RAJAPALAYAM RAJUS\' COLLEGE, RAJAPALAYAM', true, 'center', 12, false, false, true);
 
-      if (!isContinuation) {
-        // Page 1: Full University Header & Meta
-        writeCell(0, 0, 'MADURAI KAMARAJ UNIVERSITY EXAMINATIONS', true, 'center', 14, false, false, true);
-        writeCell(1, 0, 'RAJAPALAYAM RAJUS\' COLLEGE, RAJAPALAYAM', true, 'center', 12, false, false, true);
+      writeCell(2, 0, `DATE OF EXAM: ${formattedDate}`, true, 'left', 10);
+      writeCell(2, 3, `TIME OF EXAM : ${timeOfExam}`, true, 'right', 10);
+      writeCell(3, 0, `SUBJECT CODE: ${subjectCode.toUpperCase()}`, true, 'left', 10);
+      writeCell(3, 3, `DEGREE: ${pageDegree}`, true, 'right', 10);
 
-        writeCell(2, 0, `DATE OF EXAM: ${formattedDate}`, true, 'left', 10);
-        writeCell(2, 3, `TIME OF EXAM : ${timeOfExam}`, true, 'right', 10);
-        writeCell(3, 0, `DEPARTMENT: ${deptName.toUpperCase()} | SUBJECT CODE: ${subjectCode.toUpperCase()}`, true, 'left', 10);
-        writeCell(3, 3, `STUDENTS: ${students.length} (Page ${pageNum}/${totalPages})`, true, 'right', 10);
+      // Row 5: Table Header
+      writeCell(5, 0, 'SL NO', true, 'center', 10, true, true);
+      writeCell(5, 1, 'REGISTER NUMBER', true, 'center', 10, true, true);
+      writeCell(5, 2, 'NAME OF THE CANDIDATE', true, 'center', 10, true, true);
+      writeCell(5, 3, 'SIGNATURE OF THE CANDIDATE', true, 'center', 10, true, true);
 
-        // Row 5: Table Header
-        writeCell(5, 0, 'SL NO', true, 'center', 10, true, true);
-        writeCell(5, 1, 'REGISTER NUMBER', true, 'center', 10, true, true);
-        writeCell(5, 2, 'NAME OF THE CANDIDATE', true, 'center', 10, true, true);
-        writeCell(5, 3, 'SIGNATURE OF THE CANDIDATE', true, 'center', 10, true, true);
-
-        // Student rows
-        students.forEach((s, idx) => {
-          const row = 6 + idx;
-          const currentSlNo = startIndex + idx;
-          writeCell(row, 0, currentSlNo, false, 'center', 10, true);
+      // Student rows: ALWAYS EXACTLY 25 ROWS (filled + blank rows padded with continuous SL NO)
+      for (let idx = 0; idx < 25; idx++) {
+        const row = 6 + idx;
+        const currentSlNo = startIndex + idx;
+        writeCell(row, 0, currentSlNo, false, 'center', 10, true);
+        if (idx < students.length) {
+          const s = students[idx];
           writeCell(row, 1, s.registerNo || '', true, 'center', 10, true);
           writeCell(row, 2, (s.name || '').toUpperCase(), false, 'left', 10, true);
           writeCell(row, 3, '', false, 'left', 10, true);
-        });
-
-        const totalRowsCount = 6 + students.length;
-        const fStart = totalRowsCount + 1;
-
-        // Footer rows
-        writeCell(fStart, 0, 'Absentees Reg. No.:', true, 'left', 10);
-        writeCell(fStart, 3, `Hall No.: ${hallName || 'ALL'}`, true, 'right', 10);
-
-        writeCell(fStart + 1, 0, 'Total No. of Absentees:', true, 'left', 10);
-        writeCell(fStart + 1, 3, 'Name of the Invigilator and College:', true, 'right', 10);
-
-        writeCell(fStart + 3, 0, 'Signature of the Chief Superintendent', true, 'left', 10);
-        writeCell(fStart + 3, 3, 'Signature of the Invigilator', true, 'right', 10);
-
-        const pageMerges = [
-          { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } },
-          { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } },
-          { s: { r: 2, c: 0 }, e: { r: 2, c: 2 } },
-          { s: { r: 3, c: 0 }, e: { r: 3, c: 2 } },
-          { s: { r: fStart, c: 0 }, e: { r: fStart, c: 2 } },
-          { s: { r: fStart + 1, c: 0 }, e: { r: fStart + 1, c: 2 } },
-          { s: { r: fStart + 3, c: 0 }, e: { r: fStart + 3, c: 1 } }
-        ];
-
-        ws['!rows'] = [];
-        ws['!rows'][0] = { hpt: 25 };
-        ws['!rows'][1] = { hpt: 22 };
-        ws['!rows'][2] = { hpt: 20 };
-        ws['!rows'][3] = { hpt: 20 };
-        ws['!rows'][5] = { hpt: 22 };
-        for (let i = 0; i < students.length; i++) {
-          ws['!rows'][6 + i] = { hpt: 26 };
-        }
-
-        finalizeWorksheet(XLSXLib, ws, pageMerges);
-      } else {
-        // Page 2+: Continuation Sheet
-        writeCell(0, 0, 'SL NO', true, 'center', 10, true, true);
-        writeCell(0, 1, 'REGISTER NUMBER', true, 'center', 10, true, true);
-        writeCell(0, 2, 'NAME OF THE CANDIDATE', true, 'center', 10, true, true);
-        writeCell(0, 3, 'SIGNATURE OF THE CANDIDATE', true, 'center', 10, true, true);
-
-        students.forEach((s, idx) => {
-          const row = 1 + idx;
-          const currentSlNo = startIndex + idx;
-          writeCell(row, 0, currentSlNo, false, 'center', 10, true);
-          writeCell(row, 1, s.registerNo || '', true, 'center', 10, true);
-          writeCell(row, 2, (s.name || '').toUpperCase(), false, 'left', 10, true);
+        } else {
+          // Padded blank row with continuous SL NO, empty regNo, name, sig
+          writeCell(row, 1, '', false, 'center', 10, true);
+          writeCell(row, 2, '', false, 'left', 10, true);
           writeCell(row, 3, '', false, 'left', 10, true);
-        });
-
-        ws['!rows'] = [];
-        ws['!rows'][0] = { hpt: 22 };
-        for (let i = 0; i < students.length; i++) {
-          ws['!rows'][1 + i] = { hpt: 26 };
         }
-
-        finalizeWorksheet(XLSXLib, ws, []);
       }
+
+      const fStart = 32; // Footer starts at row 32 after 25 student rows (rows 6..30) and 1 blank spacer row 31
+
+      // Footer rows
+      writeCell(fStart, 0, 'Absentees Reg. No.:', true, 'left', 10);
+      writeCell(fStart, 3, `Hall No.: ${hallName || 'ALL'}`, true, 'right', 10);
+
+      writeCell(fStart + 1, 0, 'Total No. of Absentees:', true, 'left', 10);
+      writeCell(fStart + 1, 3, 'Name of the Invigilator and College:', true, 'right', 10);
+
+      writeCell(fStart + 3, 0, 'Signature of the Chief Superintendent', true, 'left', 10);
+      writeCell(fStart + 3, 3, 'Signature of the Invigilator', true, 'right', 10);
+
+      const pageMerges = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } },
+        { s: { r: 2, c: 0 }, e: { r: 2, c: 2 } },
+        { s: { r: 3, c: 0 }, e: { r: 3, c: 2 } },
+        { s: { r: fStart, c: 0 }, e: { r: fStart, c: 2 } },
+        { s: { r: fStart + 1, c: 0 }, e: { r: fStart + 1, c: 2 } },
+        { s: { r: fStart + 3, c: 0 }, e: { r: fStart + 3, c: 1 } }
+      ];
+
+      ws['!rows'] = [];
+      ws['!rows'][0] = { hpt: 25 };
+      ws['!rows'][1] = { hpt: 22 };
+      ws['!rows'][2] = { hpt: 20 };
+      ws['!rows'][3] = { hpt: 20 };
+      ws['!rows'][5] = { hpt: 22 };
+      for (let i = 0; i < 25; i++) {
+        ws['!rows'][6 + i] = { hpt: 24 };
+      }
+
+      finalizeWorksheet(XLSXLib, ws, pageMerges);
+      ws['!pageSetup'] = { paperSize: 9, orientation: 'portrait', fitToWidth: 1, fitToHeight: 1 };
 
       // Column widths
       ws['!cols'] = [
@@ -2722,6 +2794,150 @@ app.get('/api/seating/download-roster', async (req, res) => {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET export attendance roster as printable A4 PDF file (.pdf)
+app.get('/api/seating/roster/download-pdf', async (req, res) => {
+  try {
+    const { date, session, department, subjectCodes, hallId } = req.query;
+
+    const rosterData = await buildAttendanceRosterPages({
+      date,
+      session,
+      subjectCodesInput: subjectCodes,
+      departmentFilter: department || 'ALL',
+      hallId
+    });
+
+    if (!rosterData.pages || rosterData.pages.length === 0) {
+      return res.status(404).json({ error: 'No matching attendance records found for the selected criteria.' });
+    }
+
+    const allExams = await Models.Exam.find();
+    const targetDate = date ? date.split('T')[0] : rosterData.date;
+    const examsAtTime = allExams.filter(e => e.date.split('T')[0] === targetDate && e.session === session);
+
+    let formattedDate = targetDate;
+    try {
+      const d = new Date(targetDate);
+      if (!isNaN(d.getTime())) {
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        formattedDate = `${dd}/${mm}/${yyyy}`;
+      }
+    } catch (err) {}
+
+    let timeOfExam = session === 'FN' ? '10:00 AM - 01:00 PM' : '02:00 PM - 05:00 PM';
+    const firstExamWithTime = examsAtTime.find(e => e.time && e.time.trim() !== '');
+    if (firstExamWithTime) {
+      timeOfExam = firstExamWithTime.time;
+    }
+
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: 25
+    });
+
+    const buffers = [];
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => {
+      const pdfData = Buffer.concat(buffers);
+      const filename = `Attendance_Roster_${(department || 'ALL').replace(/[^A-Z0-9]/gi, '_')}_${targetDate}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(pdfData);
+    });
+
+    const pageW = 595.28;
+    const margin = 25;
+    const printableW = pageW - (2 * margin);
+
+    rosterData.pages.forEach((page, pIdx) => {
+      if (pIdx > 0) doc.addPage();
+
+      let y = margin;
+
+      // Header
+      doc.font('Helvetica-Bold').fontSize(14).text('MADURAI KAMARAJ UNIVERSITY EXAMINATIONS', margin, y, { align: 'center', width: printableW, underline: true });
+      y += 18;
+      doc.font('Helvetica-Bold').fontSize(12).text("RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM", margin, y, { align: 'center', width: printableW, underline: true });
+      y += 24;
+
+      // Meta info
+      doc.font('Helvetica-Bold').fontSize(9);
+      doc.text(`DATE OF EXAM: ${formattedDate}`, margin, y);
+      doc.text(`TIME OF EXAM: ${timeOfExam}`, margin + 300, y, { align: 'right', width: printableW - 300 });
+      y += 14;
+
+      const pageDegree = page.degree || resolveStudentDegree((page.students && page.students[0]), page.deptName);
+      doc.text(`SUBJECT CODE: ${page.subjectCode.toUpperCase()}`, margin, y);
+      doc.text(`DEGREE: ${pageDegree}`, margin + 300, y, { align: 'right', width: printableW - 300 });
+      y += 18;
+
+      // Table Header
+      const colWidths = [40, 115, 230, 160];
+      const colX = [
+        margin,
+        margin + colWidths[0],
+        margin + colWidths[0] + colWidths[1],
+        margin + colWidths[0] + colWidths[1] + colWidths[2]
+      ];
+
+      const headerH = 20;
+      doc.rect(margin, y, printableW, headerH).fillAndStroke('#EAEAEA', '#000000');
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(8);
+
+      doc.text('SL NO', colX[0], y + 6, { width: colWidths[0], align: 'center' });
+      doc.text('REGISTER NUMBER', colX[1], y + 6, { width: colWidths[1], align: 'center' });
+      doc.text('NAME OF THE CANDIDATE', colX[2] + 5, y + 6, { width: colWidths[2] - 5, align: 'left' });
+      doc.text('SIGNATURE OF THE CANDIDATE', colX[3], y + 6, { width: colWidths[3], align: 'center' });
+      y += headerH;
+
+      // 25 Student Rows (filled + blank rows padded with continuous SL NO)
+      const rowH = 19;
+      for (let r = 0; r < 25; r++) {
+        doc.rect(margin, y, printableW, rowH).stroke('#000000');
+        // vertical grid lines
+        doc.moveTo(colX[1], y).lineTo(colX[1], y + rowH).stroke('#000000');
+        doc.moveTo(colX[2], y).lineTo(colX[2], y + rowH).stroke('#000000');
+        doc.moveTo(colX[3], y).lineTo(colX[3], y + rowH).stroke('#000000');
+
+        const currentSlNo = page.startIndex + r;
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#000000');
+        doc.text(`${currentSlNo}`, colX[0], y + 5, { width: colWidths[0], align: 'center' });
+
+        if (r < page.students.length) {
+          const st = page.students[r];
+          doc.text(st.registerNo || '', colX[1], y + 5, { width: colWidths[1], align: 'center' });
+          doc.font('Helvetica').fontSize(8);
+          doc.text((st.name || '').toUpperCase(), colX[2] + 5, y + 5, { width: colWidths[2] - 10, align: 'left' });
+        }
+        y += rowH;
+      }
+
+      // Footer section
+      y += 12;
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#000000');
+      doc.text('Absentees Reg. No.: _____________________________________________', margin, y);
+      doc.text(`Hall No.: ${page.hallName || 'ALL'}`, margin + 350, y, { align: 'right', width: printableW - 350 });
+      y += 18;
+
+      doc.text('Total No. of Absentees: ______________', margin, y);
+      doc.text('Name of the Invigilator and College: _______________________', margin + 200, y, { align: 'right', width: printableW - 200 });
+      y += 32;
+
+      doc.text('Signature of the Chief Superintendent', margin, y);
+      doc.text('Signature of the Invigilator', margin + 300, y, { align: 'right', width: printableW - 300 });
+    });
+
+    doc.end();
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });
