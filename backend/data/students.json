@@ -3,7 +3,7 @@
     "_id": "bcj424hmshix4rx",
     "registerNo": "CS26001",
     "name": "BHAVANI A",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "1",
@@ -17,7 +17,7 @@
     "_id": "6siof1rmshix4rx",
     "registerNo": "CS26002",
     "name": "BHAVANI M",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "2",
@@ -31,7 +31,7 @@
     "_id": "i0xgqflmshix4rx",
     "registerNo": "CS26003",
     "name": "DINESH Z",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "3",
@@ -45,7 +45,7 @@
     "_id": "u95ycuvmshix4rx",
     "registerNo": "CS26004",
     "name": "RANJITH F",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "4",
@@ -59,7 +59,7 @@
     "_id": "90vcr2wmshix4rx",
     "registerNo": "CS26005",
     "name": "AARTHI C",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "5",
@@ -73,7 +73,7 @@
     "_id": "5d07o8bmshix4rx",
     "registerNo": "CS26006",
     "name": "POOJA D",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "6",
@@ -87,7 +87,7 @@
     "_id": "ta7hz2kmshix4rx",
     "registerNo": "CS26007",
     "name": "MONISHA U",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "7",
@@ -101,7 +101,7 @@
     "_id": "tm0586xmshix4rx",
     "registerNo": "CS26008",
     "name": "ARUN K",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "8",
@@ -115,7 +115,7 @@
     "_id": "86ky1ismshix4rx",
     "registerNo": "CS26009",
     "name": "BHAVANI K",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "9",
@@ -129,7 +129,7 @@
     "_id": "wenhtr9mshix4rx",
     "registerNo": "CS26010",
     "name": "RANJITH U",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "10",
@@ -143,7 +143,7 @@
     "_id": "h98eqfxmshix4rx",
     "registerNo": "CS26011",
     "name": "AARTHI F",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "11",
@@ -157,7 +157,7 @@
     "_id": "m10aqrtmshix4rx",
     "registerNo": "CS26012",
     "name": "GAYATHRI N",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "12",
@@ -171,7 +171,7 @@
     "_id": "6lu7fw3mshix4rx",
     "registerNo": "CS26013",
     "name": "DINESH P",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "13",
@@ -185,7 +185,7 @@
     "_id": "tfi723smshix4rx",
     "registerNo": "CS26014",
     "name": "NAVEEN T",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "14",
@@ -199,7 +199,7 @@
     "_id": "9zumh5gmshix4rx",
     "registerNo": "CS26015",
     "name": "RAGAVI E",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "15",
@@ -213,7 +213,7 @@
     "_id": "zjqs4xvmshix4rx",
     "registerNo": "CS26016",
     "name": "SURESH I",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "16",
@@ -227,7 +227,7 @@
     "_id": "tdmc4m7mshix4rx",
     "registerNo": "CS26017",
     "name": "SWETHA C",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "17",
@@ -241,7 +241,7 @@
     "_id": "eeisumumshix4rx",
     "registerNo": "CS26018",
     "name": "ARAVIND V",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "18",
@@ -255,7 +255,7 @@
     "_id": "v9tgspzmshix4rx",
     "registerNo": "CS26019",
     "name": "DINESH I",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "19",
@@ -269,7 +269,7 @@
     "_id": "k2ayfxsmshix4rx",
     "registerNo": "CS26020",
     "name": "MONISHA I",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "20",
@@ -283,7 +283,7 @@
     "_id": "oy4l7oemshix4rx",
     "registerNo": "CS26021",
     "name": "ARUN A",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "21",
@@ -297,7 +297,7 @@
     "_id": "7ilvr6wmshix4rx",
     "registerNo": "CS26022",
     "name": "MANOJ U",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "22",
@@ -311,7 +311,7 @@
     "_id": "lgn4lnlmshix4rx",
     "registerNo": "CS26023",
     "name": "SANJAY K",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "23",
@@ -325,7 +325,7 @@
     "_id": "jhmys9dmshix4rx",
     "registerNo": "CS26024",
     "name": "POOJA M",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "24",
@@ -339,7 +339,7 @@
     "_id": "ztpueoxmshix4rx",
     "registerNo": "CS26025",
     "name": "ARAVIND M",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "25",
@@ -353,7 +353,7 @@
     "_id": "gjmjufemshix4rx",
     "registerNo": "CS26026",
     "name": "KAVYA M",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "26",
@@ -367,7 +367,7 @@
     "_id": "sxgjo7dmshix4rx",
     "registerNo": "CS26027",
     "name": "RAGAVI G",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "27",
@@ -381,7 +381,7 @@
     "_id": "75p45z8mshix4rx",
     "registerNo": "CS26028",
     "name": "MEENA I",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "28",
@@ -395,7 +395,7 @@
     "_id": "o0gnbzlmshix4rx",
     "registerNo": "CS26029",
     "name": "KAVYA C",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "29",
@@ -409,7 +409,7 @@
     "_id": "zbxvxnrmshix4rx",
     "registerNo": "CS26030",
     "name": "KEERTHANA Y",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "30",
@@ -423,7 +423,7 @@
     "_id": "11asl0xmshix4rx",
     "registerNo": "CS26031",
     "name": "SURESH A",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "31",
@@ -437,7 +437,7 @@
     "_id": "tion755mshix4rx",
     "registerNo": "CS26032",
     "name": "BHARATH X",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "32",
@@ -451,7 +451,7 @@
     "_id": "1r5r9rnmshix4rx",
     "registerNo": "CS26033",
     "name": "SATHISH F",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "33",
@@ -465,7 +465,7 @@
     "_id": "zdabqygmshix4rx",
     "registerNo": "CS26034",
     "name": "PRAVEEN D",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "34",
@@ -479,7 +479,7 @@
     "_id": "jmqbx7amshix4rx",
     "registerNo": "CS26035",
     "name": "JANANI R",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "35",
@@ -493,7 +493,7 @@
     "_id": "02qaa02mshix4rx",
     "registerNo": "CS26036",
     "name": "RAHUL O",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "36",
@@ -507,7 +507,7 @@
     "_id": "r1lloeymshix4rx",
     "registerNo": "CS26037",
     "name": "KEERTHANA O",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "37",
@@ -521,7 +521,7 @@
     "_id": "4yf3bl9mshix4rx",
     "registerNo": "CS26038",
     "name": "BHARATH H",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "38",
@@ -535,7 +535,7 @@
     "_id": "agf5mp0mshix4rx",
     "registerNo": "CS26039",
     "name": "NITHYA T",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "39",
@@ -549,7 +549,7 @@
     "_id": "emsq6njmshix4rx",
     "registerNo": "CS26040",
     "name": "SANGEETHA B",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "40",
@@ -563,7 +563,7 @@
     "_id": "amawk8rmshix4rx",
     "registerNo": "CS26041",
     "name": "SATHISH I",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "41",
@@ -577,7 +577,7 @@
     "_id": "0f5fkm5mshix4rx",
     "registerNo": "CS26042",
     "name": "DIVYA J",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "42",
@@ -591,7 +591,7 @@
     "_id": "cnfesbmmshix4rx",
     "registerNo": "CS26043",
     "name": "ASHWIN Y",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "43",
@@ -605,7 +605,7 @@
     "_id": "j9lo396mshix4rx",
     "registerNo": "CS26044",
     "name": "MANOJ Q",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "44",
@@ -619,7 +619,7 @@
     "_id": "2qc15qqmshix4rx",
     "registerNo": "CS26045",
     "name": "MEENA O",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "45",
@@ -633,7 +633,7 @@
     "_id": "5i9diwdmshix4rx",
     "registerNo": "CS26046",
     "name": "VIGNESH S",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "46",
@@ -647,7 +647,7 @@
     "_id": "dxw3515mshix4rx",
     "registerNo": "CS26047",
     "name": "HARINI Z",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "47",
@@ -661,7 +661,7 @@
     "_id": "yzi8pctmshix4rx",
     "registerNo": "CS26048",
     "name": "ASHWIN O",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "48",
@@ -675,7 +675,7 @@
     "_id": "og73s0xmshix4rx",
     "registerNo": "CS26049",
     "name": "SURESH G",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "49",
@@ -689,7 +689,7 @@
     "_id": "a2q00jlmshix4rx",
     "registerNo": "CS26050",
     "name": "JANANI U",
-    "department": "GENERAL",
+    "department": "CS",
     "batch": "2024-25",
     "csvData": {
       "SNo": "50",
@@ -703,7 +703,7 @@
     "_id": "wxyk0idmshix4rx",
     "registerNo": "CA26001",
     "name": "SNEHA C",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "51",
@@ -717,7 +717,7 @@
     "_id": "xmk42v1mshix4rx",
     "registerNo": "CA26002",
     "name": "AARTHI L",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "52",
@@ -731,7 +731,7 @@
     "_id": "9f9wvk0mshix4rx",
     "registerNo": "CA26003",
     "name": "BHARATH W",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "53",
@@ -745,7 +745,7 @@
     "_id": "s2ot20wmshix4rx",
     "registerNo": "CA26004",
     "name": "DHARSHINI C",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "54",
@@ -759,7 +759,7 @@
     "_id": "phh7kefmshix4rx",
     "registerNo": "CA26005",
     "name": "GOKUL D",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "55",
@@ -773,7 +773,7 @@
     "_id": "v15zs45mshix4rx",
     "registerNo": "CA26006",
     "name": "MEENA S",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "56",
@@ -787,7 +787,7 @@
     "_id": "ynb7gvkmshix4rx",
     "registerNo": "CA26007",
     "name": "AARTHI X",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "57",
@@ -801,7 +801,7 @@
     "_id": "dhwhf1pmshix4rx",
     "registerNo": "CA26008",
     "name": "KAVYA Q",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "58",
@@ -815,7 +815,7 @@
     "_id": "3r2pekdmshix4rx",
     "registerNo": "CA26009",
     "name": "ARAVIND K",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "59",
@@ -829,7 +829,7 @@
     "_id": "6v9nxjdmshix4rx",
     "registerNo": "CA26010",
     "name": "KAVYA S",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "60",
@@ -843,7 +843,7 @@
     "_id": "dtr6zy4mshix4rx",
     "registerNo": "CA26011",
     "name": "MADHUMITHA E",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "61",
@@ -857,7 +857,7 @@
     "_id": "wx7douhmshix4rx",
     "registerNo": "CA26012",
     "name": "ARAVIND N",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "62",
@@ -871,7 +871,7 @@
     "_id": "v0vwi4pmshix4rx",
     "registerNo": "CA26013",
     "name": "SWETHA T",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "63",
@@ -885,7 +885,7 @@
     "_id": "efmexanmshix4rx",
     "registerNo": "CA26014",
     "name": "AARTHI A",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "64",
@@ -899,7 +899,7 @@
     "_id": "jbfair1mshix4rx",
     "registerNo": "CA26015",
     "name": "SNEHA F",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "65",
@@ -913,7 +913,7 @@
     "_id": "290amf0mshix4rx",
     "registerNo": "CA26016",
     "name": "DEEPA O",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "66",
@@ -927,7 +927,7 @@
     "_id": "ruji6zumshix4rx",
     "registerNo": "CA26017",
     "name": "RANJITH X",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "67",
@@ -941,7 +941,7 @@
     "_id": "8d3f0n6mshix4rx",
     "registerNo": "CA26018",
     "name": "GOKUL I",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "68",
@@ -955,7 +955,7 @@
     "_id": "z7w2shgmshix4rx",
     "registerNo": "CA26019",
     "name": "GOKUL Q",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "69",
@@ -969,7 +969,7 @@
     "_id": "t8jrq30mshix4rx",
     "registerNo": "CA26020",
     "name": "KEERTHANA M",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "70",
@@ -983,7 +983,7 @@
     "_id": "1un59qbmshix4rx",
     "registerNo": "CA26021",
     "name": "DEEPA A",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "71",
@@ -997,7 +997,7 @@
     "_id": "ccxn08imshix4rx",
     "registerNo": "CA26022",
     "name": "ARUN U",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "72",
@@ -1011,7 +1011,7 @@
     "_id": "wzsir5vmshix4rx",
     "registerNo": "CA26023",
     "name": "GOKUL U",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "73",
@@ -1025,7 +1025,7 @@
     "_id": "yvzmlf2mshix4rx",
     "registerNo": "CA26024",
     "name": "RAHUL T",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "74",
@@ -1039,7 +1039,7 @@
     "_id": "udba5mxmshix4rx",
     "registerNo": "CA26025",
     "name": "NAVEEN D",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "75",
@@ -1053,7 +1053,7 @@
     "_id": "rk2m77cmshix4rx",
     "registerNo": "CA26026",
     "name": "DHARSHINI C",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "76",
@@ -1067,7 +1067,7 @@
     "_id": "zvsdwrimshix4rx",
     "registerNo": "CA26027",
     "name": "SNEHA S",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "77",
@@ -1081,7 +1081,7 @@
     "_id": "yjpr10jmshix4rx",
     "registerNo": "CA26028",
     "name": "ANUSHA M",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "78",
@@ -1095,7 +1095,7 @@
     "_id": "7jbbc53mshix4rx",
     "registerNo": "CA26029",
     "name": "GOKUL G",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "79",
@@ -1109,7 +1109,7 @@
     "_id": "fclv18umshix4rx",
     "registerNo": "CA26030",
     "name": "NANDHINI C",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "80",
@@ -1123,7 +1123,7 @@
     "_id": "0x0sr85mshix4rx",
     "registerNo": "CA26031",
     "name": "MADHUMITHA K",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "81",
@@ -1137,7 +1137,7 @@
     "_id": "650pygbmshix4rx",
     "registerNo": "CA26032",
     "name": "SURESH A",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "82",
@@ -1151,7 +1151,7 @@
     "_id": "4jxsgvgmshix4rx",
     "registerNo": "CA26033",
     "name": "PRAVEEN U",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "83",
@@ -1165,7 +1165,7 @@
     "_id": "d4m3cnamshix4rx",
     "registerNo": "CA26034",
     "name": "MANOJ B",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "84",
@@ -1179,7 +1179,7 @@
     "_id": "v2cljs6mshix4rx",
     "registerNo": "CA26035",
     "name": "SATHISH P",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "85",
@@ -1193,7 +1193,7 @@
     "_id": "dxrd0axmshix4rx",
     "registerNo": "CA26036",
     "name": "NAVEEN W",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "86",
@@ -1207,7 +1207,7 @@
     "_id": "uupimx6mshix4rx",
     "registerNo": "CA26037",
     "name": "DHARSHINI Z",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "87",
@@ -1221,7 +1221,7 @@
     "_id": "sk2k3lwmshix4rx",
     "registerNo": "CA26038",
     "name": "SANJAY Y",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "88",
@@ -1235,7 +1235,7 @@
     "_id": "iq5t04lmshix4rx",
     "registerNo": "CA26039",
     "name": "ARAVIND P",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "89",
@@ -1249,7 +1249,7 @@
     "_id": "sgkzg5pmshix4rx",
     "registerNo": "CA26040",
     "name": "BHARATH I",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "90",
@@ -1263,7 +1263,7 @@
     "_id": "8htb7m3mshix4rx",
     "registerNo": "CA26041",
     "name": "KARTHIK L",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "91",
@@ -1277,7 +1277,7 @@
     "_id": "qznixsimshix4rx",
     "registerNo": "CA26042",
     "name": "SOWMIYA L",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "92",
@@ -1291,7 +1291,7 @@
     "_id": "he281dhmshix4rx",
     "registerNo": "CA26043",
     "name": "SATHISH B",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "93",
@@ -1305,7 +1305,7 @@
     "_id": "ibfy30smshix4rx",
     "registerNo": "CA26044",
     "name": "SANJAY S",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "94",
@@ -1319,7 +1319,7 @@
     "_id": "sh4g3skmshix4rx",
     "registerNo": "CA26045",
     "name": "SANGEETHA N",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "95",
@@ -1333,7 +1333,7 @@
     "_id": "i3uxooamshix4rx",
     "registerNo": "CA26046",
     "name": "DIVYA J",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "96",
@@ -1347,7 +1347,7 @@
     "_id": "1rbbvqzmshix4rx",
     "registerNo": "CA26047",
     "name": "MEENA Y",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "97",
@@ -1361,7 +1361,7 @@
     "_id": "xumn785mshix4rx",
     "registerNo": "CA26048",
     "name": "ANUSHA M",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "98",
@@ -1375,7 +1375,7 @@
     "_id": "y2d1sm4mshix4rx",
     "registerNo": "CA26049",
     "name": "SWETHA B",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "99",
@@ -1389,7 +1389,7 @@
     "_id": "oqvd2qsmshix4rx",
     "registerNo": "CA26050",
     "name": "SWETHA D",
-    "department": "GENERAL",
+    "department": "CA",
     "batch": "2024-25",
     "csvData": {
       "SNo": "100",
@@ -1403,7 +1403,7 @@
     "_id": "sousd8gmshix4rx",
     "registerNo": "IT26001",
     "name": "DHARANI X",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "101",
@@ -1417,7 +1417,7 @@
     "_id": "cd42vqjmshix4rx",
     "registerNo": "IT26002",
     "name": "RAHUL B",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "102",
@@ -1431,7 +1431,7 @@
     "_id": "7z06nfnmshix4rx",
     "registerNo": "IT26003",
     "name": "DHARANI B",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "103",
@@ -1445,7 +1445,7 @@
     "_id": "5c55i7gmshix4rx",
     "registerNo": "IT26004",
     "name": "PRIYA T",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "104",
@@ -1459,7 +1459,7 @@
     "_id": "r510xbemshix4rx",
     "registerNo": "IT26005",
     "name": "GOKUL A",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "105",
@@ -1473,7 +1473,7 @@
     "_id": "nq9ea9smshix4rx",
     "registerNo": "IT26006",
     "name": "SWETHA C",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "106",
@@ -1487,7 +1487,7 @@
     "_id": "c7pzm6emshix4rx",
     "registerNo": "IT26007",
     "name": "SNEHA H",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "107",
@@ -1501,7 +1501,7 @@
     "_id": "12k0rzzmshix4rx",
     "registerNo": "IT26008",
     "name": "MONISHA E",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "108",
@@ -1515,7 +1515,7 @@
     "_id": "mm2356vmshix4rx",
     "registerNo": "IT26009",
     "name": "BHARATH K",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "109",
@@ -1529,7 +1529,7 @@
     "_id": "13951g3mshix4rx",
     "registerNo": "IT26010",
     "name": "SHALINI I",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "110",
@@ -1543,7 +1543,7 @@
     "_id": "wt59evamshix4rx",
     "registerNo": "IT26011",
     "name": "RAHUL E",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "111",
@@ -1557,7 +1557,7 @@
     "_id": "qalexvkmshix4rx",
     "registerNo": "IT26012",
     "name": "SANGEETHA W",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "112",
@@ -1571,7 +1571,7 @@
     "_id": "5q98f60mshix4rx",
     "registerNo": "IT26013",
     "name": "ABINAYA Q",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "113",
@@ -1585,7 +1585,7 @@
     "_id": "kobmw1emshix4rx",
     "registerNo": "IT26014",
     "name": "NANDHINI F",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "114",
@@ -1599,7 +1599,7 @@
     "_id": "35idvpwmshix4rx",
     "registerNo": "IT26015",
     "name": "KAVYA A",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "115",
@@ -1613,7 +1613,7 @@
     "_id": "rzrykngmshix4rx",
     "registerNo": "IT26016",
     "name": "MONISHA F",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "116",
@@ -1627,7 +1627,7 @@
     "_id": "hf4xk8umshix4rx",
     "registerNo": "IT26017",
     "name": "SHALINI F",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "117",
@@ -1641,7 +1641,7 @@
     "_id": "p2tp2wbmshix4rx",
     "registerNo": "IT26018",
     "name": "KAVYA G",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "118",
@@ -1655,7 +1655,7 @@
     "_id": "77m0vm3mshix4rx",
     "registerNo": "IT26019",
     "name": "SOWMIYA M",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "119",
@@ -1669,7 +1669,7 @@
     "_id": "mbr035rmshix4rx",
     "registerNo": "IT26020",
     "name": "DEEPA D",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "120",
@@ -1683,7 +1683,7 @@
     "_id": "k2zd83amshix4ry",
     "registerNo": "IT26021",
     "name": "BHARATH X",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "121",
@@ -1697,7 +1697,7 @@
     "_id": "okboafxmshix4ry",
     "registerNo": "IT26022",
     "name": "ANITHA O",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "122",
@@ -1711,7 +1711,7 @@
     "_id": "yqscubwmshix4ry",
     "registerNo": "IT26023",
     "name": "SARANYA I",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "123",
@@ -1725,7 +1725,7 @@
     "_id": "5jn41s1mshix4ry",
     "registerNo": "IT26024",
     "name": "SANGEETHA R",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "124",
@@ -1739,7 +1739,7 @@
     "_id": "67a5daemshix4ry",
     "registerNo": "IT26025",
     "name": "MONISHA I",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "125",
@@ -1753,7 +1753,7 @@
     "_id": "ffmtyt6mshix4ry",
     "registerNo": "IT26026",
     "name": "MADHUMITHA C",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "126",
@@ -1767,7 +1767,7 @@
     "_id": "s6hi9j0mshix4ry",
     "registerNo": "IT26027",
     "name": "ANITHA K",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "127",
@@ -1781,7 +1781,7 @@
     "_id": "swfxvr1mshix4ry",
     "registerNo": "IT26028",
     "name": "VIGNESH T",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "128",
@@ -1795,7 +1795,7 @@
     "_id": "6azysigmshix4ry",
     "registerNo": "IT26029",
     "name": "GOKUL G",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "129",
@@ -1809,7 +1809,7 @@
     "_id": "d2mgjo4mshix4ry",
     "registerNo": "IT26030",
     "name": "DHARSHINI P",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "130",
@@ -1823,7 +1823,7 @@
     "_id": "lths9g6mshix4ry",
     "registerNo": "IT26031",
     "name": "HARINI Y",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "131",
@@ -1837,7 +1837,7 @@
     "_id": "eyf0uokmshix4ry",
     "registerNo": "IT26032",
     "name": "SOWMIYA U",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "132",
@@ -1851,7 +1851,7 @@
     "_id": "3u9dyj3mshix4ry",
     "registerNo": "IT26033",
     "name": "MUKESH K",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "133",
@@ -1865,7 +1865,7 @@
     "_id": "37y20ijmshix4ry",
     "registerNo": "IT26034",
     "name": "AKSHAYA N",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "134",
@@ -1879,7 +1879,7 @@
     "_id": "h61mbacmshix4ry",
     "registerNo": "IT26035",
     "name": "KEERTHANA F",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "135",
@@ -1893,7 +1893,7 @@
     "_id": "v3x4q6fmshix4ry",
     "registerNo": "IT26036",
     "name": "ANUSHA N",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "136",
@@ -1907,7 +1907,7 @@
     "_id": "iw2nwjjmshix4ry",
     "registerNo": "IT26037",
     "name": "AARTHI H",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "137",
@@ -1921,7 +1921,7 @@
     "_id": "hw9udbnmshix4ry",
     "registerNo": "IT26038",
     "name": "SHALINI P",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "138",
@@ -1935,7 +1935,7 @@
     "_id": "1if5xjxmshix4ry",
     "registerNo": "IT26039",
     "name": "KEERTHANA Y",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "139",
@@ -1949,7 +1949,7 @@
     "_id": "seuthj3mshix4ry",
     "registerNo": "IT26040",
     "name": "RAMYA D",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "140",
@@ -1963,7 +1963,7 @@
     "_id": "j8k9wa4mshix4ry",
     "registerNo": "IT26041",
     "name": "AKSHAYA N",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "141",
@@ -1977,7 +1977,7 @@
     "_id": "m17vaogmshix4ry",
     "registerNo": "IT26042",
     "name": "NAVEEN X",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "142",
@@ -1991,7 +1991,7 @@
     "_id": "azc9n1xmshix4ry",
     "registerNo": "IT26043",
     "name": "KAVYA T",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "143",
@@ -2005,7 +2005,7 @@
     "_id": "qvalxpjmshix4ry",
     "registerNo": "IT26044",
     "name": "RAHUL U",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "144",
@@ -2019,7 +2019,7 @@
     "_id": "zuu3xrsmshix4ry",
     "registerNo": "IT26045",
     "name": "ARUN K",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "145",
@@ -2033,7 +2033,7 @@
     "_id": "rrqk8k2mshix4ry",
     "registerNo": "IT26046",
     "name": "ARAVIND N",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "146",
@@ -2047,7 +2047,7 @@
     "_id": "x7qnhbwmshix4ry",
     "registerNo": "IT26047",
     "name": "DIVYA X",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "147",
@@ -2061,7 +2061,7 @@
     "_id": "wj2queimshix4ry",
     "registerNo": "IT26048",
     "name": "SURESH E",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "148",
@@ -2075,7 +2075,7 @@
     "_id": "o5opolcmshix4ry",
     "registerNo": "IT26049",
     "name": "VIGNESH U",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "149",
@@ -2089,7 +2089,7 @@
     "_id": "xov43e5mshix4ry",
     "registerNo": "IT26050",
     "name": "RAMYA I",
-    "department": "GENERAL",
+    "department": "IT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "150",
@@ -2103,7 +2103,7 @@
     "_id": "r8unn1nmshix4ry",
     "registerNo": "COM26001",
     "name": "NITHYA T",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "151",
@@ -2117,7 +2117,7 @@
     "_id": "lhbax3mmshix4ry",
     "registerNo": "COM26002",
     "name": "PRAVEEN C",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "152",
@@ -2131,7 +2131,7 @@
     "_id": "3qrt5b8mshix4ry",
     "registerNo": "COM26003",
     "name": "NITHYA H",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "153",
@@ -2145,7 +2145,7 @@
     "_id": "9vcqwqvmshix4ry",
     "registerNo": "COM26004",
     "name": "MEENA D",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "154",
@@ -2159,7 +2159,7 @@
     "_id": "vs10lqamshix4ry",
     "registerNo": "COM26005",
     "name": "RAHUL A",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "155",
@@ -2173,7 +2173,7 @@
     "_id": "y58lbz1mshix4ry",
     "registerNo": "COM26006",
     "name": "RAGAVI C",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "156",
@@ -2187,7 +2187,7 @@
     "_id": "hnyjpjamshix4ry",
     "registerNo": "COM26007",
     "name": "VIGNESH P",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "157",
@@ -2201,7 +2201,7 @@
     "_id": "j8g7klzmshix4ry",
     "registerNo": "COM26008",
     "name": "ASHWIN Y",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "158",
@@ -2215,7 +2215,7 @@
     "_id": "3ni5t86mshix4ry",
     "registerNo": "COM26009",
     "name": "SHALINI R",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "159",
@@ -2229,7 +2229,7 @@
     "_id": "indhrb4mshix4ry",
     "registerNo": "COM26010",
     "name": "PRAVEEN N",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "160",
@@ -2243,7 +2243,7 @@
     "_id": "nh1a6f5mshix4ry",
     "registerNo": "COM26011",
     "name": "RAHUL S",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "161",
@@ -2257,7 +2257,7 @@
     "_id": "wtp96lymshix4ry",
     "registerNo": "COM26012",
     "name": "PRAVEEN U",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "162",
@@ -2271,7 +2271,7 @@
     "_id": "009axcnmshix4ry",
     "registerNo": "COM26013",
     "name": "MEENA Y",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "163",
@@ -2285,7 +2285,7 @@
     "_id": "id4dp1umshix4ry",
     "registerNo": "COM26014",
     "name": "RAGAVI V",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "164",
@@ -2299,7 +2299,7 @@
     "_id": "62uar86mshix4ry",
     "registerNo": "COM26015",
     "name": "KAVIN K",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "165",
@@ -2313,7 +2313,7 @@
     "_id": "49413lumshix4ry",
     "registerNo": "COM26016",
     "name": "SARANYA P",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "166",
@@ -2327,7 +2327,7 @@
     "_id": "xaicwb1mshix4ry",
     "registerNo": "COM26017",
     "name": "SOWMIYA D",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "167",
@@ -2341,7 +2341,7 @@
     "_id": "911cndfmshix4ry",
     "registerNo": "COM26018",
     "name": "ARUN E",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "168",
@@ -2355,7 +2355,7 @@
     "_id": "qxw410qmshix4ry",
     "registerNo": "COM26019",
     "name": "JANANI B",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "169",
@@ -2369,7 +2369,7 @@
     "_id": "ehhahcfmshix4ry",
     "registerNo": "COM26020",
     "name": "KAVIN N",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "170",
@@ -2383,7 +2383,7 @@
     "_id": "wbzll2fmshix4ry",
     "registerNo": "COM26021",
     "name": "DHARANI B",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "171",
@@ -2397,7 +2397,7 @@
     "_id": "wre8mztmshix4ry",
     "registerNo": "COM26022",
     "name": "KAVYA P",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "172",
@@ -2411,7 +2411,7 @@
     "_id": "zcr4l7emshix4ry",
     "registerNo": "COM26023",
     "name": "SARANYA U",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "173",
@@ -2425,7 +2425,7 @@
     "_id": "x6ec1x4mshix4ry",
     "registerNo": "COM26024",
     "name": "MANOJ H",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "174",
@@ -2439,7 +2439,7 @@
     "_id": "c76jfvamshix4ry",
     "registerNo": "COM26025",
     "name": "SANGEETHA I",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "175",
@@ -2453,7 +2453,7 @@
     "_id": "eu48qenmshix4ry",
     "registerNo": "COM26026",
     "name": "SNEHA H",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "176",
@@ -2467,7 +2467,7 @@
     "_id": "z2t33q8mshix4ry",
     "registerNo": "COM26027",
     "name": "KIRUTHIKA N",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "177",
@@ -2481,7 +2481,7 @@
     "_id": "rwrygvdmshix4ry",
     "registerNo": "COM26028",
     "name": "DIVYA X",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "178",
@@ -2495,7 +2495,7 @@
     "_id": "gnzy7bimshix4ry",
     "registerNo": "COM26029",
     "name": "MONISHA N",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "179",
@@ -2509,7 +2509,7 @@
     "_id": "1k0qthhmshix4ry",
     "registerNo": "COM26030",
     "name": "GAYATHRI K",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "180",
@@ -2523,7 +2523,7 @@
     "_id": "mm6objvmshix4ry",
     "registerNo": "COM26031",
     "name": "NAVEEN G",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "181",
@@ -2537,7 +2537,7 @@
     "_id": "zzwc62lmshix4ry",
     "registerNo": "COM26032",
     "name": "RANJITH R",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "182",
@@ -2551,7 +2551,7 @@
     "_id": "zn4yobamshix4ry",
     "registerNo": "COM26033",
     "name": "AARTHI R",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "183",
@@ -2565,7 +2565,7 @@
     "_id": "gpuzgovmshix4ry",
     "registerNo": "COM26034",
     "name": "SARANYA P",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "184",
@@ -2579,7 +2579,7 @@
     "_id": "9wg9hwlmshix4ry",
     "registerNo": "COM26035",
     "name": "SWETHA J",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "185",
@@ -2593,7 +2593,7 @@
     "_id": "v6ijzyfmshix4ry",
     "registerNo": "COM26036",
     "name": "NITHYA Z",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "186",
@@ -2607,7 +2607,7 @@
     "_id": "yjuqum0mshix4ry",
     "registerNo": "COM26037",
     "name": "AARTHI V",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "187",
@@ -2621,7 +2621,7 @@
     "_id": "69gok45mshix4ry",
     "registerNo": "COM26038",
     "name": "KAVYA M",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "188",
@@ -2635,7 +2635,7 @@
     "_id": "x6w7yrjmshix4ry",
     "registerNo": "COM26039",
     "name": "BHARATH Q",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "189",
@@ -2649,7 +2649,7 @@
     "_id": "blhbx8mmshix4ry",
     "registerNo": "COM26040",
     "name": "AKSHAYA J",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "190",
@@ -2663,7 +2663,7 @@
     "_id": "npb8vq7mshix4ry",
     "registerNo": "COM26041",
     "name": "RAGAVI B",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "191",
@@ -2677,7 +2677,7 @@
     "_id": "fuideiemshix4ry",
     "registerNo": "COM26042",
     "name": "MADHUMITHA Y",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "192",
@@ -2691,7 +2691,7 @@
     "_id": "w8awuo6mshix4ry",
     "registerNo": "COM26043",
     "name": "MADHUMITHA M",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "193",
@@ -2705,7 +2705,7 @@
     "_id": "j84xw7ymshix4ry",
     "registerNo": "COM26044",
     "name": "ARAVIND R",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "194",
@@ -2719,7 +2719,7 @@
     "_id": "tv01q10mshix4ry",
     "registerNo": "COM26045",
     "name": "SANGEETHA Q",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "195",
@@ -2733,7 +2733,7 @@
     "_id": "cm6fw6rmshix4ry",
     "registerNo": "COM26046",
     "name": "ANUSHA J",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "196",
@@ -2747,7 +2747,7 @@
     "_id": "ug1v76lmshix4ry",
     "registerNo": "COM26047",
     "name": "PAVITHRA A",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "197",
@@ -2761,7 +2761,7 @@
     "_id": "p2v551dmshix4ry",
     "registerNo": "COM26048",
     "name": "ABINAYA R",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "198",
@@ -2775,7 +2775,7 @@
     "_id": "a2cyra7mshix4ry",
     "registerNo": "COM26049",
     "name": "DINESH S",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "199",
@@ -2789,7 +2789,7 @@
     "_id": "6361nqjmshix4ry",
     "registerNo": "COM26050",
     "name": "ABINAYA V",
-    "department": "GENERAL",
+    "department": "COM",
     "batch": "2024-25",
     "csvData": {
       "SNo": "200",
@@ -2803,7 +2803,7 @@
     "_id": "3yxldm7mshix4ry",
     "registerNo": "MAT26001",
     "name": "ANUSHA R",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "201",
@@ -2817,7 +2817,7 @@
     "_id": "3wfvwokmshix4ry",
     "registerNo": "MAT26002",
     "name": "PRIYA S",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "202",
@@ -2831,7 +2831,7 @@
     "_id": "rjjw4kqmshix4ry",
     "registerNo": "MAT26003",
     "name": "KIRUTHIKA G",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "203",
@@ -2845,7 +2845,7 @@
     "_id": "0it7mazmshix4ry",
     "registerNo": "MAT26004",
     "name": "KEERTHANA J",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "204",
@@ -2859,7 +2859,7 @@
     "_id": "djhojzkmshix4ry",
     "registerNo": "MAT26005",
     "name": "MUKESH F",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "205",
@@ -2873,7 +2873,7 @@
     "_id": "vsahc6vmshix4ry",
     "registerNo": "MAT26006",
     "name": "GOKUL L",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "206",
@@ -2887,7 +2887,7 @@
     "_id": "s9yyjdtmshix4ry",
     "registerNo": "MAT26007",
     "name": "MUKESH S",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "207",
@@ -2901,7 +2901,7 @@
     "_id": "iglf80wmshix4ry",
     "registerNo": "MAT26008",
     "name": "NITHYA L",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "208",
@@ -2915,7 +2915,7 @@
     "_id": "uogleajmshix4ry",
     "registerNo": "MAT26009",
     "name": "SANJAY K",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "209",
@@ -2929,7 +2929,7 @@
     "_id": "2z7fk7vmshix4ry",
     "registerNo": "MAT26010",
     "name": "NANDHINI F",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "210",
@@ -2943,7 +2943,7 @@
     "_id": "tt6jf3pmshix4ry",
     "registerNo": "MAT26011",
     "name": "HARINI N",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "211",
@@ -2957,7 +2957,7 @@
     "_id": "us9t44xmshix4ry",
     "registerNo": "MAT26012",
     "name": "RAMYA C",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "212",
@@ -2971,7 +2971,7 @@
     "_id": "xe434qvmshix4ry",
     "registerNo": "MAT26013",
     "name": "RAGAVI D",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "213",
@@ -2985,7 +2985,7 @@
     "_id": "y62llupmshix4ry",
     "registerNo": "MAT26014",
     "name": "VIGNESH S",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "214",
@@ -2999,7 +2999,7 @@
     "_id": "h6scdm2mshix4ry",
     "registerNo": "MAT26015",
     "name": "AARTHI H",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "215",
@@ -3013,7 +3013,7 @@
     "_id": "nyfjd2tmshix4ry",
     "registerNo": "MAT26016",
     "name": "JANANI G",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "216",
@@ -3027,7 +3027,7 @@
     "_id": "qtlr5lnmshix4ry",
     "registerNo": "MAT26017",
     "name": "BHAVANI T",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "217",
@@ -3041,7 +3041,7 @@
     "_id": "tihltgrmshix4ry",
     "registerNo": "MAT26018",
     "name": "KIRUTHIKA B",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "218",
@@ -3055,7 +3055,7 @@
     "_id": "6zqcyv9mshix4ry",
     "registerNo": "MAT26019",
     "name": "POOJA V",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "219",
@@ -3069,7 +3069,7 @@
     "_id": "tafqdygmshix4ry",
     "registerNo": "MAT26020",
     "name": "ANITHA J",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "220",
@@ -3083,7 +3083,7 @@
     "_id": "hy322p5mshix4rz",
     "registerNo": "MAT26021",
     "name": "KARTHIK R",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "221",
@@ -3097,7 +3097,7 @@
     "_id": "nn6cso0mshix4rz",
     "registerNo": "MAT26022",
     "name": "RAMYA M",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "222",
@@ -3111,7 +3111,7 @@
     "_id": "hhnhnifmshix4rz",
     "registerNo": "MAT26023",
     "name": "SANJAY H",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "223",
@@ -3125,7 +3125,7 @@
     "_id": "85fmnasmshix4rz",
     "registerNo": "MAT26024",
     "name": "PRAVEEN W",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "224",
@@ -3139,7 +3139,7 @@
     "_id": "7ichhpxmshix4rz",
     "registerNo": "MAT26025",
     "name": "DIVYA N",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "225",
@@ -3153,7 +3153,7 @@
     "_id": "a8zzmykmshix4rz",
     "registerNo": "MAT26026",
     "name": "ANITHA U",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "226",
@@ -3167,7 +3167,7 @@
     "_id": "znnkynsmshix4rz",
     "registerNo": "MAT26027",
     "name": "AKSHAYA K",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "227",
@@ -3181,7 +3181,7 @@
     "_id": "gglyhgwmshix4rz",
     "registerNo": "MAT26028",
     "name": "MANOJ L",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "228",
@@ -3195,7 +3195,7 @@
     "_id": "t891uirmshix4rz",
     "registerNo": "MAT26029",
     "name": "SARANYA T",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "229",
@@ -3209,7 +3209,7 @@
     "_id": "yql26zemshix4rz",
     "registerNo": "MAT26030",
     "name": "DINESH Z",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "230",
@@ -3223,7 +3223,7 @@
     "_id": "54lcmmrmshix4rz",
     "registerNo": "MAT26031",
     "name": "ANUSHA D",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "231",
@@ -3237,7 +3237,7 @@
     "_id": "zvwbxulmshix4rz",
     "registerNo": "MAT26032",
     "name": "DHARSHINI P",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "232",
@@ -3251,7 +3251,7 @@
     "_id": "z0b9t4mmshix4rz",
     "registerNo": "MAT26033",
     "name": "DHARANI T",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "233",
@@ -3265,7 +3265,7 @@
     "_id": "0dlyatzmshix4rz",
     "registerNo": "MAT26034",
     "name": "MADHUMITHA N",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "234",
@@ -3279,7 +3279,7 @@
     "_id": "0k16hnnmshix4rz",
     "registerNo": "MAT26035",
     "name": "MADHUMITHA G",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "235",
@@ -3293,7 +3293,7 @@
     "_id": "g6hgr35mshix4rz",
     "registerNo": "MAT26036",
     "name": "KIRUTHIKA Q",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "236",
@@ -3307,7 +3307,7 @@
     "_id": "2su52q4mshix4rz",
     "registerNo": "MAT26037",
     "name": "SANGEETHA H",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "237",
@@ -3321,7 +3321,7 @@
     "_id": "rgknjsxmshix4rz",
     "registerNo": "MAT26038",
     "name": "RAHUL E",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "238",
@@ -3335,7 +3335,7 @@
     "_id": "xcdmocsmshix4rz",
     "registerNo": "MAT26039",
     "name": "SATHISH M",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "239",
@@ -3349,7 +3349,7 @@
     "_id": "ulop04qmshix4rz",
     "registerNo": "MAT26040",
     "name": "KAVIN L",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "240",
@@ -3363,7 +3363,7 @@
     "_id": "apdtsstmshix4rz",
     "registerNo": "MAT26041",
     "name": "SANJAY K",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "241",
@@ -3377,7 +3377,7 @@
     "_id": "hm39h8umshix4rz",
     "registerNo": "MAT26042",
     "name": "SHALINI V",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "242",
@@ -3391,7 +3391,7 @@
     "_id": "ww8co96mshix4rz",
     "registerNo": "MAT26043",
     "name": "MADHUMITHA O",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "243",
@@ -3405,7 +3405,7 @@
     "_id": "7u70ntxmshix4rz",
     "registerNo": "MAT26044",
     "name": "DIVYA C",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "244",
@@ -3419,7 +3419,7 @@
     "_id": "k2689pomshix4rz",
     "registerNo": "MAT26045",
     "name": "SNEHA W",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "245",
@@ -3433,7 +3433,7 @@
     "_id": "cusr37ymshix4rz",
     "registerNo": "MAT26046",
     "name": "KEERTHANA R",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "246",
@@ -3447,7 +3447,7 @@
     "_id": "6cgd0fpmshix4rz",
     "registerNo": "MAT26047",
     "name": "NANDHINI W",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "247",
@@ -3461,7 +3461,7 @@
     "_id": "ra7ci48mshix4s0",
     "registerNo": "MAT26048",
     "name": "SANGEETHA B",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "248",
@@ -3475,7 +3475,7 @@
     "_id": "zvf00efmshix4s0",
     "registerNo": "MAT26049",
     "name": "PRAVEEN Q",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "249",
@@ -3489,7 +3489,7 @@
     "_id": "cg45lnfmshix4s0",
     "registerNo": "MAT26050",
     "name": "ABINAYA F",
-    "department": "GENERAL",
+    "department": "MAT",
     "batch": "2024-25",
     "csvData": {
       "SNo": "250",
@@ -3503,7 +3503,7 @@
     "_id": "ttmaub4mshix4s0",
     "registerNo": "PHY26001",
     "name": "DHARSHINI D",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "251",
@@ -3517,7 +3517,7 @@
     "_id": "kylabpdmshix4s0",
     "registerNo": "PHY26002",
     "name": "DHARANI P",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "252",
@@ -3531,7 +3531,7 @@
     "_id": "32wnz9ymshix4s0",
     "registerNo": "PHY26003",
     "name": "ANUSHA G",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "253",
@@ -3545,7 +3545,7 @@
     "_id": "appm4y2mshix4s0",
     "registerNo": "PHY26004",
     "name": "PRAVEEN M",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "254",
@@ -3559,7 +3559,7 @@
     "_id": "wt0a7memshix4s0",
     "registerNo": "PHY26005",
     "name": "SWETHA Q",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "255",
@@ -3573,7 +3573,7 @@
     "_id": "rlv9x6vmshix4s0",
     "registerNo": "PHY26006",
     "name": "RANJITH Z",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "256",
@@ -3587,7 +3587,7 @@
     "_id": "bqzcxf7mshix4s0",
     "registerNo": "PHY26007",
     "name": "SURESH S",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "257",
@@ -3601,7 +3601,7 @@
     "_id": "3f36mv8mshix4s0",
     "registerNo": "PHY26008",
     "name": "MUKESH D",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "258",
@@ -3615,7 +3615,7 @@
     "_id": "8jy2mlrmshix4s0",
     "registerNo": "PHY26009",
     "name": "DHARSHINI H",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "259",
@@ -3629,7 +3629,7 @@
     "_id": "s84iyyimshix4s0",
     "registerNo": "PHY26010",
     "name": "SARANYA E",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "260",
@@ -3643,7 +3643,7 @@
     "_id": "ifz6ch6mshix4s0",
     "registerNo": "PHY26011",
     "name": "NAVEEN I",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "261",
@@ -3657,7 +3657,7 @@
     "_id": "hob75ztmshix4s0",
     "registerNo": "PHY26012",
     "name": "SWETHA D",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "262",
@@ -3671,7 +3671,7 @@
     "_id": "a36zuovmshix4s0",
     "registerNo": "PHY26013",
     "name": "RANJITH V",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "263",
@@ -3685,7 +3685,7 @@
     "_id": "v6l6i4jmshix4s0",
     "registerNo": "PHY26014",
     "name": "SHALINI Z",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "264",
@@ -3699,7 +3699,7 @@
     "_id": "ddqvj0jmshix4s0",
     "registerNo": "PHY26015",
     "name": "ARAVIND Z",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "265",
@@ -3713,7 +3713,7 @@
     "_id": "219htxrmshix4s0",
     "registerNo": "PHY26016",
     "name": "SHALINI G",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "266",
@@ -3727,7 +3727,7 @@
     "_id": "9hpn00jmshix4s0",
     "registerNo": "PHY26017",
     "name": "RAGAVI N",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "267",
@@ -3741,7 +3741,7 @@
     "_id": "vt9205nmshix4s0",
     "registerNo": "PHY26018",
     "name": "MEENA I",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "268",
@@ -3755,7 +3755,7 @@
     "_id": "6l3bav2mshix4s0",
     "registerNo": "PHY26019",
     "name": "KIRUTHIKA X",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "269",
@@ -3769,7 +3769,7 @@
     "_id": "im7rcqymshix4s0",
     "registerNo": "PHY26020",
     "name": "BHAVANI Y",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "270",
@@ -3783,7 +3783,7 @@
     "_id": "8vldkafmshix4s0",
     "registerNo": "PHY26021",
     "name": "MADHUMITHA I",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "271",
@@ -3797,7 +3797,7 @@
     "_id": "m0m23w5mshix4s0",
     "registerNo": "PHY26022",
     "name": "JANANI D",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "272",
@@ -3811,7 +3811,7 @@
     "_id": "06c3w1nmshix4s0",
     "registerNo": "PHY26023",
     "name": "RAGAVI T",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "273",
@@ -3825,7 +3825,7 @@
     "_id": "3lopmljmshix4s0",
     "registerNo": "PHY26024",
     "name": "PRIYA F",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "274",
@@ -3839,7 +3839,7 @@
     "_id": "yie27eemshix4s0",
     "registerNo": "PHY26025",
     "name": "ABINAYA F",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "275",
@@ -3853,7 +3853,7 @@
     "_id": "u6060z9mshix4s0",
     "registerNo": "PHY26026",
     "name": "SARANYA F",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "276",
@@ -3867,7 +3867,7 @@
     "_id": "709w0rpmshix4s0",
     "registerNo": "PHY26027",
     "name": "VIGNESH V",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "277",
@@ -3881,7 +3881,7 @@
     "_id": "9ook9vlmshix4s0",
     "registerNo": "PHY26028",
     "name": "RAMYA B",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "278",
@@ -3895,7 +3895,7 @@
     "_id": "592tztpmshix4s0",
     "registerNo": "PHY26029",
     "name": "AARTHI Q",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "279",
@@ -3909,7 +3909,7 @@
     "_id": "xve4vt8mshix4s0",
     "registerNo": "PHY26030",
     "name": "MANOJ H",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "280",
@@ -3923,7 +3923,7 @@
     "_id": "4kk29u4mshix4s0",
     "registerNo": "PHY26031",
     "name": "POOJA T",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "281",
@@ -3937,7 +3937,7 @@
     "_id": "g1i7epfmshix4s0",
     "registerNo": "PHY26032",
     "name": "ABINAYA R",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "282",
@@ -3951,7 +3951,7 @@
     "_id": "0p17mkymshix4s0",
     "registerNo": "PHY26033",
     "name": "NITHYA E",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "283",
@@ -3965,7 +3965,7 @@
     "_id": "8t21idxmshix4s0",
     "registerNo": "PHY26034",
     "name": "GOKUL D",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "284",
@@ -3979,7 +3979,7 @@
     "_id": "xhf95u4mshix4s0",
     "registerNo": "PHY26035",
     "name": "HARINI P",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "285",
@@ -3993,7 +3993,7 @@
     "_id": "9d0i4odmshix4s0",
     "registerNo": "PHY26036",
     "name": "BHARATH P",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "286",
@@ -4007,7 +4007,7 @@
     "_id": "hfhtp1tmshix4s0",
     "registerNo": "PHY26037",
     "name": "ARUN F",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "287",
@@ -4021,7 +4021,7 @@
     "_id": "5o3s6nimshix4s0",
     "registerNo": "PHY26038",
     "name": "NANDHINI G",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "288",
@@ -4035,7 +4035,7 @@
     "_id": "kcp96l5mshix4s0",
     "registerNo": "PHY26039",
     "name": "AKSHAYA O",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "289",
@@ -4049,7 +4049,7 @@
     "_id": "i3prse9mshix4s0",
     "registerNo": "PHY26040",
     "name": "PRIYA H",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "290",
@@ -4063,7 +4063,7 @@
     "_id": "2g3lcrkmshix4s0",
     "registerNo": "PHY26041",
     "name": "GOKUL M",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "291",
@@ -4077,7 +4077,7 @@
     "_id": "nnu9l9kmshix4s0",
     "registerNo": "PHY26042",
     "name": "SNEHA W",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "292",
@@ -4091,7 +4091,7 @@
     "_id": "gkbivr0mshix4s0",
     "registerNo": "PHY26043",
     "name": "DINESH U",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "293",
@@ -4105,7 +4105,7 @@
     "_id": "d8juh4bmshix4s0",
     "registerNo": "PHY26044",
     "name": "KAVYA D",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "294",
@@ -4119,7 +4119,7 @@
     "_id": "k81dv33mshix4s0",
     "registerNo": "PHY26045",
     "name": "NANDHINI J",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "295",
@@ -4133,7 +4133,7 @@
     "_id": "sjn8o3gmshix4s0",
     "registerNo": "PHY26046",
     "name": "DIVYA H",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "296",
@@ -4147,7 +4147,7 @@
     "_id": "swvwb5imshix4s0",
     "registerNo": "PHY26047",
     "name": "RANJITH G",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "297",
@@ -4161,7 +4161,7 @@
     "_id": "e7mzjphmshix4s0",
     "registerNo": "PHY26048",
     "name": "GOKUL X",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "298",
@@ -4175,7 +4175,7 @@
     "_id": "jtl79igmshix4s0",
     "registerNo": "PHY26049",
     "name": "KARTHIK M",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "299",
@@ -4189,7 +4189,7 @@
     "_id": "cfvkt85mshix4s0",
     "registerNo": "PHY26050",
     "name": "ANITHA I",
-    "department": "GENERAL",
+    "department": "PHY",
     "batch": "2024-25",
     "csvData": {
       "SNo": "300",
@@ -4203,7 +4203,7 @@
     "_id": "ir6julkmshix4s0",
     "registerNo": "CHE26001",
     "name": "ANITHA W",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "301",
@@ -4217,7 +4217,7 @@
     "_id": "5o0q7vgmshix4s0",
     "registerNo": "CHE26002",
     "name": "MADHUMITHA A",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "302",
@@ -4231,7 +4231,7 @@
     "_id": "f2c6j6zmshix4s0",
     "registerNo": "CHE26003",
     "name": "RANJITH D",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "303",
@@ -4245,7 +4245,7 @@
     "_id": "qebgft0mshix4s0",
     "registerNo": "CHE26004",
     "name": "RAMYA H",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "304",
@@ -4259,7 +4259,7 @@
     "_id": "0p8t1xamshix4s0",
     "registerNo": "CHE26005",
     "name": "JANANI T",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "305",
@@ -4273,7 +4273,7 @@
     "_id": "rzvbc0hmshix4s0",
     "registerNo": "CHE26006",
     "name": "SHALINI J",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "306",
@@ -4287,7 +4287,7 @@
     "_id": "m5ngktrmshix4s0",
     "registerNo": "CHE26007",
     "name": "ANUSHA L",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "307",
@@ -4301,7 +4301,7 @@
     "_id": "iss8muzmshix4s0",
     "registerNo": "CHE26008",
     "name": "MONISHA P",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "308",
@@ -4315,7 +4315,7 @@
     "_id": "ko7er36mshix4s0",
     "registerNo": "CHE26009",
     "name": "BHAVANI G",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "309",
@@ -4329,7 +4329,7 @@
     "_id": "0tkh0l3mshix4s0",
     "registerNo": "CHE26010",
     "name": "ANITHA L",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "310",
@@ -4343,7 +4343,7 @@
     "_id": "tupjgccmshix4s0",
     "registerNo": "CHE26011",
     "name": "DEEPA B",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "311",
@@ -4357,7 +4357,7 @@
     "_id": "ts2svu7mshix4s0",
     "registerNo": "CHE26012",
     "name": "DHARSHINI A",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "312",
@@ -4371,7 +4371,7 @@
     "_id": "7gulrolmshix4s0",
     "registerNo": "CHE26013",
     "name": "GAYATHRI C",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "313",
@@ -4385,7 +4385,7 @@
     "_id": "2tcfz9tmshix4s0",
     "registerNo": "CHE26014",
     "name": "RAMYA O",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "314",
@@ -4399,7 +4399,7 @@
     "_id": "0shotm5mshix4s0",
     "registerNo": "CHE26015",
     "name": "POOJA F",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "315",
@@ -4413,7 +4413,7 @@
     "_id": "tj7l5f8mshix4s0",
     "registerNo": "CHE26016",
     "name": "JANANI A",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "316",
@@ -4427,7 +4427,7 @@
     "_id": "tg112msmshix4s0",
     "registerNo": "CHE26017",
     "name": "SHALINI Z",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "317",
@@ -4441,7 +4441,7 @@
     "_id": "3xc7044mshix4s0",
     "registerNo": "CHE26018",
     "name": "KAVIN A",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "318",
@@ -4455,7 +4455,7 @@
     "_id": "s558jj2mshix4s0",
     "registerNo": "CHE26019",
     "name": "ASHWIN C",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "319",
@@ -4469,7 +4469,7 @@
     "_id": "ij82yt7mshix4s1",
     "registerNo": "CHE26020",
     "name": "BHAVANI C",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "320",
@@ -4483,7 +4483,7 @@
     "_id": "ouaftnomshix4s1",
     "registerNo": "CHE26021",
     "name": "ASHWIN W",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "321",
@@ -4497,7 +4497,7 @@
     "_id": "mn0aektmshix4s1",
     "registerNo": "CHE26022",
     "name": "DHARSHINI U",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "322",
@@ -4511,7 +4511,7 @@
     "_id": "3np9j2gmshix4s1",
     "registerNo": "CHE26023",
     "name": "RAHUL Q",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "323",
@@ -4525,7 +4525,7 @@
     "_id": "kf8yjw9mshix4s1",
     "registerNo": "CHE26024",
     "name": "MUKESH Q",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "324",
@@ -4539,7 +4539,7 @@
     "_id": "7nbolrlmshix4s1",
     "registerNo": "CHE26025",
     "name": "PRIYA L",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "325",
@@ -4553,7 +4553,7 @@
     "_id": "k2d7jbomshix4s1",
     "registerNo": "CHE26026",
     "name": "SOWMIYA D",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "326",
@@ -4567,7 +4567,7 @@
     "_id": "11ndgx5mshix4s1",
     "registerNo": "CHE26027",
     "name": "DEEPA H",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "327",
@@ -4581,7 +4581,7 @@
     "_id": "t2uixf3mshix4s1",
     "registerNo": "CHE26028",
     "name": "DHARSHINI B",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "328",
@@ -4595,7 +4595,7 @@
     "_id": "bh77vp5mshix4s1",
     "registerNo": "CHE26029",
     "name": "GOKUL L",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "329",
@@ -4609,7 +4609,7 @@
     "_id": "x4nxf0qmshix4s1",
     "registerNo": "CHE26030",
     "name": "NANDHINI H",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "330",
@@ -4623,7 +4623,7 @@
     "_id": "ztdh0momshix4s1",
     "registerNo": "CHE26031",
     "name": "POOJA W",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "331",
@@ -4637,7 +4637,7 @@
     "_id": "s02r6yrmshix4s1",
     "registerNo": "CHE26032",
     "name": "ANUSHA S",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "332",
@@ -4651,7 +4651,7 @@
     "_id": "z9bmuahmshix4s1",
     "registerNo": "CHE26033",
     "name": "ANUSHA G",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "333",
@@ -4665,7 +4665,7 @@
     "_id": "kln9es9mshix4s1",
     "registerNo": "CHE26034",
     "name": "POOJA Y",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "334",
@@ -4679,7 +4679,7 @@
     "_id": "ry0h20zmshix4s1",
     "registerNo": "CHE26035",
     "name": "SURESH H",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "335",
@@ -4693,7 +4693,7 @@
     "_id": "ljkn3lxmshix4s1",
     "registerNo": "CHE26036",
     "name": "RAMYA X",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "336",
@@ -4707,7 +4707,7 @@
     "_id": "bnu6l8pmshix4s1",
     "registerNo": "CHE26037",
     "name": "NANDHINI D",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "337",
@@ -4721,7 +4721,7 @@
     "_id": "3gbtlwsmshix4s1",
     "registerNo": "CHE26038",
     "name": "SARANYA J",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "338",
@@ -4735,7 +4735,7 @@
     "_id": "y0p6szgmshix4s1",
     "registerNo": "CHE26039",
     "name": "SHALINI Q",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "339",
@@ -4749,7 +4749,7 @@
     "_id": "e1s3flpmshix4s1",
     "registerNo": "CHE26040",
     "name": "BHARATH F",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "340",
@@ -4763,7 +4763,7 @@
     "_id": "xbpmrh6mshix4s1",
     "registerNo": "CHE26041",
     "name": "GOKUL J",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "341",
@@ -4777,7 +4777,7 @@
     "_id": "k02ljzlmshix4s1",
     "registerNo": "CHE26042",
     "name": "PAVITHRA N",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "342",
@@ -4791,7 +4791,7 @@
     "_id": "y5clu4pmshix4s1",
     "registerNo": "CHE26043",
     "name": "PRAVEEN U",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "343",
@@ -4805,7 +4805,7 @@
     "_id": "qz5uaq5mshix4s1",
     "registerNo": "CHE26044",
     "name": "SOWMIYA D",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "344",
@@ -4819,7 +4819,7 @@
     "_id": "e0ochchmshix4s1",
     "registerNo": "CHE26045",
     "name": "RAHUL A",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "345",
@@ -4833,7 +4833,7 @@
     "_id": "gajyo5hmshix4s1",
     "registerNo": "CHE26046",
     "name": "DHARANI N",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "346",
@@ -4847,7 +4847,7 @@
     "_id": "4qbcde5mshix4s1",
     "registerNo": "CHE26047",
     "name": "SARANYA A",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "347",
@@ -4861,7 +4861,7 @@
     "_id": "26r8eazmshix4s1",
     "registerNo": "CHE26048",
     "name": "MANOJ Y",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "348",
@@ -4875,7 +4875,7 @@
     "_id": "sek1q89mshix4s1",
     "registerNo": "CHE26049",
     "name": "DHARSHINI L",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "349",
@@ -4889,7 +4889,7 @@
     "_id": "d2o0ns7mshix4s1",
     "registerNo": "CHE26050",
     "name": "KIRUTHIKA C",
-    "department": "GENERAL",
+    "department": "CHE",
     "batch": "2024-25",
     "csvData": {
       "SNo": "350",
@@ -4903,7 +4903,7 @@
     "_id": "2hk87q0mshix4s1",
     "registerNo": "ENG26001",
     "name": "SARANYA L",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "351",
@@ -4917,7 +4917,7 @@
     "_id": "va9iqlamshix4s1",
     "registerNo": "ENG26002",
     "name": "SURESH Y",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "352",
@@ -4931,7 +4931,7 @@
     "_id": "kzq3nrymshix4s1",
     "registerNo": "ENG26003",
     "name": "ANUSHA L",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "353",
@@ -4945,7 +4945,7 @@
     "_id": "opnzgwymshix4s1",
     "registerNo": "ENG26004",
     "name": "MANOJ R",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "354",
@@ -4959,7 +4959,7 @@
     "_id": "xpq3o4gmshix4s1",
     "registerNo": "ENG26005",
     "name": "KIRUTHIKA Q",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "355",
@@ -4973,7 +4973,7 @@
     "_id": "6xais8qmshix4s1",
     "registerNo": "ENG26006",
     "name": "DHARSHINI K",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "356",
@@ -4987,7 +4987,7 @@
     "_id": "vbble53mshix4s1",
     "registerNo": "ENG26007",
     "name": "MUKESH Y",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "357",
@@ -5001,7 +5001,7 @@
     "_id": "ow17k6hmshix4s1",
     "registerNo": "ENG26008",
     "name": "DINESH X",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "358",
@@ -5015,7 +5015,7 @@
     "_id": "tct6jnzmshix4s1",
     "registerNo": "ENG26009",
     "name": "RAHUL K",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "359",
@@ -5029,7 +5029,7 @@
     "_id": "5gsvo1fmshix4s1",
     "registerNo": "ENG26010",
     "name": "AARTHI U",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "360",
@@ -5043,7 +5043,7 @@
     "_id": "b4g25f1mshix4s1",
     "registerNo": "ENG26011",
     "name": "MANOJ V",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "361",
@@ -5057,7 +5057,7 @@
     "_id": "f8z5wnymshix4s1",
     "registerNo": "ENG26012",
     "name": "SATHISH B",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "362",
@@ -5071,7 +5071,7 @@
     "_id": "01uokvjmshix4s1",
     "registerNo": "ENG26013",
     "name": "NAVEEN V",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "363",
@@ -5085,7 +5085,7 @@
     "_id": "ncvi474mshix4s1",
     "registerNo": "ENG26014",
     "name": "VIGNESH U",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "364",
@@ -5099,7 +5099,7 @@
     "_id": "126vi1hmshix4s1",
     "registerNo": "ENG26015",
     "name": "KIRUTHIKA B",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "365",
@@ -5113,7 +5113,7 @@
     "_id": "ov0bechmshix4s1",
     "registerNo": "ENG26016",
     "name": "RANJITH Z",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "366",
@@ -5127,7 +5127,7 @@
     "_id": "rj58ka0mshix4s1",
     "registerNo": "ENG26017",
     "name": "MANOJ P",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "367",
@@ -5141,7 +5141,7 @@
     "_id": "ez4obwgmshix4s1",
     "registerNo": "ENG26018",
     "name": "NAVEEN O",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "368",
@@ -5155,7 +5155,7 @@
     "_id": "wey8prpmshix4s1",
     "registerNo": "ENG26019",
     "name": "BHARATH K",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "369",
@@ -5169,7 +5169,7 @@
     "_id": "bqrq8rrmshix4s1",
     "registerNo": "ENG26020",
     "name": "AKSHAYA D",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "370",
@@ -5183,7 +5183,7 @@
     "_id": "023504tmshix4s1",
     "registerNo": "ENG26021",
     "name": "PRAVEEN N",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "371",
@@ -5197,7 +5197,7 @@
     "_id": "729urvdmshix4s1",
     "registerNo": "ENG26022",
     "name": "PRAVEEN J",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "372",
@@ -5211,7 +5211,7 @@
     "_id": "sigav4pmshix4s1",
     "registerNo": "ENG26023",
     "name": "BHARATH B",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "373",
@@ -5225,7 +5225,7 @@
     "_id": "tx0hqz7mshix4s1",
     "registerNo": "ENG26024",
     "name": "NITHYA Y",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "374",
@@ -5239,7 +5239,7 @@
     "_id": "xupt7sqmshix4s1",
     "registerNo": "ENG26025",
     "name": "MONISHA F",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "375",
@@ -5253,7 +5253,7 @@
     "_id": "t4ly56amshix4s1",
     "registerNo": "ENG26026",
     "name": "GOKUL Z",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "376",
@@ -5267,7 +5267,7 @@
     "_id": "4tsfi70mshix4s1",
     "registerNo": "ENG26027",
     "name": "JANANI H",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "377",
@@ -5281,7 +5281,7 @@
     "_id": "wokdxosmshix4s1",
     "registerNo": "ENG26028",
     "name": "DHARANI W",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "378",
@@ -5295,7 +5295,7 @@
     "_id": "fypb3nhmshix4s1",
     "registerNo": "ENG26029",
     "name": "PRAVEEN W",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "379",
@@ -5309,7 +5309,7 @@
     "_id": "nqoi8h8mshix4s1",
     "registerNo": "ENG26030",
     "name": "KIRUTHIKA L",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "380",
@@ -5323,7 +5323,7 @@
     "_id": "g8vd5w9mshix4s1",
     "registerNo": "ENG26031",
     "name": "KEERTHANA I",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "381",
@@ -5337,7 +5337,7 @@
     "_id": "v5c8arkmshix4s2",
     "registerNo": "ENG26032",
     "name": "MEENA P",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "382",
@@ -5351,7 +5351,7 @@
     "_id": "rabylkgmshix4s2",
     "registerNo": "ENG26033",
     "name": "SANJAY G",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "383",
@@ -5365,7 +5365,7 @@
     "_id": "36v9qsdmshix4s2",
     "registerNo": "ENG26034",
     "name": "PRAVEEN Z",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "384",
@@ -5379,7 +5379,7 @@
     "_id": "6vt4eicmshix4s2",
     "registerNo": "ENG26035",
     "name": "AKSHAYA Z",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "385",
@@ -5393,7 +5393,7 @@
     "_id": "x023twumshix4s2",
     "registerNo": "ENG26036",
     "name": "BHARATH U",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "386",
@@ -5407,7 +5407,7 @@
     "_id": "1x4dqndmshix4s2",
     "registerNo": "ENG26037",
     "name": "AKSHAYA D",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "387",
@@ -5421,7 +5421,7 @@
     "_id": "ksb73rpmshix4s2",
     "registerNo": "ENG26038",
     "name": "SANGEETHA X",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "388",
@@ -5435,7 +5435,7 @@
     "_id": "tk58cmqmshix4s2",
     "registerNo": "ENG26039",
     "name": "SNEHA J",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "389",
@@ -5449,7 +5449,7 @@
     "_id": "04ohhq3mshix4s2",
     "registerNo": "ENG26040",
     "name": "SNEHA R",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "390",
@@ -5463,7 +5463,7 @@
     "_id": "cc75nx3mshix4s2",
     "registerNo": "ENG26041",
     "name": "MANOJ E",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "391",
@@ -5477,7 +5477,7 @@
     "_id": "9edp8hxmshix4s2",
     "registerNo": "ENG26042",
     "name": "ABINAYA K",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "392",
@@ -5491,7 +5491,7 @@
     "_id": "txez2humshix4s2",
     "registerNo": "ENG26043",
     "name": "PRAVEEN C",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "393",
@@ -5505,7 +5505,7 @@
     "_id": "db26n3umshix4s2",
     "registerNo": "ENG26044",
     "name": "ARAVIND J",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "394",
@@ -5519,7 +5519,7 @@
     "_id": "mdf8xxpmshix4s2",
     "registerNo": "ENG26045",
     "name": "SATHISH Q",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "395",
@@ -5533,7 +5533,7 @@
     "_id": "hdq36wkmshix4s2",
     "registerNo": "ENG26046",
     "name": "KEERTHANA G",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "396",
@@ -5547,7 +5547,7 @@
     "_id": "0kl49djmshix4s2",
     "registerNo": "ENG26047",
     "name": "DIVYA Z",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "397",
@@ -5561,7 +5561,7 @@
     "_id": "myd5w7wmshix4s2",
     "registerNo": "ENG26048",
     "name": "SATHISH Q",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "398",
@@ -5575,7 +5575,7 @@
     "_id": "kkc36pbmshix4s2",
     "registerNo": "ENG26049",
     "name": "SHALINI R",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "399",
@@ -5589,7 +5589,7 @@
     "_id": "c5hxhf1mshix4s2",
     "registerNo": "ENG26050",
     "name": "GAYATHRI Z",
-    "department": "GENERAL",
+    "department": "ENG",
     "batch": "2024-25",
     "csvData": {
       "SNo": "400",

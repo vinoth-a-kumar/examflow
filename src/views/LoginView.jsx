@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, LogIn, AlertCircle, Sparkles } from 'lucide-react';
+import { Mail, Lock, LogIn, AlertCircle } from 'lucide-react';
 
 function LoginView({ onLoginSuccess, collegeDetails }) {
   const [emailOrUsername, setEmailOrUsername] = useState('');
@@ -7,7 +7,10 @@ function LoginView({ onLoginSuccess, collegeDetails }) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const collegeName = collegeDetails?.name || 'ExamFlow';
+  const rawName = collegeDetails?.name || "Rajapalayam Rajus' College";
+  const collegeName = (rawName.includes('Rajapalym') || rawName.includes('Rajapalaym') || rawName === 'ExamFlow')
+    ? "Rajapalayam Rajus' College"
+    : rawName;
   const collegeLogo = collegeDetails?.logo || '';
 
   const handleSubmit = async (e) => {
@@ -132,8 +135,7 @@ function LoginView({ onLoginSuccess, collegeDetails }) {
           justifyContent: 'center',
           gap: '5px',
         }}>
-          <Sparkles size={11} />
-          Powered by ExamFlow · AI-assisted Seating Management
+          Powered by ExamFlow · Examination Seating Management
         </p>
       </div>
     </div>

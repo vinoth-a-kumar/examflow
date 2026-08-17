@@ -940,7 +940,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                       No subject codes found in student records. Please upload student rosters first in Upload Data.
                     </p>
                   ) : (() => {
-                    const { filteredCodes, availableYears } = filterSubjectCodes(availableSubjectCodes, subjectCodeSearch, activeYearFilter);
+                    const { filteredCodes } = filterSubjectCodes(availableSubjectCodes, subjectCodeSearch, activeYearFilter);
                     const allFilteredSelected = filteredCodes.length > 0 && filteredCodes.every(c => selectedSubjectCodes.includes(c.code));
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1347,7 +1347,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                       No subject codes found in student records. Please upload student rosters first in Upload Data.
                     </p>
                   ) : (() => {
-                    const { filteredCodes, availableYears } = filterSubjectCodes(availableSubjectCodes, editSubjectCodeSearch, editActiveYearFilter);
+                    const { filteredCodes } = filterSubjectCodes(availableSubjectCodes, editSubjectCodeSearch, editActiveYearFilter);
                     const allFilteredSelected = filteredCodes.length > 0 && filteredCodes.every(c => editSelectedSubjectCodes.includes(c.code));
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1645,10 +1645,6 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
               </p>
             ) : (
               locations.map((loc) => {
-                const depts = [...new Set(loc.classes.map(c => {
-                  const parts = c.classCode.split('/');
-                  return parts.length > 1 ? parts[0].trim() : c.classCode.trim();
-                }))].join(', ');
                 return (
                   <div key={loc.hallName} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '16px', background: 'var(--bg-card)' }}>
                     

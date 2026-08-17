@@ -545,9 +545,56 @@ Lab Block,6,4`}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="form-group">
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Rows (Horizontal Benches)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-control"
+                    value={editFormData.rows}
+                    onChange={(e) => {
+                      const r = parseInt(e.target.value) || 0;
+                      const c = parseInt(editFormData.columns) || 0;
+                      const b = r * c;
+                      setEditFormData({
+                        ...editFormData,
+                        rows: e.target.value === '' ? '' : r,
+                        benches: b > 0 ? b : editFormData.benches,
+                        capacity: b > 0 ? b * 2 : editFormData.capacity
+                      });
+                    }}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-app)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Columns (Vertical Lanes)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-control"
+                    value={editFormData.columns}
+                    onChange={(e) => {
+                      const c = parseInt(e.target.value) || 0;
+                      const r = parseInt(editFormData.rows) || 0;
+                      const b = r * c;
+                      setEditFormData({
+                        ...editFormData,
+                        columns: e.target.value === '' ? '' : c,
+                        benches: b > 0 ? b : editFormData.benches,
+                        capacity: b > 0 ? b * 2 : editFormData.capacity
+                      });
+                    }}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-app)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
                   <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Total Benches</label>
                   <input
                     type="number"
+                    min="1"
                     className="form-control"
                     value={editFormData.benches}
                     onChange={(e) => {
@@ -557,8 +604,7 @@ Lab Block,6,4`}
                       setEditFormData({
                         ...editFormData,
                         benches: val,
-                        capacity: c,
-                        rows: b > 0 ? b : editFormData.rows
+                        capacity: c
                       });
                     }}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-app)', color: 'var(--text-primary)' }}
@@ -569,6 +615,7 @@ Lab Block,6,4`}
                   <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary)' }}>Total Seats / Capacity</label>
                   <input
                     type="number"
+                    min="1"
                     className="form-control"
                     value={editFormData.capacity}
                     onChange={(e) => {
@@ -578,13 +625,12 @@ Lab Block,6,4`}
                       setEditFormData({
                         ...editFormData,
                         capacity: val,
-                        benches: b,
-                        rows: b > 0 ? b : editFormData.rows
+                        benches: b
                       });
                     }}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1.5px solid var(--color-primary)', background: 'var(--bg-app)', color: 'var(--text-primary)', fontWeight: 700 }}
                   />
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Auto-calculates (2 seats/bench)</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Auto-calculated (Rows × Cols & 2 seats/bench)</span>
                 </div>
               </div>
             </div>

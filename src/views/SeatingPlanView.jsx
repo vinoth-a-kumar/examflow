@@ -4,13 +4,18 @@ import {
   Info, 
   Printer, 
   Search, 
-  Sparkles,
-  Download,
-  ChevronDown,
-  ChevronUp
+  Download, 
+  ChevronDown, 
+  ChevronUp,
+  Sliders,
+  X,
+  Check,
+  Plus,
+  Minus,
+  Layers
 } from 'lucide-react';
 
-function SeatingPlanView({ exams, halls, collegeDetails }) {
+function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSession, setSelectedSession] = useState('FN');
   const [selectedHallId, setSelectedHallId] = useState('');
@@ -24,6 +29,15 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
   const [rosterData, setRosterData] = useState(null);
   const [showLabelExportMenu, setShowLabelExportMenu] = useState(false);
   const [allHallsLabelSequence, setAllHallsLabelSequence] = useState([]);
+
+  // Hall Grid Layout (Rows & Columns) Customization State
+  const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
+  const [customCols, setCustomCols] = useState(4);
+  const [columnRows, setColumnRows] = useState([6, 6, 6, 6]);
+  const [bulkRowVal, setBulkRowVal] = useState(6);
+  const [customSeatsPerBench, setCustomSeatsPerBench] = useState(2);
+  const [isSavingLayout, setIsSavingLayout] = useState(false);
+  const [layoutSuccessMsg, setLayoutSuccessMsg] = useState('');
 
   // Fetch overall all-halls student sequence for printing
   const fetchAllHallsLabelSequence = useCallback(async () => {
@@ -190,8 +204,222 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
     }
   }, [selectedDate, selectedSession, fetchRosterData]);
 
-  const selectedHall = halls.find(h => h._id === selectedHallId);
-  const colsCount = selectedHall ? selectedHall.columns : 4;
+  const selectedHall = useMemo(() => {
+    return (halls || []).find(h => h && (h._id === selectedHallId || h.name === selectedHallId));
+  }, [halls, selectedHallId]);
+
+  const colsCount = useMemo(() => {
+    if (seatingPlan && seatingPlan.seatingGrid && seatingPlan.seatingGrid.length > 0) {
+      const maxCol = Math.max(...seatingPlan.seatingGrid.map(b => b.col || parseInt(String(b.benchCode || '').replace(/^[A-Za-z]+/, '') || 1)));
+      if (maxCol && !isNaN(maxCol) && maxCol > 0) return maxCol;
+    }
+    return selectedHall ? (selectedHall.columns || 4) : 4;
+  }, [seatingPlan, selectedHall]);
+
+  // Helper to get alphabetic row letter (0 -> A, 25 -> Z, 26 -> AA)
+  const getRowLetterHelper = (r) => {
+    let s = '';
+    let temp = r;
+    while (temp >= 0) {
+      s = String.fromCharCode(65 + (temp % 26)) + s;
+      temp = Math.floor(temp / 26) - 1;
+    }
+    return s;
+  };
+
+  // Helper to compute hall maximum benches based on hall records
+  const getHallMaxBenches = (hall, spb = 2) => {
+    if (!hall) return 17;
+    if (hall.benches && hall.benches > 0) return hall.benches;
+    if (hall.rows && hall.columns && hall.rows > 0 && hall.columns > 0) {
+      if (Array.isArray(hall.columnRows) && hall.columnRows.length > 0) {
+        return hall.columnRows.reduce((a, b) => a + (parseInt(b) || 0), 0);
+      }
+      return hall.rows * hall.columns;
+    }
+    if (hall.capacity && hall.capacity > 0) {
+      return Math.round(hall.capacity / (spb || 2));
+    }
+    return 17;
+  };
+
+  // Open Layout Modal and prefill with current Hall values
+  const openLayoutModal = () => {
+    if (selectedHall) {
+      const examMatch = examsOnSelectedDate[0];
+      const spb = examMatch?.seatsPerBench || 2;
+      const maxBenches = getHallMaxBenches(selectedHall, spb);
+      const cols = selectedHall.columns || 1;
+
+      let cRows = [];
+      if (Array.isArray(selectedHall.columnRows) && selectedHall.columnRows.length >= cols) {
+        cRows = selectedHall.columnRows.slice(0, cols).map(n => Math.max(1, parseInt(n) || 1));
+      } else if (selectedHall.csvData && Array.isArray(selectedHall.csvData.columnRows) && selectedHall.csvData.columnRows.length >= cols) {
+        cRows = selectedHall.csvData.columnRows.slice(0, cols).map(n => Math.max(1, parseInt(n) || 1));
+      } else {
+        const baseR = Math.floor(maxBenches / cols);
+        const rem = maxBenches % cols;
+        cRows = Array.from({ length: cols }, (_, i) => baseR + (i >= (cols - rem) ? 1 : 0));
+      }
+
+      setCustomCols(cols);
+      setColumnRows(cRows);
+      setBulkRowVal(cRows[0] || Math.floor(maxBenches / cols) || 1);
+      setCustomSeatsPerBench(spb);
+    }
+    setIsLayoutModalOpen(true);
+    setLayoutSuccessMsg('');
+  };
+
+  // Change total column count (and automatically distribute hall's bench capacity across columns)
+  const handleColCountChange = (newCount) => {
+    const n = Math.max(1, Math.min(20, parseInt(newCount) || 1));
+    const spb = customSeatsPerBench || 2;
+    const maxBenches = getHallMaxBenches(selectedHall, spb);
+
+    // Automatically distribute maxBenches evenly across n columns (e.g. 17 benches into 4 cols -> [4, 4, 4, 5])
+    const baseR = Math.floor(maxBenches / n);
+    const rem = maxBenches % n;
+    const newRows = Array.from({ length: n }, (_, i) => {
+      return baseR + (i >= (n - rem) ? 1 : 0);
+    });
+
+    setCustomCols(n);
+    setColumnRows(newRows);
+    setBulkRowVal(baseR || 1);
+  };
+
+  // Change rows for a specific column, strictly capped by total hall capacity
+  const handleSpecificColumnRowChange = (colIdx, val) => {
+    const spb = customSeatsPerBench || 2;
+    const maxBenches = getHallMaxBenches(selectedHall, spb);
+
+    setColumnRows(prev => {
+      const updated = [...prev];
+      if (val === '') {
+        updated[colIdx] = '';
+        return updated;
+      }
+      const num = parseInt(val) || 1;
+      const otherTotal = updated.reduce((sum, r, idx) => idx === colIdx ? sum : sum + (parseInt(r) || 0), 0);
+      const maxAllowed = Math.max(1, maxBenches - otherTotal);
+      updated[colIdx] = Math.max(1, Math.min(num, maxAllowed));
+      return updated;
+    });
+  };
+
+  const handleSpecificColumnRowStep = (colIdx, delta) => {
+    const spb = customSeatsPerBench || 2;
+    const maxBenches = getHallMaxBenches(selectedHall, spb);
+
+    setColumnRows(prev => {
+      const updated = [...prev];
+      const current = parseInt(updated[colIdx]) || 1;
+      const otherTotal = updated.reduce((sum, r, idx) => idx === colIdx ? sum : sum + (parseInt(r) || 0), 0);
+      
+      if (delta > 0) {
+        const maxAllowed = Math.max(1, maxBenches - otherTotal);
+        updated[colIdx] = Math.min(current + delta, maxAllowed);
+      } else {
+        updated[colIdx] = Math.max(1, current + delta);
+      }
+      return updated;
+    });
+  };
+
+  // Apply same row count to all columns at once (capped at max benches)
+  const handleApplyAllRows = (targetRow) => {
+    const r = Math.max(1, parseInt(targetRow) || 1);
+    const n = parseInt(customCols) || 1;
+    const spb = customSeatsPerBench || 2;
+    const maxBenches = getHallMaxBenches(selectedHall, spb);
+
+    if (r * n > maxBenches) {
+      const baseR = Math.floor(maxBenches / n);
+      const rem = maxBenches % n;
+      const newRows = Array.from({ length: n }, (_, i) => baseR + (i >= (n - rem) ? 1 : 0));
+      setColumnRows(newRows);
+      setBulkRowVal(baseR || 1);
+    } else {
+      setColumnRows(Array(n).fill(r));
+      setBulkRowVal(r);
+    }
+  };
+
+  // Save Hall Layout (Rows & Columns) & Re-allocate Seating Arrangement
+  const handleSaveLayout = async () => {
+    if (!selectedHall) return;
+    const c = parseInt(customCols) || 1;
+    const cRows = columnRows.slice(0, c).map(n => Math.max(1, parseInt(n) || 1));
+    const maxR = Math.max(...cRows, 1);
+    const totalB = cRows.reduce((sum, r) => sum + r, 0);
+    const spb = parseInt(customSeatsPerBench) || 2;
+    const totalCap = totalB * spb;
+
+    setIsSavingLayout(true);
+    setLayoutSuccessMsg('');
+
+    try {
+      // 1. Update Hall dimensions in backend DB
+      const targetId = selectedHall._id || selectedHall.name;
+      const res = await fetch(`http://localhost:5000/api/halls/${targetId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: selectedHall.name,
+          rows: maxR,
+          columns: c,
+          columnRows: cRows,
+          benches: totalB,
+          capacity: totalCap
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        alert('Failed to update hall layout: ' + (errData.error || errData.message));
+        setIsSavingLayout(false);
+        return;
+      }
+
+      // 2. Refresh global halls state across the application
+      if (refreshData) {
+        await refreshData();
+      }
+
+      // 3. If Date and Session are selected, immediately regenerate seating plan with new layout
+      if (selectedDate && selectedSession && selectedHallId) {
+        const genRes = await fetch('http://localhost:5000/api/seating/generate-by-date-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: selectedDate,
+            session: selectedSession,
+            hallId: selectedHallId,
+            seatsPerBench: spb
+          })
+        });
+        if (genRes.ok) {
+          const newPlan = await genRes.json();
+          setSeatingPlan(newPlan);
+          setErrorMsg('');
+        }
+        await fetchRosterData();
+        await fetchAllHallsLabelSequence();
+      }
+
+      setLayoutSuccessMsg(`Hall ${selectedHall.name} layout saved: ${c} Columns (${cRows.join(', ')} rows) · ${totalB} Benches!`);
+      setTimeout(() => {
+        setIsLayoutModalOpen(false);
+        setLayoutSuccessMsg('');
+      }, 1000);
+    } catch (err) {
+      console.error('Error saving hall layout:', err);
+      alert('Error updating layout.');
+    } finally {
+      setIsSavingLayout(false);
+    }
+  };
 
   const fetchSeatingPlan = async () => {
     if (!selectedDate || !selectedSession || !selectedHallId) return;
@@ -280,6 +508,314 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
     } finally {
       setLoading(false);
     }
+  };
+
+
+  // Direct PDF Download of Colorful Seating Layout
+  const handleDownloadLayoutPdf = () => {
+    if (!selectedDate || !selectedSession || !selectedHallId) {
+      alert('Please select Date, Session, and Hall to download PDF.');
+      return;
+    }
+    const url = `http://localhost:5000/api/seating/layout/download-pdf?date=${selectedDate}&session=${selectedSession}&hallId=${selectedHallId}`;
+    window.open(url, '_blank');
+  };
+
+  // Dedicated Print Generator for Visual Full-Color Column Seating Layout
+  const handlePrintSeatingGrid = async () => {
+    if (!seatingPlan || !seatingPlan.seatingGrid || seatingPlan.seatingGrid.length === 0) {
+      alert('No seating arrangement available to print. Please generate or select a seating plan.');
+      return;
+    }
+
+    try {
+      await fetch('http://localhost:5000/api/printouts/increment', { method: 'POST' });
+    } catch (err) {
+      console.error("Failed to increment print count", err);
+    }
+
+    const hallName = seatingPlan.hallName || (selectedHall ? selectedHall.name : 'Exam Hall');
+    const examDate = selectedDate || 'N/A';
+    const sessionText = selectedSession === 'FN' ? 'Forenoon (10:00 AM - 01:00 PM)' : 'Afternoon (02:00 PM - 05:00 PM)';
+    const totalBenchesCount = seatingPlan.seatingGrid.filter(b => !b.isPlaceholder).length;
+    const is3Seat = seatingPlan.seatingGrid.some(b => b.seat3 !== undefined);
+
+    // Group seated students by department
+    const deptStudentMap = {};
+    seatingPlan.seatingGrid.forEach(b => {
+      if (b.isPlaceholder) return;
+      ['seat1', 'seat2', 'seat3'].forEach(seatKey => {
+        const st = b[seatKey];
+        if (st && st.registerNo) {
+          const dept = st.department || 'General';
+          if (!deptStudentMap[dept]) deptStudentMap[dept] = [];
+          deptStudentMap[dept].push(st.registerNo);
+        }
+      });
+    });
+
+    const deptSummaryHtml = Object.entries(deptStudentMap).map(([dept, regNos]) => {
+      const sorted = [...regNos].sort();
+      const first = sorted[0];
+      const last = sorted[sorted.length - 1];
+      const span = sorted.length === 1 ? first : `${first} - ${last}`;
+      return `<div class="dept-badge"><strong>${dept}:</strong> ${span} (${sorted.length} Students)</div>`;
+    }).join('');
+
+    const gridHtml = seatingPlan.seatingGrid.map((bench) => {
+      if (bench.isPlaceholder) {
+        return `<div class="bench-placeholder"></div>`;
+      }
+
+      const s1 = bench.seat1 ? `<div class="bench-seat seat-left">${bench.seat1.registerNo}</div>` : `<div class="bench-seat seat-empty">Empty</div>`;
+      const s2 = is3Seat 
+        ? (bench.seat2 ? `<div class="bench-seat seat-middle">${bench.seat2.registerNo}</div>` : `<div class="bench-seat seat-empty">Empty</div>`)
+        : (bench.seat2 ? `<div class="bench-seat seat-right">${bench.seat2.registerNo}</div>` : `<div class="bench-seat seat-empty">Empty</div>`);
+      const s3 = is3Seat ? (bench.seat3 ? `<div class="bench-seat seat-right">${bench.seat3.registerNo}</div>` : `<div class="bench-seat seat-empty">Empty</div>`) : null;
+
+      return `
+        <div class="bench-box">
+          <div class="bench-code-title">${bench.benchCode}</div>
+          <div class="seats-container">
+            ${s1}
+            ${is3Seat ? s2 : ''}
+            ${is3Seat ? s3 : s2}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      alert('Pop-up blocked. Please allow pop-ups to print the seating arrangement.');
+      return;
+    }
+
+    const collegeName = collegeDetails?.name || "RAJAPALAYAM RAJUS' COLLEGE (AUTONOMOUS)";
+    const collegeAddress = collegeDetails?.address || "Affiliated to Madurai Kamaraj University | Re-accredited with 'A' Grade by NAAC";
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${hallName} - Seating Layout</title>
+        <style>
+          @page {
+            size: ${colsCount >= 5 ? 'landscape' : 'portrait'};
+            margin: 8mm;
+          }
+          * { 
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: #0f172a;
+            background: #ffffff;
+            margin: 0;
+            padding: 8px;
+          }
+          .header-container {
+            text-align: center;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+          }
+          .college-title {
+            font-size: 16px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 0 0 2px 0;
+            color: #0f172a;
+          }
+          .college-subtitle {
+            font-size: 11px;
+            color: #475569;
+            margin: 0 0 6px 0;
+          }
+          .doc-title {
+            font-size: 13px;
+            font-weight: 800;
+            text-decoration: underline;
+            letter-spacing: 0.5px;
+            color: #1e293b;
+          }
+          .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            margin-bottom: 8px;
+          }
+          .meta-item strong { color: #0f172a; }
+          .dept-summary-box {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 6px 8px;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            margin-bottom: 12px;
+          }
+          .dept-badge {
+            background: #ffffff;
+            border: 1px solid #94a3b8;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+          }
+          .seating-print-grid {
+            display: grid;
+            grid-template-columns: repeat(${colsCount}, 1fr);
+            gap: 8px;
+            width: 100%;
+          }
+          .bench-box {
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            background: #ffffff;
+            padding: 8px 10px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .bench-placeholder {
+            visibility: hidden;
+            min-height: 48px;
+          }
+          .bench-code-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #64748b;
+            text-align: center;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+          }
+          .seats-container {
+            display: grid;
+            grid-template-columns: repeat(${is3Seat ? 3 : 2}, 1fr);
+            gap: 6px;
+          }
+          .bench-seat {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 6px 4px;
+            border-radius: 4px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justifyContent: center;
+            min-height: 28px;
+            letter-spacing: 0.3px;
+          }
+          .seat-left {
+            background: rgba(168, 85, 247, 0.08) !important;
+            color: #7c3aed !important;
+            border: 1px dashed rgba(168, 85, 247, 0.5) !important;
+          }
+          .seat-middle {
+            background: rgba(245, 158, 11, 0.08) !important;
+            color: #d97706 !important;
+            border: 1px dashed rgba(245, 158, 11, 0.5) !important;
+          }
+          .seat-right {
+            background: rgba(16, 185, 129, 0.08) !important;
+            color: #059669 !important;
+            border: 1px dashed rgba(16, 185, 129, 0.5) !important;
+          }
+          .seat-empty {
+            background: #f8fafc !important;
+            color: #94a3b8 !important;
+            border: 1px dashed #cbd5e1 !important;
+            font-style: italic !important;
+          }
+          .signatures {
+            display: flex;
+            justifyContent: space-between;
+            margin-top: 24px;
+            padding-top: 12px;
+            border-top: 1px dashed #cbd5e1;
+            font-size: 11px;
+            font-weight: 700;
+            page-break-inside: avoid;
+          }
+          .no-print-toolbar {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: #f1f5f9;
+            border-radius: 8px;
+          }
+          .btn-action {
+            background: #4f46e5;
+            color: #fff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+          }
+          @media print {
+            .no-print-toolbar { display: none !important; }
+            body { padding: 0 !important; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="no-print-toolbar">
+          <button class="btn-action" onclick="window.print()">🖨️ Print Document</button>
+          <a class="btn-action" href="http://localhost:5000/api/seating/layout/download-pdf?date=${selectedDate}&session=${selectedSession}&hallId=${selectedHallId}" style="text-decoration:none; display:inline-block;" target="_blank">📥 Download PDF File</a>
+        </div>
+
+        <div class="header-container">
+          <h1 class="college-title">${collegeName}</h1>
+          <p class="college-subtitle">${collegeAddress}</p>
+          <div class="doc-title">EXAMINATION SEATING ARRANGEMENT</div>
+        </div>
+
+        <div class="meta-grid">
+          <div class="meta-item"><strong>Hall:</strong> ${hallName}</div>
+          <div class="meta-item"><strong>Date:</strong> ${examDate}</div>
+          <div class="meta-item"><strong>Session:</strong> ${sessionText}</div>
+          <div class="meta-item"><strong>Layout:</strong> ${colsCount} Cols · ${totalBenchesCount} Benches · ${Object.values(deptStudentMap).reduce((a, b) => a + b.length, 0)} Seated</div>
+        </div>
+
+        <div class="dept-summary-box">
+          ${deptSummaryHtml || '<div style="font-size:11px; color:#64748b;">No students allocated.</div>'}
+        </div>
+
+        <div class="seating-print-grid">
+          ${gridHtml}
+        </div>
+
+        <div class="signatures">
+          <div>Hall Invigilator's Signature: _______________________</div>
+          <div>Chief Superintendent Signature: _______________________</div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 400);
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
   };
 
   const handlePrint = async () => {
@@ -458,8 +994,7 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
             {errorMsg}
           </p>
           {selectedDate && selectedHallId && (
-            <button className="btn-primary" onClick={handleGenerate} style={{ gap: '6px' }}>
-              <Sparkles size={16} />
+            <button className="btn-primary" onClick={handleGenerate}>
               <span>Generate Seating Plan</span>
             </button>
           )}
@@ -670,8 +1205,85 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
             return (
               <div className="card-container">
                 <div className="card-title-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                  <h3>{seatingPlan.hallName} - Seating Arrangement</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0 }}>{seatingPlan.hallName} - Seating Arrangement</h3>
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-app)',
+                      border: '1px solid var(--border-color)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: 'var(--text-secondary)'
+                    }}>
+                      <Layers size={13} color="var(--color-primary)" />
+                      <span>{selectedHall?.rows || Math.ceil((seatingPlan.seatingGrid?.length || 24) / (colsCount || 1))} Rows × {colsCount} Columns ({seatingPlan.totalBenches || ((selectedHall?.rows || 6) * colsCount)} Benches)</span>
+                    </div>
+                  </div>
                   <div className="no-print" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={handlePrintSeatingGrid}
+                      className="btn-primary"
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        borderRadius: '9999px',
+                        cursor: 'pointer'
+                      }}
+                      title="Print the complete multi-column seating arrangement"
+                    >
+                      <Printer size={13} />
+                      <span>Print Layout</span>
+                    </button>
+                    <button
+                      onClick={handleDownloadLayoutPdf}
+                      className="btn-secondary"
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        borderRadius: '9999px',
+                        background: 'linear-gradient(135deg, rgba(79,70,229,0.1), rgba(139,92,246,0.1))',
+                        border: '1px solid rgba(79,70,229,0.3)',
+                        color: 'var(--color-primary)',
+                        cursor: 'pointer'
+                      }}
+                      title="Download colorful PDF file for this hall"
+                    >
+                      <Download size={13} />
+                      <span>Download PDF</span>
+                    </button>
+                    <button
+                      onClick={openLayoutModal}
+                      className="btn-secondary"
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        borderRadius: '9999px',
+                        background: 'linear-gradient(135deg, rgba(79,70,229,0.08), rgba(139,92,246,0.05))',
+                        border: '1px solid rgba(79,70,229,0.25)',
+                        color: 'var(--color-primary)',
+                        cursor: 'pointer'
+                      }}
+                      title="Edit number of rows and columns for this hall"
+                    >
+                      <Sliders size={13} />
+                      <span>Edit Rows & Columns</span>
+                    </button>
                     {hasMoreBenches && (
                       <button
                         onClick={() => setShowAllSeating(!showAllSeating)}
@@ -702,32 +1314,43 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
                     className="seating-layout-grid" 
                     style={{ gridTemplateColumns: `repeat(${colsCount}, minmax(${seatingPlan?.seatingGrid?.[0]?.seat3 !== undefined ? '250px' : '180px'}, 1fr))` }}
                   >
-                  {displayedBenches.map((bench, bIdx) => (
-                    <div className="bench-card" key={`${bench.benchCode || 'bench'}-${bIdx}`}>
-                      <span className="bench-code">{bench.benchCode}</span>
-                      
-                      <div className="bench-seats">
-                        <div className={`bench-seat ${bench.seat1 ? 'seat-left' : 'empty'}`} title={bench.seat1 ? `${bench.seat1.name} (${bench.seat1.department}${bench.seat1.subjectCode ? ' - ' + bench.seat1.subjectCode : ''})` : 'Empty'}>
-                          {bench.seat1 ? bench.seat1.registerNo : 'Empty'}
-                        </div>
-                        
-                        <div className="bench-divider" />
+                  {displayedBenches.map((bench, bIdx) => {
+                    if (bench.isPlaceholder) {
+                      return (
+                        <div 
+                          key={`placeholder-${bIdx}`} 
+                          style={{ visibility: 'hidden', minHeight: '90px', pointerEvents: 'none' }} 
+                        />
+                      );
+                    }
 
-                        {bench.seat3 !== undefined && (
-                          <>
-                            <div className={`bench-seat ${bench.seat2 ? 'seat-middle' : 'empty'}`} title={bench.seat2 ? `${bench.seat2.name} (${bench.seat2.department}${bench.seat2.subjectCode ? ' - ' + bench.seat2.subjectCode : ''})` : 'Empty'}>
-                              {bench.seat2 ? bench.seat2.registerNo : 'Empty'}
-                            </div>
-                            <div className="bench-divider" />
-                          </>
-                        )}
+                    return (
+                      <div className="bench-card" key={`${bench.benchCode || 'bench'}-${bIdx}`}>
+                        <span className="bench-code">{bench.benchCode}</span>
                         
-                        <div className={`bench-seat ${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? 'seat-right' : 'empty'}`} title={(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? `${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).name} (${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).department}${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).subjectCode ? ' - ' + (bench.seat3 !== undefined ? bench.seat3 : bench.seat2).subjectCode : ''})` : 'Empty'}>
-                          {(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? (bench.seat3 !== undefined ? bench.seat3 : bench.seat2).registerNo : 'Empty'}
+                        <div className="bench-seats">
+                          <div className={`bench-seat ${bench.seat1 ? 'seat-left' : 'empty'}`} title={bench.seat1 ? `${bench.seat1.name} (${bench.seat1.department}${bench.seat1.subjectCode ? ' - ' + bench.seat1.subjectCode : ''})` : 'Empty'}>
+                            {bench.seat1 ? bench.seat1.registerNo : 'Empty'}
+                          </div>
+                          
+                          <div className="bench-divider" />
+
+                          {bench.seat3 !== undefined && (
+                            <>
+                              <div className={`bench-seat ${bench.seat2 ? 'seat-middle' : 'empty'}`} title={bench.seat2 ? `${bench.seat2.name} (${bench.seat2.department}${bench.seat2.subjectCode ? ' - ' + bench.seat2.subjectCode : ''})` : 'Empty'}>
+                                {bench.seat2 ? bench.seat2.registerNo : 'Empty'}
+                              </div>
+                              <div className="bench-divider" />
+                            </>
+                          )}
+                          
+                          <div className={`bench-seat ${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? 'seat-right' : 'empty'}`} title={(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? `${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).name} (${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).department}${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).subjectCode ? ' - ' + (bench.seat3 !== undefined ? bench.seat3 : bench.seat2).subjectCode : ''})` : 'Empty'}>
+                            {(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? (bench.seat3 !== undefined ? bench.seat3 : bench.seat2).registerNo : 'Empty'}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   </div>
                 </div>
 
@@ -1015,6 +1638,512 @@ function SeatingPlanView({ exams, halls, collegeDetails }) {
           ));
         })()}
       </div>
+
+      {/* Grid Layout (Rows & Columns) Editor Modal */}
+      {isLayoutModalOpen && selectedHall && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}
+        onClick={() => { if (!isSavingLayout) setIsLayoutModalOpen(false); }}
+        >
+          <div
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-xl)',
+              padding: '28px',
+              maxWidth: '640px',
+              width: '100%',
+              boxShadow: 'var(--shadow-xl)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              maxHeight: '90vh',
+              overflowY: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, rgba(79,70,229,0.15), rgba(139,92,246,0.1))',
+                    border: '1px solid rgba(79,70,229,0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--color-primary)'
+                  }}>
+                    <Sliders size={18} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      Edit Grid Layout
+                    </h3>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-primary)' }}>
+                      Hall: {selectedHall.name}
+                    </span>
+                  </div>
+                </div>
+                <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  Choose the number of columns, and configure how many rows each column contains.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLayoutModalOpen(false)}
+                disabled={isSavingLayout}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '4px'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Total Columns Selector & Bulk Row Setter */}
+            <div style={{
+              background: 'var(--bg-app)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '12px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'block' }}>
+                    Number of Columns (Vertical Lanes)
+                  </label>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Total vertical sections in this hall
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleColCountChange(Math.max(1, (parseInt(customCols) || 1) - 1))}
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-card)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    <Minus size={16} />
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={customCols}
+                    onChange={(e) => handleColCountChange(e.target.value)}
+                    style={{
+                      width: '60px',
+                      textAlign: 'center',
+                      fontSize: '16px',
+                      fontWeight: 800,
+                      height: '36px',
+                      borderRadius: '8px',
+                      border: '1.5px solid var(--color-primary)',
+                      background: 'var(--bg-card)',
+                      color: 'var(--text-primary)'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleColCountChange((parseInt(customCols) || 1) + 1)}
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-card)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Action: Set All Columns to Same Row Count */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingTop: '10px',
+                borderTop: '1px dashed var(--border-color)',
+                flexWrap: 'wrap',
+                gap: '8px'
+              }}>
+                <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  Quick Apply (Same Rows for All Columns):
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={bulkRowVal}
+                    onChange={(e) => setBulkRowVal(e.target.value)}
+                    style={{
+                      width: '54px',
+                      textAlign: 'center',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      height: '30px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-card)',
+                      color: 'var(--text-primary)'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleApplyAllRows(bulkRowVal)}
+                    className="btn-secondary"
+                    style={{ padding: '6px 12px', fontSize: '11.5px', fontWeight: 600 }}
+                  >
+                    Set All Columns to {bulkRowVal}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Per-Column Rows Configuration */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                  Configure Rows for Each Column
+                </label>
+                <span style={{ fontSize: '11.5px', color: 'var(--color-primary)', fontWeight: 600 }}>
+                  {customCols} {customCols === 1 ? 'Column' : 'Columns'}
+                </span>
+              </div>
+
+              {(() => {
+                const c = parseInt(customCols) || 1;
+                const spb = customSeatsPerBench || 2;
+                const maxBenches = getHallMaxBenches(selectedHall, spb);
+                const activeRows = columnRows.slice(0, c).map(n => Math.max(1, parseInt(n) || 1));
+                const totalBenchesCount = activeRows.reduce((a, b) => a + b, 0);
+
+                return (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                    gap: '10px',
+                    maxHeight: '260px',
+                    overflowY: 'auto',
+                    padding: '4px 2px'
+                  }}>
+                    {Array.from({ length: c }).map((_, colIdx) => {
+                      const currentR = columnRows[colIdx] !== undefined ? columnRows[colIdx] : (parseInt(bulkRowVal) || 6);
+                      const numR = Math.max(1, parseInt(currentR) || 1);
+                      const endRowLetter = getRowLetterHelper(numR - 1);
+                      const isAtMax = totalBenchesCount >= maxBenches;
+
+                      return (
+                        <div
+                          key={colIdx}
+                          style={{
+                            background: 'var(--bg-app)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '10px',
+                            padding: '10px 12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-primary)' }}>
+                              Column {colIdx + 1}
+                            </span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                              A{colIdx + 1}..{endRowLetter}{colIdx + 1}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleSpecificColumnRowStep(colIdx, -1)}
+                              style={{
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '6px',
+                                border: '1px solid var(--border-color)',
+                                background: 'var(--bg-card)',
+                                color: 'var(--text-primary)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 'bold',
+                                padding: 0
+                              }}
+                            >
+                              <Minus size={13} />
+                            </button>
+                            <input
+                              type="number"
+                              min="1"
+                              max="100"
+                              value={currentR}
+                              onChange={(e) => handleSpecificColumnRowChange(colIdx, e.target.value)}
+                              style={{
+                                flex: 1,
+                                minWidth: '36px',
+                                textAlign: 'center',
+                                fontSize: '14px',
+                                fontWeight: 700,
+                                height: '28px',
+                                borderRadius: '6px',
+                                border: '1px solid var(--color-primary)',
+                                background: 'var(--bg-card)',
+                                color: 'var(--text-primary)',
+                                padding: 0
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSpecificColumnRowStep(colIdx, 1)}
+                              disabled={isAtMax}
+                              style={{
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '6px',
+                                border: '1px solid var(--border-color)',
+                                background: isAtMax ? 'var(--bg-app)' : 'var(--bg-card)',
+                                color: isAtMax ? 'var(--text-muted)' : 'var(--text-primary)',
+                                cursor: isAtMax ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 'bold',
+                                padding: 0
+                              }}
+                            >
+                              <Plus size={13} />
+                            </button>
+                          </div>
+
+                          <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                            {numR} Benches
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Live Calculation Summary Card */}
+            {(() => {
+              const c = parseInt(customCols) || 1;
+              const spb = customSeatsPerBench || 2;
+              const maxBenches = getHallMaxBenches(selectedHall, spb);
+              const activeRows = columnRows.slice(0, c).map(n => Math.max(1, parseInt(n) || 1));
+              const totalBenchesCount = activeRows.reduce((a, b) => a + b, 0);
+              const totalCapacityCount = totalBenchesCount * spb;
+              const isMatched = totalBenchesCount === maxBenches;
+              const isExceeded = totalBenchesCount > maxBenches;
+
+              return (
+                <div style={{
+                  background: isExceeded 
+                    ? 'rgba(239, 68, 68, 0.08)' 
+                    : isMatched 
+                      ? 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(79,70,229,0.05))' 
+                      : 'linear-gradient(135deg, rgba(79,70,229,0.06), rgba(139,92,246,0.03))',
+                  border: isExceeded 
+                    ? '1.5px solid #ef4444' 
+                    : isMatched 
+                      ? '1.5px solid #10b981' 
+                      : '1px solid rgba(79,70,229,0.18)',
+                  borderRadius: '12px',
+                  padding: '14px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px'
+                }}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '12px',
+                    textAlign: 'center'
+                  }}>
+                    <div>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', display: 'block' }}>Total Benches</span>
+                      <span style={{ fontSize: '20px', fontWeight: 800, color: isExceeded ? '#ef4444' : 'var(--color-primary)' }}>
+                        {totalBenchesCount} <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>/ {maxBenches} Max</span>
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', display: 'block' }}>Seating Capacity</span>
+                      <span style={{ fontSize: '20px', fontWeight: 800, color: isExceeded ? '#ef4444' : '#10b981' }}>
+                        {totalCapacityCount}
+                      </span>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>Seats ({spb} per bench)</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', display: 'block' }}>Columns Breakdown</span>
+                      <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: '28px' }}>
+                        {c} Cols · [{activeRows.join(', ')}]
+                      </span>
+                    </div>
+                  </div>
+
+                  {isMatched && (
+                    <div style={{
+                      fontSize: '11.5px',
+                      fontWeight: 700,
+                      color: '#059669',
+                      background: 'rgba(16,185,129,0.12)',
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      textAlign: 'center'
+                    }}>
+                      ✓ Matches Exact Hall Bench Capacity ({maxBenches} Benches · {maxBenches * spb} Seats)
+                    </div>
+                  )}
+
+                  {!isMatched && !isExceeded && (
+                    <div style={{
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      color: '#d97706',
+                      background: 'rgba(245,158,11,0.12)',
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      textAlign: 'center'
+                    }}>
+                      ℹ {totalBenchesCount} of {maxBenches} benches assigned ({maxBenches - totalBenchesCount} benches remaining to match full hall capacity)
+                    </div>
+                  )}
+
+                  {isExceeded && (
+                    <div style={{
+                      fontSize: '11.5px',
+                      fontWeight: 700,
+                      color: '#dc2626',
+                      background: 'rgba(239,68,68,0.12)',
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      textAlign: 'center'
+                    }}>
+                      ⚠ Exceeds Hall Capacity! Max allowed: {maxBenches} benches.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {layoutSuccessMsg && (
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: '8px',
+                background: 'rgba(16,185,129,0.1)',
+                border: '1px solid rgba(16,185,129,0.3)',
+                color: '#10b981',
+                fontSize: '13px',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <Check size={16} />
+                <span>{layoutSuccessMsg}</span>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setIsLayoutModalOpen(false)}
+                disabled={isSavingLayout}
+                style={{ padding: '10px 18px', fontSize: '13px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleSaveLayout}
+                disabled={isSavingLayout || (() => {
+                  const c = parseInt(customCols) || 1;
+                  const spb = customSeatsPerBench || 2;
+                  const maxB = getHallMaxBenches(selectedHall, spb);
+                  const act = columnRows.slice(0, c).map(n => Math.max(1, parseInt(n) || 1));
+                  const tot = act.reduce((a, b) => a + b, 0);
+                  return tot === 0 || tot > maxB;
+                })()}
+                style={{
+                  padding: '10px 22px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                {isSavingLayout ? (
+                  <>
+                    <div style={{
+                      width: '16px',
+                      height: '16px',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTopColor: '#fff',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite'
+                    }} />
+                    <span>Saving & Applying...</span>
+                  </>
+                ) : (
+                  <span>Save & Re-arrange Seating</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

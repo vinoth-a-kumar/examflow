@@ -5,7 +5,10 @@ function Header({ collegeDetails, isMobileSidebarOpen, onToggleMobileSidebar }) 
   const [isOpen, setIsOpen] = useState(false);
 
   const academicYear = collegeDetails?.academicYear || '2026-27';
-  const collegeName = collegeDetails?.name || 'ExamFlow';
+  const rawName = collegeDetails?.name || "Rajapalayam Rajus' College";
+  const collegeName = (rawName.includes('Rajapalym') || rawName.includes('Rajapalaym'))
+    ? "Rajapalayam Rajus' College"
+    : rawName;
   const collegeLogo = collegeDetails?.logo || '';
 
   return (

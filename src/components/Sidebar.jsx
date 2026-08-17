@@ -20,7 +20,10 @@ function Sidebar({ currentTab, setCurrentTab, user, collegeDetails, onLogout, is
     { id: 'settings', name: 'Settings', icon: Settings },
   ];
 
-  const collegeName = collegeDetails?.name || 'ExamFlow';
+  const rawName = collegeDetails?.name || "Rajapalayam Rajus' College";
+  const collegeName = (rawName.includes('Rajapalym') || rawName.includes('Rajapalaym'))
+    ? "Rajapalayam Rajus' College"
+    : rawName;
   const collegeLogo = collegeDetails?.logo || '';
 
   const handleNavClick = (tabId) => {

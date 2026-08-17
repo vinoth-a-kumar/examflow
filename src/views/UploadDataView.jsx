@@ -25,13 +25,28 @@ function UploadDataView({ students, uploads, onClear, refreshData, onClearUpload
   // Get table headers dynamically based on uploaded CSV columns
   const tableHeaders = React.useMemo(() => {
     if (students.length > 0 && students[0].csvData) {
-      return Object.keys(students[0].csvData);
+      const keys = Object.keys(students[0].csvData);
+      const hasDeptCol = keys.some(k => /dept|depart|branch|course/i.test(k));
+      if (!hasDeptCol) {
+        const nameIdx = keys.findIndex(k => /name|student/i.test(k));
+        const newKeys = [...keys];
+        if (nameIdx !== -1) {
+          newKeys.splice(nameIdx + 1, 0, 'Department');
+        } else {
+          newKeys.push('Department');
+        }
+        return newKeys;
+      }
+      return keys;
     }
     return ['Register No', 'Name', 'Department', 'Batch'];
   }, [students]);
 
   // Helper to extract cell values matching dynamic headers with fallback
   const getCellValue = (student, header) => {
+    if (header === 'Department') {
+      return student.department;
+    }
     if (student.csvData && student.csvData[header] !== undefined) {
       return student.csvData[header];
     }
@@ -42,7 +57,7 @@ function UploadDataView({ students, uploads, onClear, refreshData, onClearUpload
     if (headerLower.includes('name') || headerLower.includes('student')) {
       return student.name;
     }
-    if (headerLower.includes('dept') || headerLower.includes('depart') || headerLower.includes('branch') || headerLower.includes('course') || headerLower.includes('subject')) {
+    if (headerLower.includes('dept') || headerLower.includes('depart') || headerLower.includes('branch') || headerLower.includes('course')) {
       return student.department;
     }
     if (headerLower.includes('batch') || headerLower.includes('year')) {
@@ -67,7 +82,14 @@ function UploadDataView({ students, uploads, onClear, refreshData, onClearUpload
   const hasMoreRows = filteredStudents.length > ROWS_TO_SHOW;
 
   // Get list of unique departments for filter dropdown
-  const departments = ['ALL', ...new Set((students || []).map(s => (s && s.department ? s.department.toUpperCase() : '')).filter(Boolean))];
+  const departments = ['ALL', ...new Set((students || []).map(s => {
+    if (!s) return '';
+    if (s.department && s.department.toUpperCase() !== 'GENERAL' && s.department.toUpperCase() !== 'UNKNOWN') {
+      return s.department.toUpperCase();
+    }
+    const regMatch = (s.registerNo || '').match(/^([A-Z]{2,6})\d+/);
+    return regMatch ? regMatch[1].toUpperCase() : (s.department ? s.department.toUpperCase() : '');
+  }).filter(Boolean))];
 
   const handleDrag = (e) => {
     e.preventDefault();

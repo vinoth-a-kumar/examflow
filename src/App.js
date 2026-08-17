@@ -83,14 +83,21 @@ function App() {
 
     try {
       const parsed = JSON.parse(saved);
-      // Auto-migrate old default college details or empty logo
-      const isOldName = parsed.name === 'ExamFlow Engineering College' || parsed.name === 'ExamFlow AI';
-      if (isOldName || !parsed.logo || parsed.logo === '' || parsed.logo.includes('logo.svg') || parsed.logo.includes('logo192') || parsed.logo.includes('favicon.ico') || (typeof parsed.logo === 'string' && parsed.logo.startsWith('data:'))) {
+      // Auto-migrate old default college details, empty logo, or misspelled college names
+      const isMispelled = !parsed.name || 
+        parsed.name.includes('Rajapalym') || 
+        parsed.name.includes('Rajapalaym') || 
+        parsed.name === 'ExamFlow Engineering College' || 
+        parsed.name === 'ExamFlow AI';
+
+      const needsLogoFix = !parsed.logo || parsed.logo === '' || parsed.logo.includes('logo.svg') || parsed.logo.includes('logo192') || parsed.logo.includes('favicon.ico') || (typeof parsed.logo === 'string' && parsed.logo.startsWith('data:'));
+      
+      if (isMispelled || needsLogoFix || parsed.address === '123 University Campus, Tech City, 600001') {
         const updated = {
           ...parsed,
-          name: isOldName ? "Rajapalayam Rajus' College" : (parsed.name || "Rajapalayam Rajus' College"),
-          logo: '/college-logo.png',
-          address: parsed.address === '123 University Campus, Tech City, 600001' ? 'Rajapalayam, Tamil Nadu, 626117' : (parsed.address || 'Rajapalayam, Tamil Nadu, 626117')
+          name: isMispelled ? "Rajapalayam Rajus' College" : parsed.name,
+          logo: needsLogoFix ? '/college-logo.png' : parsed.logo,
+          address: (parsed.address === '123 University Campus, Tech City, 600001' || !parsed.address) ? 'Rajapalayam, Tamil Nadu, 626117' : parsed.address
         };
         localStorage.setItem('examflow-college-details', JSON.stringify(updated));
         return updated;
@@ -324,33 +331,6 @@ function App() {
     }
   };
 
-
-  // Reset entire database (Students, Halls, Exams, Seating Plans)
-  const handleClearAll = async () => {
-    if (window.confirm("CRITICAL WARNING: This will permanently wipe ALL students, halls, exams, and seating plans. This cannot be undone. Are you sure?")) {
-      try {
-        // Clear students (also clears seating plans on backend)
-        await fetch('http://localhost:5000/api/students/clear', { method: 'POST' });
-        
-        // Delete all halls
-        for (let hall of halls) {
-          await fetch(`http://localhost:5000/api/halls/${hall._id}`, { method: 'DELETE' });
-        }
-
-        // Delete all exams
-        for (let exam of exams) {
-          await fetch(`http://localhost:5000/api/exams/${exam._id}`, { method: 'DELETE' });
-        }
-
-        alert("System databases have been completely wiped.");
-        fetchAllData();
-      } catch (err) {
-        console.error(err);
-        alert("An error occurred during system reset.");
-      }
-    }
-  };
-
   // Clear system activities history
   const handleClearActivities = async () => {
     if (!window.confirm("Are you sure you want to clear the recent activities history?")) return;
@@ -424,16 +404,14 @@ function App() {
           />
         );
       case 'seating':
-        return <SeatingPlanView exams={exams} halls={halls} collegeDetails={collegeDetails} />;
+        return <SeatingPlanView exams={exams} halls={halls} collegeDetails={collegeDetails} refreshData={fetchAllData} />;
       case 'settings':
         return (
           <SettingsView 
             dbStatus={dbConnection} 
-            onClearAll={handleClearAll}
             refreshData={fetchAllData}
             currentTheme={theme}
             onChangeTheme={handleThemeChange}
-            setTab={handleTabChange}
           />
         );
       case 'profile':

@@ -10,7 +10,6 @@ import {
   Activity,
   Info,
   TriangleAlert,
-  Trash2,
   ExternalLink,
   Clock,
   CheckCircle2,
@@ -18,7 +17,7 @@ import {
   FileText
 } from 'lucide-react';
 
-function SettingsView({ dbStatus, onClearAll, refreshData, setTab }) {
+function SettingsView({ dbStatus, refreshData, setTab }) {
   const [systemInfo, setSystemInfo] = useState({
     projectVersion: 'v1.2.0',
     databaseStatus: 'Checking...',
@@ -38,10 +37,6 @@ function SettingsView({ dbStatus, onClearAll, refreshData, setTab }) {
   const [restoreModalFile, setRestoreModalFile] = useState(null);
   const [restoreParsedData, setRestoreParsedData] = useState(null);
   const [isRestoring, setIsRestoring] = useState(false);
-
-  // Danger Zone Reset Modal State
-  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
-  const [resetConfirmInput, setResetConfirmInput] = useState('');
 
   // Last Backup Info
   const [lastBackupInfo, setLastBackupInfo] = useState(() => {
@@ -193,17 +188,6 @@ function SettingsView({ dbStatus, onClearAll, refreshData, setTab }) {
       showToast('Network error during database restore.', 'error');
     } finally {
       setIsRestoring(false);
-    }
-  };
-
-  const handleExecuteReset = async () => {
-    if (resetConfirmInput !== 'RESET') return;
-    if (onClearAll) {
-      await onClearAll();
-      setIsResetModalOpen(false);
-      setResetConfirmInput('');
-      fetchSystemInfo();
-      showToast('System operational data has been completely reset.');
     }
   };
 
@@ -623,60 +607,6 @@ function SettingsView({ dbStatus, onClearAll, refreshData, setTab }) {
         </div>
       </div>
 
-      {/* 7. DANGER ZONE (Full Width at Bottom) */}
-      <div className="card-container" style={{
-        background: '#ffffff',
-        border: '1px solid rgba(239, 68, 68, 0.3)',
-        boxShadow: '0 4px 16px rgba(239, 68, 68, 0.05)',
-        padding: '20px 24px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{
-              width: '38px', height: '38px', borderRadius: '10px',
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.25)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#dc2626', flexShrink: 0
-            }}>
-              <TriangleAlert size={20} />
-            </div>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#dc2626', margin: 0 }}>Danger Zone</h3>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
-                Permanently removes operational data from the system.
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => {
-              setResetConfirmInput('');
-              setIsResetModalOpen(true);
-            }}
-            style={{
-              background: 'transparent',
-              border: '1px solid #dc2626',
-              color: '#dc2626',
-              padding: '8px 18px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.06)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-          >
-            <Trash2 size={15} />
-            <span>Reset System Data</span>
-          </button>
-        </div>
-      </div>
-
       {/* RESTORE CONFIRMATION MODAL */}
       {restoreModalFile && restoreParsedData && (
         <div style={{
@@ -729,99 +659,6 @@ function SettingsView({ dbStatus, onClearAll, refreshData, setTab }) {
                 style={{ padding: '8px 16px', fontSize: '13px', background: '#10b981' }}
               >
                 {isRestoring ? 'Restoring Database...' : 'Confirm Restore'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* DANGER ZONE RESET MODAL */}
-      {isResetModalOpen && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 10000, padding: '20px'
-        }}>
-          <div style={{
-            background: '#ffffff', border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: '16px', width: '100%', maxWidth: '500px', overflow: 'hidden',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.2)', animation: 'fadeIn 0.2s ease'
-          }}>
-            <div style={{ padding: '18px 20px', borderBottom: '1px solid #fee2e2', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fef2f2' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <TriangleAlert size={20} style={{ color: '#dc2626' }} />
-                <h3 style={{ fontSize: '17px', fontWeight: 700, margin: 0, color: '#dc2626' }}>Reset Operational System Data</h3>
-              </div>
-              <button onClick={() => setIsResetModalOpen(false)} style={{ background: 'none', border: 'none', color: '#991b1b', cursor: 'pointer' }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
-                This action will permanently delete all operational records currently stored in the system:
-              </p>
-
-              <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px' }}>
-                <div>Students: <strong style={{ color: '#dc2626' }}>{systemInfo.recordCounts?.students ?? 0} records</strong></div>
-                <div>Halls: <strong style={{ color: '#dc2626' }}>{systemInfo.recordCounts?.halls ?? 0} records</strong></div>
-                <div>Exams: <strong style={{ color: '#dc2626' }}>{systemInfo.recordCounts?.exams ?? 0} records</strong></div>
-                <div>Seating Plans: <strong style={{ color: '#dc2626' }}>{systemInfo.recordCounts?.plans ?? 0} records</strong></div>
-              </div>
-
-              {/* Recommended Backup Banner */}
-              <div style={{
-                padding: '12px 14px', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '10px',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px'
-              }}>
-                <span style={{ fontSize: '12.5px', color: '#b45309', fontWeight: 600 }}>Creating a backup before resetting is recommended.</span>
-                <button
-                  onClick={handleCreateBackup}
-                  className="btn-secondary"
-                  style={{ padding: '4px 10px', fontSize: '12px', height: '30px', whiteSpace: 'nowrap', borderColor: '#fde68a', background: '#ffffff', color: '#b45309' }}
-                >
-                  <Download size={12} />
-                  <span>Create Backup First</span>
-                </button>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                  Type <strong style={{ color: '#dc2626' }}>RESET</strong> to confirm action:
-                </label>
-                <input
-                  type="text"
-                  value={resetConfirmInput}
-                  onChange={(e) => setResetConfirmInput(e.target.value)}
-                  placeholder="RESET"
-                  style={{
-                    width: '100%', padding: '10px 14px', borderRadius: '8px',
-                    border: '1px solid var(--border-color)', fontSize: '14px', outline: 'none'
-                  }}
-                />
-              </div>
-            </div>
-
-            <div style={{ padding: '14px 20px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: '10px', background: '#f8fafc' }}>
-              <button
-                onClick={() => setIsResetModalOpen(false)}
-                className="btn-secondary"
-                style={{ padding: '8px 16px', fontSize: '13px' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleExecuteReset}
-                disabled={resetConfirmInput !== 'RESET'}
-                style={{
-                  padding: '8px 18px', fontSize: '13px', fontWeight: 700, borderRadius: '8px',
-                  background: resetConfirmInput === 'RESET' ? '#dc2626' : '#fca5a5',
-                  color: '#ffffff', border: 'none', cursor: resetConfirmInput === 'RESET' ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.2s'
-                }}
-              >
-                Confirm System Reset
               </button>
             </div>
           </div>

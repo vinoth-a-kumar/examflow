@@ -242,6 +242,22 @@ async function createTables() {
       \`uploadedAt\` DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Auto-normalize student departments in MySQL
+  try {
+    const [rows] = await pool.query(`SELECT _id, registerNo, department FROM students WHERE department = 'GENERAL' OR department = '' OR department IS NULL OR department = 'UNKNOWN'`);
+    if (rows && rows.length > 0) {
+      for (const r of rows) {
+        const match = (r.registerNo || '').match(/^([A-Za-z]{2,6})/);
+        if (match && match[1]) {
+          await pool.query(`UPDATE students SET department = ? WHERE _id = ?`, [match[1].toUpperCase(), r._id]);
+        }
+      }
+      console.log(`[MySQL Migration] Normalized departments for ${rows.length} students in MySQL.`);
+    }
+  } catch (err) {
+    console.error('Error auto-migrating departments in MySQL:', err);
+  }
 }
 
 // Start database initialization
@@ -435,6 +451,38 @@ const Models = {
       let data = readJson('students');
       if (query.department) data = data.filter(s => s.department === query.department);
       return data.length;
+    },
+    findByIdAndUpdate: async (id, update) => {
+      const mysqlRes = await safeMysqlQuery(async () => {
+        const fields = [];
+        const values = [];
+        for (let key of Object.keys(update)) {
+          if (key === '_id') continue;
+          fields.push(`\`${key}\` = ?`);
+          values.push(key === 'csvData' ? JSON.stringify(update[key]) : update[key]);
+        }
+        values.push(id);
+        await runQuery(`UPDATE students SET ${fields.join(', ')} WHERE _id = ?`, values);
+        const rows = await runQuery(`SELECT * FROM students WHERE _id = ?`, [id]);
+        if (rows.length > 0) {
+          return {
+            ...rows[0],
+            csvData: rows[0].csvData ? JSON.parse(rows[0].csvData) : null
+          };
+        }
+        return null;
+      });
+      if (mysqlRes !== null) return mysqlRes;
+
+      // Fallback
+      let data = readJson('students');
+      const idx = data.findIndex(s => s._id === id);
+      if (idx !== -1) {
+        data[idx] = { ...data[idx], ...update };
+        writeJson('students', data);
+        return data[idx];
+      }
+      return null;
     }
   },
 
@@ -443,10 +491,21 @@ const Models = {
       const mysqlRes = await safeMysqlQuery(async () => {
         const { clause, values } = buildWhere(query);
         const rows = await runQuery(`SELECT * FROM halls${clause} ORDER BY idx ASC`, values);
-        return rows.map(r => ({
-          ...r,
-          csvData: r.csvData ? JSON.parse(r.csvData) : null
-        }));
+        return rows.map(r => {
+          let cRows = [];
+          if (r.columnRows) {
+            try { cRows = typeof r.columnRows === 'string' ? JSON.parse(r.columnRows) : r.columnRows; } catch(e){}
+          }
+          let cData = r.csvData ? (typeof r.csvData === 'string' ? JSON.parse(r.csvData) : r.csvData) : null;
+          if ((!cRows || cRows.length === 0) && cData && cData.columnRows) {
+            cRows = cData.columnRows;
+          }
+          return {
+            ...r,
+            columnRows: cRows,
+            csvData: cData
+          };
+        });
       });
       if (mysqlRes !== null) return mysqlRes;
       // Fallback
@@ -460,6 +519,12 @@ const Models = {
         if (h && h.csvData && typeof h.csvData === 'string') {
           try { h.csvData = JSON.parse(h.csvData); } catch (e) {}
         }
+        if (h && h.columnRows && typeof h.columnRows === 'string') {
+          try { h.columnRows = JSON.parse(h.columnRows); } catch (e) {}
+        }
+        if (h && (!h.columnRows || h.columnRows.length === 0) && h.csvData && h.csvData.columnRows) {
+          h.columnRows = h.csvData.columnRows;
+        }
         return h;
       });
       if (mysqlRes !== null) return mysqlRes;
@@ -472,8 +537,8 @@ const Models = {
         await runQuery(`DELETE FROM halls WHERE name = ?`, [doc.name]);
         const _id = generateId();
         await runQuery(
-          `INSERT INTO halls (\`_id\`, \`name\`, \`rows\`, \`columns\`, \`capacity\`, \`benches\`, \`csvData\`, \`idx\`) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`,
-          [_id, doc.name, doc.rows, doc.columns, doc.capacity, doc.benches, JSON.stringify(doc.csvData || null)]
+          `INSERT INTO halls (\`_id\`, \`name\`, \`rows\`, \`columns\`, \`capacity\`, \`benches\`, \`columnRows\`, \`csvData\`, \`idx\`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+          [_id, doc.name, doc.rows, doc.columns, doc.capacity, doc.benches, JSON.stringify(doc.columnRows || []), JSON.stringify(doc.csvData || null)]
         );
         return { _id, ...doc };
       });
@@ -488,9 +553,12 @@ const Models = {
     },
     findByIdAndUpdate: async (id, doc) => {
       const mysqlRes = await safeMysqlQuery(async () => {
+        try {
+          await runQuery(`ALTER TABLE halls ADD COLUMN \`columnRows\` LONGTEXT`);
+        } catch (e) {}
         await runQuery(
-          `UPDATE halls SET \`name\` = ?, \`rows\` = ?, \`columns\` = ?, \`capacity\` = ?, \`benches\` = ?, \`csvData\` = ? WHERE \`_id\` = ? OR \`name\` = ?`,
-          [doc.name, doc.rows, doc.columns, doc.capacity, doc.benches, JSON.stringify(doc.csvData || null), id, id]
+          `UPDATE halls SET \`name\` = ?, \`rows\` = ?, \`columns\` = ?, \`capacity\` = ?, \`benches\` = ?, \`columnRows\` = ?, \`csvData\` = ? WHERE \`_id\` = ? OR \`name\` = ?`,
+          [doc.name, doc.rows, doc.columns, doc.capacity, doc.benches, JSON.stringify(doc.columnRows || []), JSON.stringify(doc.csvData || null), id, id]
         );
         return { _id: id, ...doc };
       });
@@ -709,15 +777,15 @@ const Models = {
           [
             _id,
             doc.examId,
-            doc.examName,
+            doc.examName || doc.name || 'Exam',
             doc.hallId,
-            doc.hallName,
-            JSON.stringify(doc.seatingGrid),
-            JSON.stringify(doc.attendanceRoster),
+            doc.hallName || 'Hall',
+            JSON.stringify(doc.seatingGrid || []),
+            JSON.stringify(doc.attendanceRoster || []),
             JSON.stringify(doc.unseatedStudents || []),
-            doc.totalBenches,
-            doc.totalStudents,
-            doc.emptySeats,
+            doc.totalBenches || 0,
+            doc.totalStudents || 0,
+            doc.emptySeats || 0,
             generatedAt
           ]
         );

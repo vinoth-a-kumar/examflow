@@ -1,25 +1,32 @@
 [
   {
-    "_id": "123vhfamshkbtzg",
-    "name": "SCAPC61, SCMPC41, SCHPC41",
+    "_id": "iltvbv4msxbrkw7",
+    "name": "SCAPC6P, SCHPC6P, SCMPC6P",
     "departments": [],
     "subjectCodes": [
-      "SCAPC61",
-      "SCMPC41",
-      "SCHPC41",
-      "SCHPS11",
+      "SCAPC6P",
+      "SCHPC6P",
+      "SCMPC6P",
       "SCSPC6P",
-      "SENPC6P"
+      "SENPC6P",
+      "SITPC6P",
+      "SMTPC6P",
+      "SPHPC6P"
     ],
-    "date": "2026-08-13",
+    "date": "2026-08-18",
     "session": "FN",
     "time": "10:00 AM - 01:00 PM",
-    "studentsCount": 173,
+    "studentsCount": 400,
     "assignedHalls": [
       "A1",
       "A2",
       "A3",
-      "C3"
+      "A6",
+      "A7",
+      "A8",
+      "A9",
+      "B1",
+      "C4"
     ],
     "seatsPerBench": 3,
     "status": "Scheduled"
