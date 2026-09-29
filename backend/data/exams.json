@@ -1,34 +1,25 @@
 [
   {
-    "_id": "iltvbv4msxbrkw7",
+    "_id": "t1p7nhbmuk1v3ji",
     "name": "SCAPC6P, SCHPC6P, SCMPC6P",
     "departments": [],
     "subjectCodes": [
       "SCAPC6P",
       "SCHPC6P",
-      "SCMPC6P",
-      "SCSPC6P",
-      "SENPC6P",
-      "SITPC6P",
-      "SMTPC6P",
-      "SPHPC6P"
+      "SCMPC6P"
     ],
-    "date": "2026-08-18",
+    "date": "2026-09-28",
     "session": "FN",
     "time": "10:00 AM - 01:00 PM",
-    "studentsCount": 400,
+    "studentsCount": 150,
     "assignedHalls": [
       "A1",
       "A2",
       "A3",
       "A6",
-      "A7",
-      "A8",
-      "A9",
-      "B1",
-      "C4"
+      "A7"
     ],
-    "seatsPerBench": 3,
+    "seatsPerBench": 2,
     "status": "Scheduled"
   }
 ]

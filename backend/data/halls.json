@@ -2,16 +2,24 @@
   {
     "_id": "3szpmkqmryxvieo",
     "name": "A1",
-    "rows": 17,
-    "columns": 1,
-    "benches": 17,
-    "capacity": 34,
+    "rows": 3,
+    "columns": 5,
+    "benches": 15,
+    "capacity": 30,
     "csvData": {
       "H NO": "A1",
-      "SET OF BENCH": 17,
-      "2*SEATS": 34,
-      "3*SEATS": 51
-    }
+      "SET OF BENCH": 15,
+      "2*SEATS": 30,
+      "3*SEATS": 45,
+      "columnRows": 3
+    },
+    "columnRows": [
+      3,
+      3,
+      3,
+      3,
+      3
+    ]
   },
   {
     "_id": "u7pncjbmryxvies",
@@ -44,16 +52,23 @@
   {
     "_id": "com4vuxmryxvif6",
     "name": "A6",
-    "rows": 17,
-    "columns": 1,
+    "rows": 5,
+    "columns": 4,
     "benches": 17,
     "capacity": 34,
     "csvData": {
       "H NO": "A6",
-      "SET OF BENCH": "17",
-      "2*SEATS": "34",
-      "3*SEATS": "51"
-    }
+      "SET OF BENCH": 17,
+      "2*SEATS": 34,
+      "3*SEATS": 51,
+      "columnRows": 5
+    },
+    "columnRows": [
+      4,
+      4,
+      4,
+      5
+    ]
   },
   {
     "_id": "bbxvjihmryxvifa",
@@ -408,15 +423,22 @@
   {
     "_id": "oh5zcdsmryxvijl",
     "name": "C4",
-    "rows": 13,
-    "columns": 1,
+    "rows": 4,
+    "columns": 4,
     "benches": 13,
-    "capacity": 26,
+    "capacity": 39,
     "csvData": {
       "H NO": "C4",
-      "SET OF BENCH": "13",
-      "2*SEATS": "26",
-      "3*SEATS": "39"
-    }
+      "SET OF BENCH": 13,
+      "2*SEATS": 39,
+      "3*SEATS": 59,
+      "columnRows": 4
+    },
+    "columnRows": [
+      3,
+      3,
+      3,
+      4
+    ]
   }
 ]

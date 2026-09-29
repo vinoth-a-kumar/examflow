@@ -7,7 +7,6 @@ import HallManagementView from './views/HallManagementView';
 import ExamManagementView from './views/ExamManagementView';
 import SeatingPlanView from './views/SeatingPlanView';
 import SettingsView from './views/SettingsView';
-import ProfileView from './views/ProfileView';
 import LoginView from './views/LoginView';
 
 function App() {
@@ -43,7 +42,7 @@ function App() {
     return null;
   });
 
-  const [theme, setTheme] = useState(() => {
+  const [theme] = useState(() => {
     return localStorage.getItem('examflow-theme') || 'light';
   });
 
@@ -52,11 +51,6 @@ function App() {
     document.body.classList.remove('theme-light', 'theme-dark', 'theme-sunset');
     document.body.classList.add(`theme-${theme}`);
   }, [theme]);
-
-  const handleThemeChange = (newTheme) => {
-    setTheme(newTheme);
-    localStorage.setItem('examflow-theme', newTheme);
-  };
 
   const [collegeDetails, setCollegeDetails] = useState(() => {
     const saved = localStorage.getItem('examflow-college-details');
@@ -108,10 +102,6 @@ function App() {
     }
   });
 
-  const handleSaveCollegeDetails = (details) => {
-    setCollegeDetails(details);
-    localStorage.setItem('examflow-college-details', JSON.stringify(details));
-  };
 
   const handleLogin = (userData) => {
     setUser(userData);
@@ -410,20 +400,7 @@ function App() {
           <SettingsView 
             dbStatus={dbConnection} 
             refreshData={fetchAllData}
-            currentTheme={theme}
-            onChangeTheme={handleThemeChange}
-          />
-        );
-      case 'profile':
-        return (
-          <ProfileView 
-            user={user} 
-            collegeDetails={collegeDetails} 
-            onSaveCollegeDetails={handleSaveCollegeDetails}
-            onSaveUser={(updatedUser) => {
-              setUser(updatedUser);
-              localStorage.setItem('examflow-user', JSON.stringify(updatedUser));
-            }}
+            setTab={handleTabChange}
           />
         );
       default:

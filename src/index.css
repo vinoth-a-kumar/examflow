@@ -661,45 +661,6 @@ body {
   letter-spacing: -0.3px;
 }
 
-/* ==========================================================================
-   CHARTS
-   ========================================================================== */
-.chart-bar-container {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  width: 100%;
-}
-
-.chart-bar-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.chart-bar-info {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.chart-bar-track {
-  height: 10px;
-  background: var(--bg-app);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-  position: relative;
-}
-
-.chart-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
-  border-radius: var(--radius-full);
-  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 6px rgba(79,70,229,0.25);
-}
-
 .donut-chart-container {
   display: flex;
   flex-direction: column;
@@ -1242,29 +1203,12 @@ body {
   overflow: hidden;
 }
 
-.modal-header-inner {
-  padding: 22px 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  position: relative;
-  z-index: 1;
-}
-
 .modal-header h3 {
   font-family: var(--font-display);
   font-size: 19px;
   font-weight: 800;
   color: white;
   letter-spacing: -0.5px;
-}
-
-.modal-header-bg {
-  position: absolute;
-  top: -30px; right: -30px;
-  width: 120px; height: 120px;
-  background: rgba(255,255,255,0.06);
-  border-radius: 50%;
 }
 
 .modal-close {
@@ -1355,12 +1299,6 @@ body {
   color: var(--text-primary);
 }
 
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
 .checkbox-group {
   display: flex;
   flex-wrap: wrap;
@@ -1406,20 +1344,6 @@ body {
   border-radius: var(--radius-lg);
   padding: 22px;
   box-shadow: var(--shadow-sm);
-}
-
-.seating-grid-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.seating-grid-section h4 {
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.3px;
 }
 
 .seating-layout-grid {
@@ -1507,89 +1431,6 @@ body {
   width: 1px;
   height: 20px;
   background: var(--border-color);
-}
-
-/* ==========================================================================
-   ACTION MENUS
-   ========================================================================== */
-.actions-menu-btn {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  cursor: pointer;
-  color: var(--text-secondary);
-  padding: 6px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition-fast);
-  box-shadow: var(--shadow-xs);
-}
-
-.actions-menu-btn:hover {
-  background: var(--color-primary-light);
-  border-color: rgba(79,70,229,0.2);
-  color: var(--color-primary);
-}
-
-/* ==========================================================================
-   SEED / INFO BOX
-   ========================================================================== */
-.seed-box {
-  background: linear-gradient(135deg, var(--color-primary-alpha-05), transparent);
-  border: 1px solid rgba(79,70,229,0.12);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.seed-box h4 {
-  font-family: var(--font-display);
-  font-size: 16px;
-  color: var(--color-primary);
-  font-weight: 800;
-}
-
-.seed-box p {
-  font-size: 13.5px;
-  color: var(--text-secondary);
-  line-height: 1.6;
-}
-
-.seed-buttons {
-  display: flex;
-  gap: 10px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-
-/* ==========================================================================
-   UTILITY CLASSES
-   ========================================================================== */
-.gradient-text {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.glass-card {
-  background: rgba(255,255,255,0.8);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.9);
-}
-
-.icon-circle {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
 }
 
 .badge-pill {
@@ -2012,12 +1853,6 @@ body {
   box-shadow: none;
   cursor: not-allowed;
   transform: none;
-}
-
-.auth-footer-text {
-  text-align: center;
-  font-size: 13px;
-  color: rgba(255,255,255,0.4);
 }
 
 .auth-error-banner {

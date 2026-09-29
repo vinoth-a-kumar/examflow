@@ -23,6 +23,7 @@ app.use(express.json());
 // Set up Multer for CSV/Excel uploads (using memory storage)
 const storage = multer.memoryStorage();
 const upload = multer({
+  storage,
   limits: { fileSize: 50 * 1024 * 1024 } // 50MB max limit
 });
 
@@ -245,7 +246,7 @@ function formatClassCode(department, subjectCode, registerNo = '') {
   }
 
   if (sub && dept.includes(sub)) {
-    dept = dept.replace(sub, '').trim().replace(/[\/\-_]+$/, '').trim();
+    dept = dept.replace(sub, '').trim().replace(/[/\-_]+$/, '').trim();
   }
   if (dept.includes('/')) {
     dept = dept.split('/')[0].trim();
@@ -503,6 +504,26 @@ const getPrintoutCount = () => {
   return 0;
 };
 
+const incrementPrintoutCount = () => {
+  const filePath = path.join(__dirname, 'data', 'printouts.json');
+  try {
+    if (!fs.existsSync(path.dirname(filePath))) {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    }
+    let count = 0;
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      count = data.count || 0;
+    }
+    count += 1;
+    fs.writeFileSync(filePath, JSON.stringify({ count }, null, 2), 'utf8');
+    return count;
+  } catch (err) {
+    console.error("Error updating printout count", err);
+    return 1;
+  }
+};
+
 // API ROUTES
 
 // 0. Authentication
@@ -638,33 +659,7 @@ app.get('/api/settings/backup', async (req, res) => {
   }
 });
 
-// 1.3 Database Backups List Endpoint
-app.get('/api/settings/backups-list', (req, res) => {
-  try {
-    const backupsDir = path.join(__dirname, 'data', 'backups');
-    if (!fs.existsSync(backupsDir)) {
-      return res.json([]);
-    }
-    const files = fs.readdirSync(backupsDir).filter(f => f.endsWith('.json'));
-    const list = files.map(file => {
-      const filePath = path.join(backupsDir, file);
-      const stats = fs.statSync(filePath);
-      return {
-        filename: file,
-        size: (stats.size / 1024).toFixed(1) + ' KB',
-        sizeBytes: stats.size,
-        timestamp: stats.mtime
-      };
-    }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-    res.json(list);
-  } catch (error) {
-    console.error("Failed to list backups:", error);
-    res.json([]);
-  }
-});
-
-// 1.4 Database Backup Restore Endpoint
+// 1.3 Database Backup Restore Endpoint
 app.post('/api/settings/restore', async (req, res) => {
   try {
     const { students, halls, exams, seatingPlans } = req.body;
@@ -1163,9 +1158,28 @@ app.get('/api/exams', async (req, res) => {
         const plan = plans.find(p => String(p.examId) === String(e._id) && (p.hallId === hallName || p.hallName === hallName));
         const hallObj = allHalls.find(h => h.name === hallName);
         
+        let vacantSeats = 0;
+        if (plan) {
+          if (plan.seatingGrid && Array.isArray(plan.seatingGrid)) {
+            const realBenches = plan.seatingGrid.filter(b => !b.isPlaceholder);
+            if (realBenches.length > 0) {
+              realBenches.forEach(b => {
+                if (!b.seat1) vacantSeats++;
+                if (!b.seat2) vacantSeats++;
+                if (b.seat3 !== undefined && !b.seat3) vacantSeats++;
+              });
+            } else {
+              vacantSeats = plan.emptySeats !== undefined ? plan.emptySeats : 0;
+            }
+          } else {
+            vacantSeats = plan.emptySeats !== undefined ? plan.emptySeats : 0;
+          }
+        } else {
+          vacantSeats = hallObj ? (getHallCapacityForSeatsPerBench(hallObj, e.seatsPerBench || 2)) : 0;
+        }
         return {
           name: hallName,
-          vacantSeats: plan ? plan.emptySeats : (hallObj ? hallObj.capacity : 0)
+          vacantSeats: Math.max(0, vacantSeats)
         };
       });
 
@@ -1365,77 +1379,6 @@ app.put('/api/exams/:id', async (req, res) => {
 
     logActivity('exam', 'Exam Updated', `${name} configuration was updated.`);
     res.json(updated);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/exams/remaining-students', async (req, res) => {
-  try {
-    const exams = await Models.Exam.find();
-    const plans = await Models.SeatingPlan.find();
-    const allStudents = await Models.Student.find();
-
-    // Group exams by unique date and session
-    const groups = {};
-    exams.forEach(e => {
-      const dateStr = e.date.split('T')[0];
-      const key = `${dateStr}_${e.session}`;
-      if (!groups[key]) {
-        groups[key] = {
-          date: e.date,
-          session: e.session,
-          departments: new Set()
-        };
-      }
-      e.departments.forEach(d => groups[key].departments.add(d.toUpperCase()));
-    });
-
-    const result = [];
-
-    for (const key of Object.keys(groups)) {
-      const group = groups[key];
-      const dateStr = group.date.split('T')[0];
-      
-      // Seated student register numbers on this date and session
-      const examsAtTime = exams.filter(e => e.date.split('T')[0] === dateStr && e.session === group.session);
-      const examIds = examsAtTime.map(e => e._id);
-      const plansAtTime = plans.filter(p => examIds.includes(p.examId));
-      
-      const seatedRegNos = new Set();
-      plansAtTime.forEach(p => {
-        if (p.attendanceRoster) {
-          p.attendanceRoster.forEach(s => seatedRegNos.add(s.registerNo));
-        }
-      });
-
-      const deptsArray = Array.from(group.departments);
-      const deptDetails = [];
-
-      deptsArray.forEach(dept => {
-        const deptStudents = allStudents.filter(s => s.department.toUpperCase() === dept);
-        const unseated = deptStudents.filter(s => !seatedRegNos.has(s.registerNo))
-          .sort((a, b) => a.registerNo.localeCompare(b.registerNo));
-
-        if (unseated.length > 0) {
-          deptDetails.push({
-            department: dept,
-            count: unseated.length,
-            students: unseated.map(s => s.registerNo)
-          });
-        }
-      });
-
-      if (deptDetails.length > 0) {
-        result.push({
-          date: group.date,
-          session: group.session,
-          departments: deptDetails
-        });
-      }
-    }
-
-    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1645,13 +1588,29 @@ app.get('/api/halls/availability', async (req, res) => {
           };
         }
       } else {
-        // Seating plan exists. Check emptySeats
-        if (plan.emptySeats > 0) {
+        // Seating plan exists. Calculate vacant seats in real configured benches
+        let planVacant = 0;
+        if (plan.seatingGrid && Array.isArray(plan.seatingGrid)) {
+          const realBenches = plan.seatingGrid.filter(b => !b.isPlaceholder);
+          if (realBenches.length > 0) {
+            realBenches.forEach(b => {
+              if (!b.seat1) planVacant++;
+              if (!b.seat2) planVacant++;
+              if (b.seat3 !== undefined && !b.seat3) planVacant++;
+            });
+          } else {
+            planVacant = plan.emptySeats || 0;
+          }
+        } else {
+          planVacant = plan.emptySeats || 0;
+        }
+        planVacant = Math.max(0, planVacant);
+        if (planVacant > 0) {
           availability[hall.name] = {
             occupied: false,
-            vacantSeats: plan.emptySeats,
+            vacantSeats: planVacant,
             assigned: true,
-            msg: `${plan.emptySeats} Seats`
+            msg: `${planVacant} Seats`
           };
         } else {
           availability[hall.name] = {
@@ -1822,11 +1781,6 @@ async function generateSeatingPlan(examId, hallId) {
     return false;
   }).sort((a, b) => a.registerNo.localeCompare(b.registerNo));
 
-  let targetSeatingGrid = [];
-  let targetAttendanceRoster = [];
-  let targetTotalStudentsSeated = 0;
-  let targetEmptySeats = 0;
-
   const initialPoolForUnseated = [...currentPool];
 
   // Group students by subject codes (preserving the selected order/click priority)
@@ -1902,23 +1856,6 @@ async function generateSeatingPlan(examId, hallId) {
     })).filter(p => p.students.length > 0);
   }
 
-  // Helper to classify pool's year batch (1st year, 2nd year, 3rd year)
-  const getYearCategory = (pool) => {
-    const code = (pool.code || '').toUpperCase();
-    const firstStudent = pool.students[0];
-    const regNo = firstStudent ? (firstStudent.registerNo || '') : '';
-
-    if (regNo.startsWith('25')) return 1;
-    if (regNo.startsWith('24')) return 2;
-    if (regNo.startsWith('23')) return 3;
-
-    if (code.includes('111') || code.includes('101') || code.endsWith('1')) return 1;
-    if (code.includes('211') || code.includes('201') || code.endsWith('2')) return 2;
-    if (code.includes('311') || code.includes('301') || code.endsWith('3')) return 3;
-
-    return 1;
-  };
-
   const createdPlansMap = {};
   const allCreatedPlansForThisExam = [];
 
@@ -1951,8 +1888,6 @@ async function generateSeatingPlan(examId, hallId) {
     const currentHallIdStr = String(h._id);
     const currentHallNameLower = (h.name || '').trim().toLowerCase();
 
-    // Select active pools (subject codes) for this hall
-    const availablePools = activePools.filter(p => p.students && p.students.length > 0);
     const secondarySeatedByExam = {};
 
     // Stream-based allocation (Seat 1 = Left, Seat 2 = Right / Middle, Seat 3 = Right):
@@ -2052,7 +1987,6 @@ async function generateSeatingPlan(examId, hallId) {
 
     // Benches layout for this hall
     const gridMap = {};
-    let availableSeats = 0;
     for (let c = 1; c <= colsCount; c++) {
       const rowsForThisCol = colRowsList[c - 1] !== undefined ? colRowsList[c - 1] : rowsCount;
       for (let r = 0; r < rowsForThisCol; r++) {
@@ -2066,9 +2000,6 @@ async function generateSeatingPlan(examId, hallId) {
           seat2: occupiedSeatsInThisHall[`${benchCode}_seat2`] || null,
           seat3: seatsPerBench === 3 ? (occupiedSeatsInThisHall[`${benchCode}_seat3`] || null) : undefined
         };
-        if (!gridMap[benchCode].seat1) availableSeats++;
-        if (!gridMap[benchCode].seat2) availableSeats++;
-        if (seatsPerBench === 3 && !gridMap[benchCode].seat3) availableSeats++;
       }
     }
 
@@ -2154,9 +2085,9 @@ async function generateSeatingPlan(examId, hallId) {
 
     // Reconstruct currentPool from remaining activePools students
     currentPool = [];
-    activePools.forEach(p => {
+    for (const p of activePools) {
       currentPool.push(...p.students);
-    });
+    }
 
     // Construct grid in row-major order (with placeholders for uneven column rows)
     const localGrid = [];
@@ -2206,9 +2137,9 @@ async function generateSeatingPlan(examId, hallId) {
       seatingGrid: localGrid,
       attendanceRoster: sortAttendanceRoster(localRoster),
       unseatedStudents: unseatedForThisExam,
-      totalBenches: h.benches || (h.rows * h.columns),
+      totalBenches: (localGrid && localGrid.filter(b => !b.isPlaceholder).length) || h.benches || totalBenchesInHall,
       totalStudents: totalSeatedInThisHall,
-      emptySeats: emptySeatsCount
+      emptySeats: Math.max(0, emptySeatsCount)
     });
 
     allCreatedPlansForThisExam.push(plan);
@@ -2252,9 +2183,9 @@ async function generateSeatingPlan(examId, hallId) {
         seatingGrid: localGrid,
         attendanceRoster: sortAttendanceRoster(secRoster),
         unseatedStudents: [],
-        totalBenches: h.benches || (h.rows * h.columns),
+        totalBenches: (localGrid && localGrid.filter(b => !b.isPlaceholder).length) || h.benches || totalBenchesInHall,
         totalStudents: secRoster.length,
-        emptySeats: emptySeatsCount
+        emptySeats: Math.max(0, emptySeatsCount)
       });
     }
   }
@@ -2376,6 +2307,7 @@ app.get('/api/seating/by-date-session', async (req, res) => {
     let emptyCount = 0;
     if (mergedPlan.seatingGrid) {
       mergedPlan.seatingGrid.forEach(bench => {
+        if (bench.isPlaceholder) return;
         if (bench.seat1) {
           rosterFromGrid.push({
             registerNo: bench.seat1.registerNo,
@@ -2421,7 +2353,20 @@ app.get('/api/seating/by-date-session', async (req, res) => {
 
     mergedPlan.attendanceRoster = sortAttendanceRoster(rosterFromGrid, allExamSubCodes);
     mergedPlan.totalStudents = mergedPlan.attendanceRoster.length;
-    mergedPlan.emptySeats = emptyCount;
+    mergedPlan.emptySeats = Math.max(0, emptyCount);
+    mergedPlan.totalBenches = mergedPlan.seatingGrid ? mergedPlan.seatingGrid.filter(b => !b.isPlaceholder).length : plansForHall[0].totalBenches;
+
+    // Persist corrected totalBenches and emptySeats on plans in DB if different
+    for (const p of plansForHall) {
+      if (p._id && (p.emptySeats !== mergedPlan.emptySeats || p.totalBenches !== mergedPlan.totalBenches)) {
+        try {
+          await Models.SeatingPlan.findByIdAndUpdate(p._id, {
+            emptySeats: mergedPlan.emptySeats,
+            totalBenches: mergedPlan.totalBenches
+          });
+        } catch (_) {}
+      }
+    }
 
     // Merge unseated
     const unseatedMap = new Map();
@@ -2694,7 +2639,7 @@ app.get('/api/seating/download-roster', async (req, res) => {
     const usedSheetNames = new Set();
 
     rosterData.pages.forEach(page => {
-      const { deptName, degree, subjectCode, students, pageNum, totalPages, startIndex, hallName } = page;
+      const { deptName, degree, subjectCode, students, pageNum, startIndex, hallName } = page;
       const pageDegree = degree || resolveStudentDegree((students && students[0]), deptName);
       const ws = {};
 
@@ -3226,7 +3171,7 @@ app.get('/api/seating/labels/download-excel', async (req, res) => {
 
     const buffer = XLSXLib.write(wb, { type: 'buffer', bookType: 'xlsx' });
     const targetDate = date ? date.split('T')[0] : 'Date';
-    const filename = `Seat_Labels_All_${targetDate}_${session || ''}.xlsx`;
+    const filename = `Seat_Labels_${fileSuffix}_${targetDate}_${session || ''}.xlsx`;
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -3652,97 +3597,290 @@ function summarizeRegisterNumbers(regNos) {
   return summarizedParts.join('; ');
 }
 
+// Helper to compute Exam Location Summary data dynamically for a given date and session
+async function getLocationsSummaryData(date, session) {
+  const allExams = await Models.Exam.find();
+  const targetDate = getDateString(date);
+  const examsAtTime = allExams.filter(e => 
+    getDateString(e.date) === targetDate && e.session === session
+  );
+  const examIds = examsAtTime.map(e => String(e._id));
+
+  // Auto-regenerate fresh seating plans for these exams
+  for (const exam of examsAtTime) {
+    if (exam.assignedHalls && exam.assignedHalls.length > 0) {
+      try {
+        const firstHall = await resolveHall(exam.assignedHalls[0]);
+        if (firstHall) {
+          await generateSeatingPlan(exam._id, firstHall._id || exam.assignedHalls[0]);
+        }
+      } catch (e) {
+        console.error("Error auto-generating plan for locations:", e);
+      }
+    }
+  }
+
+  const allPlans = await Models.SeatingPlan.find();
+  const plansForTime = allPlans.filter(p => examIds.includes(String(p.examId)));
+
+  if (plansForTime.length === 0) {
+    return { targetDate, formattedDate: targetDate, session, examsAtTime, plansForTime: [], result: [] };
+  }
+
+  let formattedDate = targetDate;
+  try {
+    const d = new Date(targetDate);
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yyyy = d.getFullYear();
+      formattedDate = `${dd}-${mm}-${yyyy}`;
+    }
+  } catch (err) {}
+
+  // Group plans by hallId / hallName
+  const hallPlans = {};
+  plansForTime.forEach(p => {
+    const hKey = p.hallId || p.hallName;
+    if (!hallPlans[hKey]) {
+      hallPlans[hKey] = [];
+    }
+    hallPlans[hKey].push(p);
+  });
+
+  const result = [];
+
+  for (const [, plans] of Object.entries(hallPlans)) {
+    const hallName = plans[0].hallName;
+    
+    // Merge attendance rosters
+    const attendanceRoster = [];
+    plans.forEach(p => {
+      if (p.attendanceRoster) {
+        attendanceRoster.push(...p.attendanceRoster);
+      }
+    });
+
+    // Group students by department / subjectCode
+    const classGroups = {};
+    attendanceRoster.forEach(s => {
+      const classKey = formatClassCode(s.department, s.subjectCode, s.registerNo);
+      if (!classGroups[classKey]) {
+        classGroups[classKey] = [];
+      }
+      classGroups[classKey].push(s.registerNo);
+    });
+
+    const classes = Object.entries(classGroups).map(([classCode, regNos]) => {
+      return {
+        classCode,
+        regNos: regNos.sort((a,b) => a.localeCompare(b)),
+        summarizedRange: summarizeRegisterNumbers(regNos.sort((a,b) => a.localeCompare(b))),
+        count: regNos.length
+      };
+    });
+
+    classes.sort((a,b) => a.classCode.localeCompare(b.classCode));
+
+    const totalStudents = attendanceRoster.length;
+
+    result.push({
+      hallName,
+      totalStudents,
+      classes
+    });
+  }
+
+  result.sort((a,b) => a.hallName.localeCompare(b.hallName));
+
+  const timeOfExam = (examsAtTime[0] && examsAtTime[0].time) || (session === "FN" ? "10:00 AM - 01:00 PM" : "02:00 PM - 05:00 PM");
+  const sessionName = session === "FN" ? "FORENOON (FN)" : "AFTERNOON (AN)";
+
+  return {
+    targetDate,
+    formattedDate,
+    session,
+    sessionName,
+    timeOfExam,
+    examsAtTime,
+    plansForTime,
+    result
+  };
+}
+
+// Helper to generate professional Exam Location Summary PDF document
+function generateExamLocationsPdf(doc, data) {
+  const pageW = 595.28;
+  const pageH = 841.89;
+  const margin = 35;
+  const printableW = pageW - (2 * margin);
+  const safeBottom = pageH - 45;
+
+  const formattedDate = data.formattedDate || data.targetDate;
+  const sessionName = data.sessionName || (data.session === "FN" ? "FORENOON (FN)" : "AFTERNOON (AN)");
+  const timeText = data.timeOfExam || (data.session === "FN" ? "10:00 AM - 01:00 PM" : "02:00 PM - 05:00 PM");
+
+  // Draw Primary Header on First Page
+  const drawMainHeader = () => {
+    let y = margin;
+    doc.font("Helvetica-Bold").fontSize(13).fillColor("#111827")
+       .text("MADURAI KAMARAJ UNIVERSITY EXAMINATIONS", margin, y, { align: "center", width: printableW });
+    y += 18;
+
+    doc.font("Helvetica-Bold").fontSize(11).fillColor("#1F2937")
+       .text("RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM", margin, y, { align: "center", width: printableW });
+    y += 20;
+
+    doc.lineWidth(1).strokeColor("#374151")
+       .moveTo(margin, y).lineTo(margin + printableW, y).stroke();
+    y += 8;
+
+    doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#111827");
+    doc.text(`DATE OF EXAM: ${formattedDate}`, margin + 5, y, { width: printableW / 2 });
+    doc.text(`TIME / SESSION: ${timeText} / ${sessionName}`, margin + (printableW / 2), y, { width: (printableW / 2) - 5, align: "right" });
+    y += 18;
+
+    const badgeH = 22;
+    doc.rect(margin, y, printableW, badgeH).fillAndStroke("#E5E7EB", "#9CA3AF");
+    doc.font("Helvetica-Bold").fontSize(11).fillColor("#111827")
+       .text("EXAM LOCATION SUMMARY", margin, y + 5, { align: "center", width: printableW });
+    y += badgeH + 14;
+
+    return y;
+  };
+
+  // Draw Compact Header on Subsequent Pages
+  const drawCompactHeader = () => {
+    let y = margin;
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#111827")
+       .text("RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM — EXAM LOCATION SUMMARY", margin, y, { align: "center", width: printableW });
+    y += 14;
+    doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#4B5563")
+       .text(`DATE: ${formattedDate}   |   SESSION: ${sessionName} (${timeText})`, margin, y, { align: "center", width: printableW });
+    y += 14;
+    doc.lineWidth(0.8).strokeColor("#6B7280")
+       .moveTo(margin, y).lineTo(margin + printableW, y).stroke();
+    y += 12;
+    return y;
+  };
+
+  // Table Column configuration: Total = 525.28 pt
+  const colW = [95, 235.28, 95, 100];
+  const colX = [
+    margin,
+    margin + colW[0],
+    margin + colW[0] + colW[1],
+    margin + colW[0] + colW[1] + colW[2]
+  ];
+
+  const headerH = 20;
+  const rowH = 19;
+
+  const drawTableHeader = (y) => {
+    doc.rect(margin, y, printableW, headerH).fillAndStroke("#F3F4F6", "#1F2937");
+    doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#111827");
+
+    doc.text("CLASS / CODE NO", colX[0], y + 5, { width: colW[0], align: "center" });
+    doc.text("REGISTER NO", colX[1], y + 5, { width: colW[1], align: "center" });
+    doc.text("CANDIDATE NO", colX[2], y + 5, { width: colW[2], align: "center" });
+    doc.text("TOTAL CANDIDATE NO", colX[3], y + 5, { width: colW[3], align: "center" });
+
+    for (let c = 1; c < colX.length; c++) {
+      doc.moveTo(colX[c], y).lineTo(colX[c], y + headerH).stroke("#1F2937");
+    }
+
+    return y + headerH;
+  };
+
+  let currentY = drawMainHeader();
+
+  data.result.forEach((hall) => {
+    const classCount = (hall.classes && hall.classes.length) || 0;
+    const hallTitleH = 20;
+    const tableBodyH = classCount * rowH;
+    const totalHallH = hallTitleH + headerH + tableBodyH + 16;
+
+    // Check if entire hall fits on current page
+    if (currentY + totalHallH > safeBottom) {
+      doc.addPage();
+      currentY = drawCompactHeader();
+    }
+
+    // Hall Title Header Banner
+    doc.rect(margin, currentY, printableW, hallTitleH).fillAndStroke("#E0E7FF", "#4F46E5");
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#312E81")
+       .text(`HALL NO. ${hall.hallName}`, margin + 8, currentY + 5, { width: printableW - 16, align: "left" });
+    currentY += hallTitleH;
+
+    // Table Header
+    currentY = drawTableHeader(currentY);
+    const tableStartY = currentY;
+
+    // Class rows
+    hall.classes.forEach((c) => {
+      doc.rect(margin, currentY, printableW, rowH).stroke("#4B5563");
+
+      doc.moveTo(colX[1], currentY).lineTo(colX[1], currentY + rowH).stroke("#4B5563");
+      doc.moveTo(colX[2], currentY).lineTo(colX[2], currentY + rowH).stroke("#4B5563");
+      doc.moveTo(colX[3], currentY).lineTo(colX[3], currentY + rowH).stroke("#4B5563");
+
+      doc.font("Helvetica-Bold").fontSize(9).fillColor("#111827");
+      doc.text(c.classCode || "", colX[0], currentY + 5, { width: colW[0], align: "center" });
+
+      doc.font("Helvetica").fontSize(9).fillColor("#111827");
+      doc.text(c.summarizedRange || "", colX[1], currentY + 5, { width: colW[1], align: "center" });
+
+      doc.font("Helvetica").fontSize(9).fillColor("#111827");
+      doc.text(String(c.count || ""), colX[2], currentY + 5, { width: colW[2], align: "center" });
+
+      currentY += rowH;
+    });
+
+    // Vertically merged TOTAL CANDIDATE NO in Col 3
+    if (classCount > 0) {
+      doc.rect(colX[3] + 0.5, tableStartY + 0.5, colW[3] - 1, tableBodyH - 1).fill("#FFFFFF");
+      doc.rect(colX[3], tableStartY, colW[3], tableBodyH).stroke("#4B5563");
+
+      const textY = tableStartY + (tableBodyH / 2) - 5;
+      doc.font("Helvetica-Bold").fontSize(10).fillColor("#111827")
+         .text(String(hall.totalStudents || ""), colX[3], textY, { width: colW[3], align: "center" });
+    }
+
+    currentY += 16;
+  });
+
+  // Footer: Page Numbers on all pages
+  const pages = doc.bufferedPageRange();
+  for (let i = pages.start; i < pages.start + pages.count; i++) {
+    doc.switchToPage(i);
+    doc.lineWidth(0.5).strokeColor("#9CA3AF")
+       .moveTo(margin, pageH - 32).lineTo(margin + printableW, pageH - 32).stroke();
+
+    doc.font("Helvetica").fontSize(8).fillColor("#6B7280");
+    doc.text("ExamFlow | Exam Location Summary Report", margin, pageH - 24, { width: 250, align: "left" });
+    doc.text(`Page ${i + 1} of ${pages.count}`, margin + printableW - 150, pageH - 24, { width: 150, align: "right" });
+  }
+
+  doc.end();
+}
+
 // GET seating summary (locations) for all halls on a date and session
-app.get('/api/seating/locations-by-date-session', async (req, res) => {
+app.get("/api/seating/locations-by-date-session", async (req, res) => {
   try {
     const { date, session } = req.query;
     if (!date || !session) {
-      return res.status(400).json({ error: 'date and session are required.' });
+      return res.status(400).json({ error: "date and session are required." });
     }
 
-    const allExams = await Models.Exam.find();
-    const targetDate = getDateString(date);
-    const examsAtTime = allExams.filter(e => 
-      getDateString(e.date) === targetDate && e.session === session
-    );
-    const examIds = examsAtTime.map(e => String(e._id));
-
-    // Auto-regenerate fresh seating plans for these exams to guarantee up-to-date solid stream allocation
-    for (const exam of examsAtTime) {
-      if (exam.assignedHalls && exam.assignedHalls.length > 0) {
-        try {
-          const firstHall = await resolveHall(exam.assignedHalls[0]);
-          if (firstHall) {
-            await generateSeatingPlan(exam._id, firstHall._id || exam.assignedHalls[0]);
-          }
-        } catch (e) {
-          console.error('Error auto-generating plan for locations:', e);
-        }
-      }
+    const data = await getLocationsSummaryData(date, session);
+    if (!data.result || data.result.length === 0) {
+      return res.status(404).json({ error: "No seating plans generated for this date and session." });
     }
-
-    const allPlans = await Models.SeatingPlan.find();
-    const plansForTime = allPlans.filter(p => examIds.includes(String(p.examId)));
-
-    // Group plans by hallId / hallName
-    const hallPlans = {};
-    plansForTime.forEach(p => {
-      const hKey = p.hallId || p.hallName;
-      if (!hallPlans[hKey]) {
-        hallPlans[hKey] = [];
-      }
-      hallPlans[hKey].push(p);
-    });
-
-    const result = [];
-
-    for (const [hKey, plans] of Object.entries(hallPlans)) {
-      const hallName = plans[0].hallName;
-      
-      // Merge attendance rosters
-      const attendanceRoster = [];
-      plans.forEach(p => {
-        if (p.attendanceRoster) {
-          attendanceRoster.push(...p.attendanceRoster);
-        }
-      });
-
-      // Group students by department / subjectCode
-      const classGroups = {};
-      attendanceRoster.forEach(s => {
-        const classKey = formatClassCode(s.department, s.subjectCode, s.registerNo);
-        if (!classGroups[classKey]) {
-          classGroups[classKey] = [];
-        }
-        classGroups[classKey].push(s.registerNo);
-      });
-
-      const classes = Object.entries(classGroups).map(([classCode, regNos]) => {
-        return {
-          classCode,
-          regNos: regNos.sort((a,b) => a.localeCompare(b)),
-          summarizedRange: summarizeRegisterNumbers(regNos.sort((a,b) => a.localeCompare(b))),
-          count: regNos.length
-        };
-      });
-
-      classes.sort((a,b) => a.classCode.localeCompare(b.classCode));
-
-      const totalStudents = attendanceRoster.length;
-
-      result.push({
-        hallName,
-        totalStudents,
-        classes
-      });
-    }
-
-    result.sort((a,b) => a.hallName.localeCompare(b.hallName));
 
     res.json({
-      date: targetDate,
-      session,
-      locations: result
+      date: data.targetDate,
+      session: data.session,
+      locations: data.result
     });
 
   } catch (error) {
@@ -3751,94 +3889,60 @@ app.get('/api/seating/locations-by-date-session', async (req, res) => {
   }
 });
 
-// GET export exam locations seating summary as styled Excel file (.xlsx)
-app.get('/api/seating/download-locations', async (req, res) => {
+// GET export exam locations seating summary as styled PDF file (.pdf)
+app.get(["/api/seating/download-locations-pdf", "/api/seating/locations/download-pdf"], async (req, res) => {
   try {
     const { date, session } = req.query;
     if (!date || !session) {
-      return res.status(400).json({ error: 'date and session are required.' });
+      return res.status(400).json({ error: "date and session are required." });
     }
 
-    const allExams = await Models.Exam.find();
-    const targetDate = getDateString(date);
-    const examsAtTime = allExams.filter(e => 
-      getDateString(e.date) === targetDate && e.session === session
-    );
-    const examIds = examsAtTime.map(e => String(e._id));
-
-    // Auto-regenerate fresh seating plans for these exams
-    for (const exam of examsAtTime) {
-      if (exam.assignedHalls && exam.assignedHalls.length > 0) {
-        try {
-          const firstHall = await resolveHall(exam.assignedHalls[0]);
-          if (firstHall) {
-            await generateSeatingPlan(exam._id, firstHall._id || exam.assignedHalls[0]);
-          }
-        } catch (e) {
-          console.error('Error auto-generating plan for locations download:', e);
-        }
-      }
+    const data = await getLocationsSummaryData(date, session);
+    if (!data.result || data.result.length === 0) {
+      return res.status(404).json({ error: "No seating plans generated for this date and session." });
     }
 
-    const allPlans = await Models.SeatingPlan.find();
-    const plansForTime = allPlans.filter(p => examIds.includes(String(p.examId)));
-
-    if (plansForTime.length === 0) {
-      return res.status(404).json({ error: 'No seating plans generated for this date and session.' });
-    }
-
-    // Group plans by hallId / hallName
-    const hallPlans = {};
-    plansForTime.forEach(p => {
-      const hKey = p.hallId || p.hallName;
-      if (!hallPlans[hKey]) {
-        hallPlans[hKey] = [];
-      }
-      hallPlans[hKey].push(p);
+    const PDFDocument = require("pdfkit");
+    const doc = new PDFDocument({
+      size: "A4",
+      margin: 35,
+      bufferPages: true
     });
 
-    const result = [];
+    const buffers = [];
+    doc.on("data", buffers.push.bind(buffers));
+    doc.on("end", () => {
+      const pdfData = Buffer.concat(buffers);
+      res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="Exam_Locations_${data.formattedDate}.pdf"`);
+      res.send(pdfData);
+    });
 
-    for (const [hKey, plans] of Object.entries(hallPlans)) {
-      const hallName = plans[0].hallName;
-      
-      const attendanceRoster = [];
-      plans.forEach(p => {
-        if (p.attendanceRoster) {
-          attendanceRoster.push(...p.attendanceRoster);
-        }
-      });
+    generateExamLocationsPdf(doc, data);
 
-      const classGroups = {};
-      attendanceRoster.forEach(s => {
-        const classKey = formatClassCode(s.department, s.subjectCode, s.registerNo);
-        if (!classGroups[classKey]) {
-          classGroups[classKey] = [];
-        }
-        classGroups[classKey].push(s.registerNo);
-      });
+  } catch (error) {
+    console.error("Error generating locations PDF:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
-      const classes = Object.entries(classGroups).map(([classCode, regNos]) => {
-        return {
-          classCode,
-          regNos: regNos.sort((a,b) => a.localeCompare(b)),
-          count: regNos.length
-        };
-      });
-
-      classes.sort((a,b) => a.classCode.localeCompare(b.classCode));
-      const totalStudents = attendanceRoster.length;
-
-      result.push({
-        hallName,
-        totalStudents,
-        classes
-      });
+// GET export exam locations seating summary as styled Excel file (.xlsx)
+app.get("/api/seating/download-locations", async (req, res) => {
+  try {
+    const { date, session } = req.query;
+    if (!date || !session) {
+      return res.status(400).json({ error: "date and session are required." });
     }
 
-    result.sort((a,b) => a.hallName.localeCompare(b.hallName));
+    const data = await getLocationsSummaryData(date, session);
+    if (!data.result || data.result.length === 0) {
+      return res.status(404).json({ error: "No seating plans generated for this date and session." });
+    }
 
-    // Dynamic import of xlsx-js-style with fallback to xlsx
+    let { targetDate, formattedDate, result } = data;
+
+// Dynamic import of xlsx-js-style with fallback to xlsx
     let XLSXLib;
     try {
       XLSXLib = require('xlsx-js-style');
@@ -3888,16 +3992,18 @@ app.get('/api/seating/download-locations', async (req, res) => {
     };
 
     // Format headers
-    let formattedDate = targetDate;
-    try {
-      const d = new Date(targetDate);
-      if (!isNaN(d.getTime())) {
-        const dd = String(d.getDate()).padStart(2, '0');
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const yyyy = d.getFullYear();
-        formattedDate = `${dd}-${mm}-${yyyy}`;
-      }
-    } catch (err) {}
+    if (!formattedDate) {
+      formattedDate = targetDate;
+      try {
+        const d = new Date(targetDate);
+        if (!isNaN(d.getTime())) {
+          const dd = String(d.getDate()).padStart(2, '0');
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const yyyy = d.getFullYear();
+          formattedDate = `${dd}-${mm}-${yyyy}`;
+        }
+      } catch (err) {}
+    }
 
     const monthYear = getMonthYearString(targetDate);
     const sessionText = session === 'FN' ? 'F.N' : 'A.N';
@@ -3977,6 +4083,7 @@ app.get('/api/seating/download-locations', async (req, res) => {
 
     const buf = XLSXLib.write(wb, { bookType: 'xlsx', type: 'buffer' });
 
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
     res.setHeader('Content-Disposition', `attachment; filename="Exam_Locations_${formattedDate}.xlsx"`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.send(buf);
@@ -4081,6 +4188,7 @@ app.post('/api/seating/generate-by-date-session', async (req, res) => {
     let emptyCountGen = 0;
     if (mergedPlan.seatingGrid) {
       mergedPlan.seatingGrid.forEach(bench => {
+        if (bench.isPlaceholder) return;
         if (bench.seat1) {
           rosterFromGridGen.push({
             registerNo: bench.seat1.registerNo,
@@ -4126,7 +4234,8 @@ app.post('/api/seating/generate-by-date-session', async (req, res) => {
 
     mergedPlan.attendanceRoster = sortAttendanceRoster(rosterFromGridGen, allExamSubCodesGen);
     mergedPlan.totalStudents = mergedPlan.attendanceRoster.length;
-    mergedPlan.emptySeats = emptyCountGen;
+    mergedPlan.emptySeats = Math.max(0, emptyCountGen);
+    mergedPlan.totalBenches = mergedPlan.seatingGrid ? mergedPlan.seatingGrid.filter(b => !b.isPlaceholder).length : (plansForHall.length > 0 ? plansForHall[0].totalBenches : (hall ? hall.benches : 0));
 
     const unseatedMap = new Map();
     plansForHall.forEach(p => {
@@ -4158,121 +4267,6 @@ const hashPassword = (password) => {
   const salt = 'examflow_secret_salt_123';
   return crypto.createHash('sha256').update(password + salt).digest('hex');
 };
-
-// 7. Authentication APIs
-app.post('/api/auth/register', async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: 'Username, email, and password are required.' });
-    }
-
-    // Check if user already exists
-    const existingUserByEmail = await Models.User.findOne({ email });
-    if (existingUserByEmail) {
-      return res.status(400).json({ error: 'User with this email already exists.' });
-    }
-
-    const existingUserByUsername = await Models.User.findOne({ username });
-    if (existingUserByUsername) {
-      return res.status(400).json({ error: 'User with this username already exists.' });
-    }
-
-    const hashedPassword = hashPassword(password);
-    const newUser = await Models.User.create({
-      username,
-      email,
-      password: hashedPassword
-    });
-
-    logActivity('user', 'User Registered', `New administrator profile '${username}' was created.`);
-
-    res.status(201).json({
-      success: true,
-      message: 'Registration successful. You can now login.',
-      user: {
-        username: newUser.username,
-        email: newUser.email
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-// Auto-seed default admin user if no users exist or update existing admin
-async function ensureAdminUser() {
-  try {
-    const existingUsers = await Models.User.find();
-    const adminUser = existingUsers.find(u => u.username && u.username.toLowerCase() === 'admin');
-    const hashedPassword = hashPassword('admin');
-    if (!adminUser) {
-      await Models.User.create({
-        username: 'admin',
-        email: 'admin@examflow.com',
-        password: hashedPassword
-      });
-      console.log('Default Admin user initialized (Username: admin, Password: admin)');
-    }
-  } catch (err) {
-    console.error('Error seeding admin user:', err);
-  }
-}
-
-// Generic parameterized Seating Plan Retrieval (Must be placed AFTER all static /api/seating/... routes)
-app.get('/api/seating/:examId/:hallId', async (req, res) => {
-  try {
-    const plan = await Models.SeatingPlan.findOne({ 
-      examId: req.params.examId, 
-      hallId: req.params.hallId 
-    });
-    if (!plan) {
-      return res.status(404).json({ message: 'Seating plan not generated yet.' });
-    }
-
-    // Recalculate unseated students dynamically based on all plans scheduled for the same time
-    const exam = await Models.Exam.findById(req.params.examId);
-    if (exam) {
-      const allExams = await Models.Exam.find();
-      const targetDate = exam.date.split('T')[0];
-      const examsAtSameTime = allExams.filter(e => 
-        e.date.split('T')[0] === targetDate && e.session === exam.session
-      );
-      const examIds = examsAtSameTime.map(e => e._id);
-      
-      const allPlans = await Models.SeatingPlan.find();
-      const plansAtSameTime = allPlans.filter(p => examIds.includes(p.examId));
-      
-      const seatedStudentRegNos = new Set();
-      plansAtSameTime.forEach(p => {
-        p.attendanceRoster.forEach(student => {
-          seatedStudentRegNos.add(student.registerNo);
-        });
-      });
-      
-      const allStudents = await Models.Student.find();
-      const examSubCodes = (exam.subjectCodes || []).map(c => c.toUpperCase());
-      const examDepts = (exam.departments || []).map(d => d.toUpperCase());
-      
-      const unseated = allStudents
-        .filter(s => {
-          if (examSubCodes.length > 0) {
-            if (!hasMatchingSubCode(s, examSubCodes)) return false;
-          } else {
-            if (!examDepts.includes(s.department.toUpperCase())) return false;
-          }
-          if (seatedStudentRegNos.has(s.registerNo)) return false;
-          return true;
-        })
-        .sort((a, b) => a.registerNo.localeCompare(b.registerNo));
-        
-      plan.unseatedStudents = unseated;
-    }
-
-    res.json(plan);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // Auto-seed default admin user if no users exist or update existing admin
 async function ensureAdminUser() {
@@ -4329,13 +4323,61 @@ const server = app.listen(PORT, async () => {
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.error(`\n==================================================`);
-    console.error(`ERROR: Port ${PORT} is already in use by another process.`);
-    console.error(`Please stop the existing process on port ${PORT} before running npm start.`);
-    console.error(`==================================================\n`);
-    process.exit(1);
+    // Check if the running server is already an active ExamFlow backend instance
+    const http = require('http');
+    const checkReq = http.get(`http://127.0.0.1:${PORT}/api/status`, (checkRes) => {
+      let data = '';
+      checkRes.on('data', chunk => { data += chunk; });
+      checkRes.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed && typeof parsed.connected !== 'undefined') {
+            console.log(`\n==================================================`);
+            console.log(`ExamFlow Backend is ALREADY running and healthy on port ${PORT} (Mode: ${parsed.mode || 'Active'}).`);
+            console.log(`Exactly one ExamFlow backend server is active and serving requests.`);
+            console.log(`No action required. (To restart, stop the existing process first).`);
+            console.log(`==================================================\n`);
+            process.exit(0);
+          }
+        } catch (e) {}
+        console.error(`\n==================================================`);
+        console.error(`ERROR: Port ${PORT} is in use by another application or process.`);
+        console.error(`Please stop the existing process on port ${PORT} before running npm start.`);
+        console.error(`==================================================\n`);
+        process.exit(1);
+      });
+    });
+    checkReq.on('error', () => {
+      console.error(`\n==================================================`);
+      console.error(`ERROR: Port ${PORT} is already in use by another process.`);
+      console.error(`Please stop the existing process on port ${PORT} before running npm start.`);
+      console.error(`==================================================\n`);
+      process.exit(1);
+    });
+    checkReq.setTimeout(2000, () => {
+      checkReq.destroy();
+      console.error(`\n==================================================`);
+      console.error(`ERROR: Port ${PORT} is already in use by another process.`);
+      console.error(`Please stop the existing process on port ${PORT} before running npm start.`);
+      console.error(`==================================================\n`);
+      process.exit(1);
+    });
   } else {
     console.error('Server startup error:', err);
     process.exit(1);
   }
 });
+
+const gracefulShutdown = () => {
+  console.log('\n[ExamFlow Backend] Shutting down gracefully...');
+  server.close(() => {
+    console.log('[ExamFlow Backend] Server closed successfully.');
+    process.exit(0);
+  });
+  setTimeout(() => {
+    process.exit(0);
+  }, 2000);
+};
+
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);

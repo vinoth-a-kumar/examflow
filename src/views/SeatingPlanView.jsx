@@ -1059,7 +1059,15 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
           <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <div className="stat-card">
               <div className="stat-card-info">
-                <span className="stat-card-number">{seatingPlan.totalBenches}</span>
+                <span className="stat-card-number">
+                  {(() => {
+                    if (seatingPlan.seatingGrid && Array.isArray(seatingPlan.seatingGrid)) {
+                      const realBenches = seatingPlan.seatingGrid.filter(b => !b.isPlaceholder).length;
+                      if (realBenches > 0) return realBenches;
+                    }
+                    return seatingPlan.totalBenches || 0;
+                  })()}
+                </span>
                 <span className="stat-card-label">Total Benches</span>
               </div>
             </div>
@@ -1074,9 +1082,11 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                     if (seatingPlan.seatingGrid && Array.isArray(seatingPlan.seatingGrid)) {
                       let count = 0;
                       seatingPlan.seatingGrid.forEach(b => {
-                        if (b.seat1) count++;
-                        if (b.seat2) count++;
-                        if (b.seat3) count++;
+                        if (!b.isPlaceholder) {
+                          if (b.seat1) count++;
+                          if (b.seat2) count++;
+                          if (b.seat3) count++;
+                        }
                       });
                       if (count > 0) return count;
                     }
@@ -1092,15 +1102,25 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                 <span className="stat-card-number">
                   {(() => {
                     if (seatingPlan.seatingGrid && Array.isArray(seatingPlan.seatingGrid)) {
-                      let empty = 0;
-                      seatingPlan.seatingGrid.forEach(b => {
-                        if (!b.seat1) empty++;
-                        if (!b.seat2) empty++;
-                        if (b.seat3 !== undefined && !b.seat3) empty++;
-                      });
-                      return empty;
+                      const realBenches = seatingPlan.seatingGrid.filter(b => !b.isPlaceholder);
+                      if (realBenches.length > 0) {
+                        let empty = 0;
+                        realBenches.forEach(b => {
+                          if (!b.seat1) empty++;
+                          if (!b.seat2) empty++;
+                          if (b.seat3 !== undefined && !b.seat3) empty++;
+                        });
+                        return Math.max(0, empty);
+                      }
                     }
-                    return seatingPlan.emptySeats !== undefined ? seatingPlan.emptySeats : 0;
+                    const totalBenches = seatingPlan.totalBenches || 0;
+                    const seatsPerBench = seatingPlan.seatsPerBench || 2;
+                    const cap = totalBenches * seatsPerBench;
+                    const students = (seatingPlan.attendanceRoster && seatingPlan.attendanceRoster.length) || (seatingPlan.totalStudents || 0);
+                    if (seatingPlan.emptySeats !== undefined && seatingPlan.emptySeats !== null) {
+                      return Math.max(0, seatingPlan.emptySeats);
+                    }
+                    return Math.max(0, cap - students);
                   })()}
                 </span>
                 <span className="stat-card-label">Empty Seats</span>

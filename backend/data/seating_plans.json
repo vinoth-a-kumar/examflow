@@ -1,55 +1,41 @@
 [
   {
-    "_id": "yj8gvxdmsxcgt1n",
-    "examId": "iltvbv4msxbrkw7",
+    "_id": "6jjd2n6muk1ypja",
+    "examId": "t1p7nhbmuk1v3ji",
     "examName": "SCAPC6P, SCHPC6P, SCMPC6P",
-    "hallId": "oh5zcdsmryxvijl",
-    "hallName": "C4",
+    "hallId": "bbxvjihmryxvifa",
+    "hallName": "A7",
     "seatingGrid": [
       {
         "benchCode": "A1",
         "row": "A",
         "col": 1,
         "seat1": {
-          "_id": "d8juh4bmshix4s0",
-          "registerNo": "PHY26044",
-          "name": "KAVYA D",
-          "department": "PHY",
+          "_id": "zn4yobamshix4ry",
+          "registerNo": "COM26033",
+          "name": "AARTHI R",
+          "department": "COM",
           "batch": "2024-25",
           "csvData": {
-            "SNo": "294",
-            "RegNo": "PHY26044",
-            "Student Name": "KAVYA D",
+            "SNo": "183",
+            "RegNo": "COM26033",
+            "Student Name": "AARTHI R",
             "No of Sub": "9",
-            "Subjects Appearing": "UTMPL21 UNM1107 SPHPC61 SPHPC62 SPHPC6P SPHPS6P SPHPT61 SPHPT62 UEAPG6G"
+            "Subjects Appearing": "UTMPL21 UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
           }
         },
         "seat2": {
-          "_id": "k81dv33mshix4s0",
-          "registerNo": "PHY26045",
-          "name": "NANDHINI J",
-          "department": "PHY",
+          "_id": "gpuzgovmshix4ry",
+          "registerNo": "COM26034",
+          "name": "SARANYA P",
+          "department": "COM",
           "batch": "2024-25",
           "csvData": {
-            "SNo": "295",
-            "RegNo": "PHY26045",
-            "Student Name": "NANDHINI J",
-            "No of Sub": "10",
-            "Subjects Appearing": "SPHPC51 SPHPC41 UNM1107 SPHPC61 SPHPC62 SPHPC6P SPHPS6P SPHPT61 SPHPT62 UEAPG6G"
-          }
-        },
-        "seat3": {
-          "_id": "sjn8o3gmshix4s0",
-          "registerNo": "PHY26046",
-          "name": "DIVYA H",
-          "department": "PHY",
-          "batch": "2024-25",
-          "csvData": {
-            "SNo": "296",
-            "RegNo": "PHY26046",
-            "Student Name": "DIVYA H",
+            "SNo": "184",
+            "RegNo": "COM26034",
+            "Student Name": "SARANYA P",
             "No of Sub": "8",
-            "Subjects Appearing": "UNM1107 SPHPC61 SPHPC62 SPHPC6P SPHPS6P SPHPT61 SPHPT62 UEAPG6G"
+            "Subjects Appearing": "UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
           }
         }
       },
@@ -58,45 +44,31 @@
         "row": "B",
         "col": 1,
         "seat1": {
-          "_id": "swvwb5imshix4s0",
-          "registerNo": "PHY26047",
-          "name": "RANJITH G",
-          "department": "PHY",
+          "_id": "9wg9hwlmshix4ry",
+          "registerNo": "COM26035",
+          "name": "SWETHA J",
+          "department": "COM",
           "batch": "2024-25",
           "csvData": {
-            "SNo": "297",
-            "RegNo": "PHY26047",
-            "Student Name": "RANJITH G",
-            "No of Sub": "8",
-            "Subjects Appearing": "UNM1107 SPHPC61 SPHPC62 SPHPC6P SPHPS6P SPHPT61 SPHPT62 UEAPG6G"
+            "SNo": "185",
+            "RegNo": "COM26035",
+            "Student Name": "SWETHA J",
+            "No of Sub": "10",
+            "Subjects Appearing": "UENPE21 SCMPC41 UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
           }
         },
         "seat2": {
-          "_id": "e7mzjphmshix4s0",
-          "registerNo": "PHY26048",
-          "name": "GOKUL X",
-          "department": "PHY",
+          "_id": "v6ijzyfmshix4ry",
+          "registerNo": "COM26036",
+          "name": "NITHYA Z",
+          "department": "COM",
           "batch": "2024-25",
           "csvData": {
-            "SNo": "298",
-            "RegNo": "PHY26048",
-            "Student Name": "GOKUL X",
-            "No of Sub": "8",
-            "Subjects Appearing": "UNM1107 SPHPC61 SPHPC62 SPHPC6P SPHPS6P SPHPT61 SPHPT62 UEAPG6G"
-          }
-        },
-        "seat3": {
-          "_id": "jtl79igmshix4s0",
-          "registerNo": "PHY26049",
-          "name": "KARTHIK M",
-          "department": "PHY",
-          "batch": "2024-25",
-          "csvData": {
-            "SNo": "299",
-            "RegNo": "PHY26049",
-            "Student Name": "KARTHIK M",
+            "SNo": "186",
+            "RegNo": "COM26036",
+            "Student Name": "NITHYA Z",
             "No of Sub": "9",
-            "Subjects Appearing": "UENPE21 UNM1107 SPHPC61 SPHPC62 SPHPC6P SPHPS6P SPHPT61 SPHPT62 UEAPG6G"
+            "Subjects Appearing": "SCMPC51 UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
           }
         }
       },
@@ -105,165 +77,425 @@
         "row": "C",
         "col": 1,
         "seat1": {
-          "_id": "cfvkt85mshix4s0",
-          "registerNo": "PHY26050",
-          "name": "ANITHA I",
-          "department": "PHY",
+          "_id": "yjuqum0mshix4ry",
+          "registerNo": "COM26037",
+          "name": "AARTHI V",
+          "department": "COM",
           "batch": "2024-25",
           "csvData": {
-            "SNo": "300",
-            "RegNo": "PHY26050",
-            "Student Name": "ANITHA I",
-            "No of Sub": "9",
-            "Subjects Appearing": "SPHPC41 UNM1107 SPHPC61 SPHPC62 SPHPC6P SPHPS6P SPHPT61 SPHPT62 UEAPG6G"
+            "SNo": "187",
+            "RegNo": "COM26037",
+            "Student Name": "AARTHI V",
+            "No of Sub": "8",
+            "Subjects Appearing": "UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
           }
         },
-        "seat2": null,
-        "seat3": null
+        "seat2": {
+          "_id": "69gok45mshix4ry",
+          "registerNo": "COM26038",
+          "name": "KAVYA M",
+          "department": "COM",
+          "batch": "2024-25",
+          "csvData": {
+            "SNo": "188",
+            "RegNo": "COM26038",
+            "Student Name": "KAVYA M",
+            "No of Sub": "8",
+            "Subjects Appearing": "UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
+          }
+        }
       },
       {
         "benchCode": "D1",
         "row": "D",
         "col": 1,
-        "seat1": null,
-        "seat2": null,
-        "seat3": null
+        "seat1": {
+          "_id": "x6w7yrjmshix4ry",
+          "registerNo": "COM26039",
+          "name": "BHARATH Q",
+          "department": "COM",
+          "batch": "2024-25",
+          "csvData": {
+            "SNo": "189",
+            "RegNo": "COM26039",
+            "Student Name": "BHARATH Q",
+            "No of Sub": "9",
+            "Subjects Appearing": "SCMPS11 UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
+          }
+        },
+        "seat2": {
+          "_id": "blhbx8mmshix4ry",
+          "registerNo": "COM26040",
+          "name": "AKSHAYA J",
+          "department": "COM",
+          "batch": "2024-25",
+          "csvData": {
+            "SNo": "190",
+            "RegNo": "COM26040",
+            "Student Name": "AKSHAYA J",
+            "No of Sub": "9",
+            "Subjects Appearing": "SCMPC41 UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
+          }
+        }
       },
       {
         "benchCode": "E1",
         "row": "E",
         "col": 1,
-        "seat1": null,
-        "seat2": null,
-        "seat3": null
+        "seat1": {
+          "_id": "npb8vq7mshix4ry",
+          "registerNo": "COM26041",
+          "name": "RAGAVI B",
+          "department": "COM",
+          "batch": "2024-25",
+          "csvData": {
+            "SNo": "191",
+            "RegNo": "COM26041",
+            "Student Name": "RAGAVI B",
+            "No of Sub": "8",
+            "Subjects Appearing": "UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
+          }
+        },
+        "seat2": {
+          "_id": "fuideiemshix4ry",
+          "registerNo": "COM26042",
+          "name": "MADHUMITHA Y",
+          "department": "COM",
+          "batch": "2024-25",
+          "csvData": {
+            "SNo": "192",
+            "RegNo": "COM26042",
+            "Student Name": "MADHUMITHA Y",
+            "No of Sub": "9",
+            "Subjects Appearing": "UENPE21 UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
+          }
+        }
       },
       {
         "benchCode": "F1",
         "row": "F",
         "col": 1,
-        "seat1": null,
-        "seat2": null,
-        "seat3": null
+        "seat1": {
+          "_id": "w8awuo6mshix4ry",
+          "registerNo": "COM26043",
+          "name": "MADHUMITHA M",
+          "department": "COM",
+          "batch": "2024-25",
+          "csvData": {
+            "SNo": "193",
+            "RegNo": "COM26043",
+            "Student Name": "MADHUMITHA M",
+            "No of Sub": "8",
+            "Subjects Appearing": "UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
+          }
+        },
+        "seat2": {
+          "_id": "j84xw7ymshix4ry",
+          "registerNo": "COM26044",
+          "name": "ARAVIND R",
+          "department": "COM",
+          "batch": "2024-25",
+          "csvData": {
+            "SNo": "194",
+            "RegNo": "COM26044",
+            "Student Name": "ARAVIND R",
+            "No of Sub": "9",
+            "Subjects Appearing": "UTMPL21 UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
+          }
+        }
       },
       {
         "benchCode": "G1",
         "row": "G",
         "col": 1,
-        "seat1": null,
-        "seat2": null,
-        "seat3": null
+        "seat1": {
+          "_id": "tv01q10mshix4ry",
+          "registerNo": "COM26045",
+          "name": "SANGEETHA Q",
+          "department": "COM",
+          "batch": "2024-25",
+          "csvData": {
+            "SNo": "195",
+            "RegNo": "COM26045",
+            "Student Name": "SANGEETHA Q",
+            "No of Sub": "10",
+            "Subjects Appearing": "SCMPC51 SCMPC41 UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
+          }
+        },
+        "seat2": {
+          "_id": "cm6fw6rmshix4ry",
+          "registerNo": "COM26046",
+          "name": "ANUSHA J",
+          "department": "COM",
+          "batch": "2024-25",
+          "csvData": {
+            "SNo": "196",
+            "RegNo": "COM26046",
+            "Student Name": "ANUSHA J",
+            "No of Sub": "8",
+            "Subjects Appearing": "UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
+          }
+        }
       },
       {
         "benchCode": "H1",
         "row": "H",
         "col": 1,
-        "seat1": null,
-        "seat2": null,
-        "seat3": null
+        "seat1": {
+          "_id": "ug1v76lmshix4ry",
+          "registerNo": "COM26047",
+          "name": "PAVITHRA A",
+          "department": "COM",
+          "batch": "2024-25",
+          "csvData": {
+            "SNo": "197",
+            "RegNo": "COM26047",
+            "Student Name": "PAVITHRA A",
+            "No of Sub": "8",
+            "Subjects Appearing": "UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
+          }
+        },
+        "seat2": {
+          "_id": "p2v551dmshix4ry",
+          "registerNo": "COM26048",
+          "name": "ABINAYA R",
+          "department": "COM",
+          "batch": "2024-25",
+          "csvData": {
+            "SNo": "198",
+            "RegNo": "COM26048",
+            "Student Name": "ABINAYA R",
+            "No of Sub": "8",
+            "Subjects Appearing": "UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
+          }
+        }
       },
       {
         "benchCode": "I1",
         "row": "I",
         "col": 1,
-        "seat1": null,
-        "seat2": null,
-        "seat3": null
+        "seat1": {
+          "_id": "a2cyra7mshix4ry",
+          "registerNo": "COM26049",
+          "name": "DINESH S",
+          "department": "COM",
+          "batch": "2024-25",
+          "csvData": {
+            "SNo": "199",
+            "RegNo": "COM26049",
+            "Student Name": "DINESH S",
+            "No of Sub": "9",
+            "Subjects Appearing": "UENPE21 UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
+          }
+        },
+        "seat2": {
+          "_id": "6361nqjmshix4ry",
+          "registerNo": "COM26050",
+          "name": "ABINAYA V",
+          "department": "COM",
+          "batch": "2024-25",
+          "csvData": {
+            "SNo": "200",
+            "RegNo": "COM26050",
+            "Student Name": "ABINAYA V",
+            "No of Sub": "9",
+            "Subjects Appearing": "SCMPC41 UNM1107 SCMPC61 SCMPC62 SCMPC6P SCMPS6P SCMPT61 SCMPT62 UEAPG6G"
+          }
+        }
       },
       {
         "benchCode": "J1",
         "row": "J",
         "col": 1,
         "seat1": null,
-        "seat2": null,
-        "seat3": null
+        "seat2": null
       },
       {
         "benchCode": "K1",
         "row": "K",
         "col": 1,
         "seat1": null,
-        "seat2": null,
-        "seat3": null
+        "seat2": null
       },
       {
         "benchCode": "L1",
         "row": "L",
         "col": 1,
         "seat1": null,
-        "seat2": null,
-        "seat3": null
+        "seat2": null
       },
       {
         "benchCode": "M1",
         "row": "M",
         "col": 1,
         "seat1": null,
-        "seat2": null,
-        "seat3": null
+        "seat2": null
+      },
+      {
+        "benchCode": "N1",
+        "row": "N",
+        "col": 1,
+        "seat1": null,
+        "seat2": null
+      },
+      {
+        "benchCode": "O1",
+        "row": "O",
+        "col": 1,
+        "seat1": null,
+        "seat2": null
       }
     ],
     "attendanceRoster": [
       {
-        "registerNo": "PHY26044",
-        "name": "KAVYA D",
-        "department": "PHY",
-        "subjectCode": "SPHPC6P",
+        "registerNo": "COM26033",
+        "name": "AARTHI R",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
         "bench": "A1",
         "seat": "Left"
       },
       {
-        "registerNo": "PHY26045",
-        "name": "NANDHINI J",
-        "department": "PHY",
-        "subjectCode": "SPHPC6P",
-        "bench": "A1",
-        "seat": "Middle"
-      },
-      {
-        "registerNo": "PHY26046",
-        "name": "DIVYA H",
-        "department": "PHY",
-        "subjectCode": "SPHPC6P",
+        "registerNo": "COM26034",
+        "name": "SARANYA P",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
         "bench": "A1",
         "seat": "Right"
       },
       {
-        "registerNo": "PHY26047",
-        "name": "RANJITH G",
-        "department": "PHY",
-        "subjectCode": "SPHPC6P",
+        "registerNo": "COM26035",
+        "name": "SWETHA J",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
         "bench": "B1",
         "seat": "Left"
       },
       {
-        "registerNo": "PHY26048",
-        "name": "GOKUL X",
-        "department": "PHY",
-        "subjectCode": "SPHPC6P",
-        "bench": "B1",
-        "seat": "Middle"
-      },
-      {
-        "registerNo": "PHY26049",
-        "name": "KARTHIK M",
-        "department": "PHY",
-        "subjectCode": "SPHPC6P",
+        "registerNo": "COM26036",
+        "name": "NITHYA Z",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
         "bench": "B1",
         "seat": "Right"
       },
       {
-        "registerNo": "PHY26050",
-        "name": "ANITHA I",
-        "department": "PHY",
-        "subjectCode": "SPHPC6P",
+        "registerNo": "COM26037",
+        "name": "AARTHI V",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
         "bench": "C1",
         "seat": "Left"
+      },
+      {
+        "registerNo": "COM26038",
+        "name": "KAVYA M",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
+        "bench": "C1",
+        "seat": "Right"
+      },
+      {
+        "registerNo": "COM26039",
+        "name": "BHARATH Q",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
+        "bench": "D1",
+        "seat": "Left"
+      },
+      {
+        "registerNo": "COM26040",
+        "name": "AKSHAYA J",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
+        "bench": "D1",
+        "seat": "Right"
+      },
+      {
+        "registerNo": "COM26041",
+        "name": "RAGAVI B",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
+        "bench": "E1",
+        "seat": "Left"
+      },
+      {
+        "registerNo": "COM26042",
+        "name": "MADHUMITHA Y",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
+        "bench": "E1",
+        "seat": "Right"
+      },
+      {
+        "registerNo": "COM26043",
+        "name": "MADHUMITHA M",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
+        "bench": "F1",
+        "seat": "Left"
+      },
+      {
+        "registerNo": "COM26044",
+        "name": "ARAVIND R",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
+        "bench": "F1",
+        "seat": "Right"
+      },
+      {
+        "registerNo": "COM26045",
+        "name": "SANGEETHA Q",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
+        "bench": "G1",
+        "seat": "Left"
+      },
+      {
+        "registerNo": "COM26046",
+        "name": "ANUSHA J",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
+        "bench": "G1",
+        "seat": "Right"
+      },
+      {
+        "registerNo": "COM26047",
+        "name": "PAVITHRA A",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
+        "bench": "H1",
+        "seat": "Left"
+      },
+      {
+        "registerNo": "COM26048",
+        "name": "ABINAYA R",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
+        "bench": "H1",
+        "seat": "Right"
+      },
+      {
+        "registerNo": "COM26049",
+        "name": "DINESH S",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
+        "bench": "I1",
+        "seat": "Left"
+      },
+      {
+        "registerNo": "COM26050",
+        "name": "ABINAYA V",
+        "department": "COM",
+        "subjectCode": "SCMPC6P",
+        "bench": "I1",
+        "seat": "Right"
       }
     ],
     "unseatedStudents": [],
-    "totalBenches": 13,
-    "totalStudents": 7,
-    "emptySeats": 32,
-    "generatedAt": "2026-08-17T14:43:58.859Z"
+    "totalBenches": 15,
+    "totalStudents": 18,
+    "emptySeats": 12,
+    "generatedAt": "2026-09-27T16:48:22.726Z"
   }
 ]

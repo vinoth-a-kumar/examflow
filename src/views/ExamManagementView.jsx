@@ -17,8 +17,6 @@ import {
 
 function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, onUpdateExam, refreshData }) {
   const [modalOpen, setModalOpen] = useState(false);
-  // eslint-disable-next-line no-unused-vars
-  const [examName, setExamName] = useState('');
   const [examDate, setExamDate] = useState('');
   const [session, setSession] = useState('FN');
   const [time, setTime] = useState('10:00 AM - 01:00 PM');
@@ -101,17 +99,139 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     }
   };
 
-  const handleDownloadLocationsExcel = () => {
+  const handleDownloadLocationsPdf = async () => {
     if (!locDate || !locSession) return;
-    const url = `http://localhost:5000/api/seating/download-locations?date=${locDate}&session=${locSession}`;
-    window.open(url, '_blank');
+    try {
+      const response = await fetch(`http://localhost:5000/api/seating/download-locations-pdf?date=${locDate}&session=${locSession}`);
+      
+      const contentType = response.headers.get('content-type') || '';
+      
+      if (!response.ok || contentType.includes('application/json')) {
+        let errorMsg = 'Failed to download PDF file.';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errData.message || errorMsg;
+        } catch (_) {
+          const text = await response.text();
+          if (text) errorMsg = text;
+        }
+        setLocError(errorMsg);
+        alert(errorMsg);
+        return;
+      }
+
+      const rawBlob = await response.blob();
+      const pdfBlob = new Blob([rawBlob], { type: 'application/pdf' });
+
+      let filename = '';
+      const disposition = response.headers.get('content-disposition');
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (match && match[1]) {
+          filename = match[1].replace(/['"]/g, '').trim();
+        }
+      }
+
+      if (!filename || !filename.toLowerCase().endsWith('.pdf')) {
+        let formattedDate = locDate;
+        try {
+          const d = new Date(locDate);
+          if (!isNaN(d.getTime())) {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            formattedDate = `${dd}-${mm}-${yyyy}`;
+          }
+        } catch (_) {}
+        filename = `Exam_Locations_${formattedDate}.pdf`;
+      }
+
+      const objectUrl = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      console.error('Error downloading locations PDF:', err);
+      setLocError('Failed to download PDF file: ' + err.message);
+      alert('Failed to download PDF file: ' + err.message);
+    }
+  };
+  const handleDownloadLocationsExcel = async () => {
+    if (!locDate || !locSession) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/seating/download-locations?date=${locDate}&session=${locSession}`);
+      
+      const contentType = response.headers.get('content-type') || '';
+      
+      // If error or JSON response, do not save as .xlsx
+      if (!response.ok || contentType.includes('application/json')) {
+        let errorMsg = 'Failed to download Excel file.';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errData.message || errorMsg;
+        } catch (_) {
+          const text = await response.text();
+          if (text) errorMsg = text;
+        }
+        setLocError(errorMsg);
+        alert(errorMsg);
+        return;
+      }
+
+      // Read response as Blob with explicit XLSX MIME type
+      const rawBlob = await response.blob();
+      const excelBlob = new Blob([rawBlob], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+
+      // Extract filename from Content-Disposition header if present
+      let filename = '';
+      const disposition = response.headers.get('content-disposition');
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (match && match[1]) {
+          filename = match[1].replace(/['"]/g, '').trim();
+        }
+      }
+
+      // Fallback filename if header was missing or improperly formatted
+      if (!filename || !filename.toLowerCase().endsWith('.xlsx')) {
+        let formattedDate = locDate;
+        try {
+          const d = new Date(locDate);
+          if (!isNaN(d.getTime())) {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            formattedDate = `${dd}-${mm}-${yyyy}`;
+          }
+        } catch (_) {}
+        filename = `Exam_Locations_${formattedDate}.xlsx`;
+      }
+
+      // Create Object URL and trigger download via temporary link
+      const objectUrl = window.URL.createObjectURL(excelBlob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      console.error('Error downloading locations Excel:', err);
+      setLocError('Failed to download Excel file: ' + err.message);
+      alert('Failed to download Excel file: ' + err.message);
+    }
   };
 
   // Edit states
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingExam, setEditingExam] = useState(null);
-  // eslint-disable-next-line no-unused-vars
-  const [editExamName, setEditExamName] = useState('');
   const [editExamDate, setEditExamDate] = useState('');
   const [editSession, setEditSession] = useState('FN');
   const [editTime, setEditTime] = useState('');
@@ -476,7 +596,6 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     });
 
     // Reset and close
-    setExamName('');
     setExamDate('');
     setSession('FN');
     setTime('10:00 AM - 01:00 PM');
@@ -536,7 +655,6 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
 
     // Reset and close
     setEditingExam(null);
-    setEditExamName('');
     setEditExamDate('');
     setEditSession('FN');
     setEditTime('');
@@ -695,7 +813,6 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                           className="btn-secondary" 
                           onClick={() => {
                             setEditingExam(e);
-                            setEditExamName(e.name);
                             setEditExamDate(e.date.split('T')[0]);
                             setEditSession(e.session);
                             setEditTime(e.time || (e.session === 'FN' ? '10:00 AM - 01:00 PM' : '02:00 PM - 05:00 PM'));
@@ -1601,14 +1718,24 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
           </button>
 
           {locations && locations.length > 0 && (
-            <button 
-              className="btn-secondary" 
-              onClick={handleDownloadLocationsExcel}
-              style={{ height: '42px', display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              <Download size={16} />
-              <span>Download Location Sheet (.xlsx)</span>
-            </button>
+            <>
+              <button 
+                className="btn-secondary" 
+                onClick={handleDownloadLocationsPdf}
+                style={{ height: '42px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Download size={16} />
+                <span>Download PDF (.pdf)</span>
+              </button>
+              <button 
+                className="btn-secondary" 
+                onClick={handleDownloadLocationsExcel}
+                style={{ height: '42px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Download size={16} />
+                <span>Download Location Sheet (.xlsx)</span>
+              </button>
+            </>
           )}
         </div>
 
