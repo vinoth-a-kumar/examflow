@@ -2003,15 +2003,27 @@ async function generateSeatingPlan(examId, hallId) {
       }
     }
 
-    // Construct list of benches in column-by-column order
+    // Construct list of benches in W-pattern (serpentine column order: Col 1 top-to-bottom, Col 2 bottom-to-top, Col 3 top-to-bottom, etc.)
     const benchesList = [];
     for (let c = 1; c <= colsCount; c++) {
       const rowsForThisCol = colRowsList[c - 1] !== undefined ? colRowsList[c - 1] : rowsCount;
-      for (let r = 0; r < rowsForThisCol; r++) {
-        const rowLetter = getRowLetter(r);
-        const benchCode = `${rowLetter}${c}`;
-        if (gridMap[benchCode]) {
-          benchesList.push(gridMap[benchCode]);
+      if (c % 2 === 1) {
+        // Odd columns (1, 3, 5...): Top to Bottom (A -> B -> C -> ...)
+        for (let r = 0; r < rowsForThisCol; r++) {
+          const rowLetter = getRowLetter(r);
+          const benchCode = `${rowLetter}${c}`;
+          if (gridMap[benchCode]) {
+            benchesList.push(gridMap[benchCode]);
+          }
+        }
+      } else {
+        // Even columns (2, 4, 6...): Bottom to Top (... -> C -> B -> A)
+        for (let r = rowsForThisCol - 1; r >= 0; r--) {
+          const rowLetter = getRowLetter(r);
+          const benchCode = `${rowLetter}${c}`;
+          if (gridMap[benchCode]) {
+            benchesList.push(gridMap[benchCode]);
+          }
         }
       }
     }

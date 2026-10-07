@@ -183,20 +183,6 @@
     }
   },
   {
-    "_id": "amhnxuimryxvigl",
-    "name": "B6",
-    "rows": 15,
-    "columns": 1,
-    "benches": 15,
-    "capacity": 30,
-    "csvData": {
-      "H NO": "B6",
-      "SET OF BENCH": "15",
-      "2*SEATS": "30",
-      "3*SEATS": "45"
-    }
-  },
-  {
     "_id": "bak59pfmryxvigq",
     "name": "15",
     "rows": 17,
@@ -233,20 +219,6 @@
     "capacity": 34,
     "csvData": {
       "H NO": "17",
-      "SET OF BENCH": "17",
-      "2*SEATS": "34",
-      "3*SEATS": "51"
-    }
-  },
-  {
-    "_id": "bhxm60qmryxvihf",
-    "name": "18",
-    "rows": 17,
-    "columns": 1,
-    "benches": 17,
-    "capacity": 34,
-    "csvData": {
-      "H NO": "18",
       "SET OF BENCH": "17",
       "2*SEATS": "34",
       "3*SEATS": "51"

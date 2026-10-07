@@ -21,5 +21,23 @@
     ],
     "seatsPerBench": 2,
     "status": "Scheduled"
+  },
+  {
+    "_id": "gfb6qd7muwd6opt",
+    "name": "SCSPS11, SCSPC41",
+    "departments": [],
+    "subjectCodes": [
+      "SCSPS11",
+      "SCSPC41"
+    ],
+    "date": "2026-10-07",
+    "session": "FN",
+    "time": "10:00 AM - 01:00 PM",
+    "studentsCount": 13,
+    "assignedHalls": [
+      "A1"
+    ],
+    "seatsPerBench": 2,
+    "status": "Scheduled"
   }
 ]

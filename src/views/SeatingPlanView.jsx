@@ -1242,6 +1242,20 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                       <Layers size={13} color="var(--color-primary)" />
                       <span>{selectedHall?.rows || Math.ceil((seatingPlan.seatingGrid?.length || 24) / (colsCount || 1))} Rows × {colsCount} Columns ({seatingPlan.totalBenches || ((selectedHall?.rows || 6) * colsCount)} Benches)</span>
                     </div>
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      background: 'rgba(79, 70, 229, 0.08)',
+                      border: '1px solid rgba(79, 70, 229, 0.25)',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: 'var(--color-primary)'
+                    }}>
+                      <span>W-Order Serpentine</span>
+                    </div>
                   </div>
                   <div className="no-print" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button
