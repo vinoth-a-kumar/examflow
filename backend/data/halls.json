@@ -10,8 +10,7 @@
       "H NO": "A1",
       "SET OF BENCH": 15,
       "2*SEATS": 30,
-      "3*SEATS": 45,
-      "columnRows": 3
+      "3*SEATS": 45
     },
     "columnRows": [
       3,
@@ -60,8 +59,7 @@
       "H NO": "A6",
       "SET OF BENCH": 17,
       "2*SEATS": 34,
-      "3*SEATS": 51,
-      "columnRows": 5
+      "3*SEATS": 51
     },
     "columnRows": [
       4,
@@ -403,8 +401,7 @@
       "H NO": "C4",
       "SET OF BENCH": 13,
       "2*SEATS": 39,
-      "3*SEATS": 59,
-      "columnRows": 4
+      "3*SEATS": 59
     },
     "columnRows": [
       3,

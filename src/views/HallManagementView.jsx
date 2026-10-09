@@ -90,8 +90,10 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
     : 0;
 
   const csvHeaders = React.useMemo(() => {
-    const hallWithData = halls.find(h => h.csvData);
-    if (hallWithData) return Object.keys(hallWithData.csvData);
+    const hallWithData = halls.find(h => h.csvData && Object.keys(h.csvData).some(k => !/^column[_-]?rows?$/i.test(k.trim())));
+    if (hallWithData && hallWithData.csvData) {
+      return Object.keys(hallWithData.csvData).filter(k => !/^column[_-]?rows?$/i.test(k.trim()));
+    }
     return null;
   }, [halls]);
 
@@ -545,52 +547,6 @@ Lab Block,6,4`}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="form-group">
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Rows (Horizontal Benches)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="form-control"
-                    value={editFormData.rows}
-                    onChange={(e) => {
-                      const r = parseInt(e.target.value) || 0;
-                      const c = parseInt(editFormData.columns) || 0;
-                      const b = r * c;
-                      setEditFormData({
-                        ...editFormData,
-                        rows: e.target.value === '' ? '' : r,
-                        benches: b > 0 ? b : editFormData.benches,
-                        capacity: b > 0 ? b * 2 : editFormData.capacity
-                      });
-                    }}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-app)', color: 'var(--text-primary)' }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Columns (Vertical Lanes)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="form-control"
-                    value={editFormData.columns}
-                    onChange={(e) => {
-                      const c = parseInt(e.target.value) || 0;
-                      const r = parseInt(editFormData.rows) || 0;
-                      const b = r * c;
-                      setEditFormData({
-                        ...editFormData,
-                        columns: e.target.value === '' ? '' : c,
-                        benches: b > 0 ? b : editFormData.benches,
-                        capacity: b > 0 ? b * 2 : editFormData.capacity
-                      });
-                    }}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-app)', color: 'var(--text-primary)' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div className="form-group">
                   <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Total Benches</label>
                   <input
                     type="number"
@@ -630,7 +586,7 @@ Lab Block,6,4`}
                     }}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1.5px solid var(--color-primary)', background: 'var(--bg-app)', color: 'var(--text-primary)', fontWeight: 700 }}
                   />
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Auto-calculated (Rows × Cols & 2 seats/bench)</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Auto-calculated (2 seats / bench)</span>
                 </div>
               </div>
             </div>

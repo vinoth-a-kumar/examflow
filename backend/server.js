@@ -939,9 +939,8 @@ app.put('/api/halls/:id', async (req, res) => {
     const parsedCapacity = capacity !== undefined && capacity !== null ? parseInt(capacity) : (existingHall.capacity || (parsedBenches * 2));
 
     let updatedCsvData = existingHall.csvData ? { ...existingHall.csvData } : {};
-    if (parsedColumnRows.length > 0) {
-      updatedCsvData.columnRows = parsedColumnRows;
-    }
+    delete updatedCsvData.columnRows;
+    delete updatedCsvData.columnrows;
     Object.keys(updatedCsvData).forEach(key => {
       if (/2\*seat|2_seat|2seat|capacity/i.test(key)) {
         updatedCsvData[key] = parsedCapacity;
@@ -1068,10 +1067,12 @@ app.post('/api/halls/upload', upload.single('file'), async (req, res) => {
       if (isNaN(capacity) || capacity <= 0) {
         capacity = rows * columns * 2;
       }
-      // Build csvData: map every original CSV header to its value
+      // Build csvData: map every original CSV header to its value (excluding internal columnRows)
       const csvData = {};
       headers.forEach((header, index) => {
-        csvData[header] = parts[index] || '';
+        if (!/^column[_-]?rows?$/i.test((header || '').trim())) {
+          csvData[header] = parts[index] || '';
+        }
       });
 
       hallRecords.push({ name, rows, columns, csvData, capacity });
