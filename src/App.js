@@ -125,7 +125,7 @@ function App() {
   const [globalLoading, setGlobalLoading] = useState(true);
 
   // Fetch all system data from the Express backend APIs
-  const fetchAllData = async () => {
+  const fetchAllData = async (refreshStudents = false) => {
     try {
       // 1. Fetch DB Status
       const statusResp = await fetch('http://localhost:5000/api/status');
@@ -148,11 +148,13 @@ function App() {
         setActivities(data);
       }
 
-      // 4. Fetch Students
-      const studentsResp = await fetch('http://localhost:5000/api/students');
-      if (studentsResp.ok) {
-        const data = await studentsResp.json();
-        setStudents(data);
+      // 4. Fetch Students (on mount or when explicitly needed)
+      if (refreshStudents || students.length === 0) {
+        const studentsResp = await fetch('http://localhost:5000/api/students');
+        if (studentsResp.ok) {
+          const data = await studentsResp.json();
+          setStudents(data);
+        }
       }
 
       // 5. Fetch Uploads History
@@ -210,11 +212,11 @@ function App() {
       }
     }
 
-    fetchAllData();
-    // Auto-refresh stats/activities periodically if logged in
+    fetchAllData(true);
+    // Auto-refresh light data periodically if logged in (every 60s)
     let timer = null;
     if (user) {
-      timer = setInterval(fetchAllData, 15000);
+      timer = setInterval(() => fetchAllData(false), 60000);
     }
     return () => {
       if (timer) clearInterval(timer);
@@ -278,13 +280,16 @@ function App() {
       });
       if (resp.ok) {
         fetchAllData();
+        return true;
       } else {
         const err = await resp.json();
         alert("Failed to create exam: " + err.error);
+        return false;
       }
     } catch (err) {
       console.error(err);
       alert("Network error creating exam.");
+      return false;
     }
   };
 
@@ -311,13 +316,16 @@ function App() {
       });
       if (resp.ok) {
         fetchAllData();
+        return true;
       } else {
         const err = await resp.json();
         alert("Failed to update exam: " + err.error);
+        return false;
       }
     } catch (err) {
       console.error(err);
       alert("Network error updating exam.");
+      return false;
     }
   };
 

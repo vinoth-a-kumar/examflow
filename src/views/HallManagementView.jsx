@@ -17,19 +17,31 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
   const [dragActive,     setDragActive]     = useState(false);
   const [selectedFile,   setSelectedFile]   = useState(null);
   const [isUploading,    setIsUploading]    = useState(false);
-  const [csvTextMode,    setCsvTextMode]    = useState(false);
-  const [manualCsvText,  setManualCsvText]  = useState('');
-  const [editingHall,    setEditingHall]    = useState(null);
-  const [editFormData,   setEditFormData]   = useState({ name: '', rows: 0, columns: 0, benches: 0, capacity: 0 });
-  const [isSaving,       setIsSaving]       = useState(false);
-  const [searchQuery,    setSearchQuery]    = useState('');
+  const [csvTextMode,         setCsvTextMode]         = useState(false);
+  const [manualCsvText,       setManualCsvText]       = useState('');
+  const [editingHall,         setEditingHall]         = useState(null);
+  const [editFormData,        setEditFormData]        = useState({ name: '', block: '', rows: 0, columns: 0, benches: 0, capacity: 0, seatsPerBench: 2 });
+  const [isSaving,            setIsSaving]            = useState(false);
+  const [searchQuery,         setSearchQuery]         = useState('');
+  const [selectedBlockFilter, setSelectedBlockFilter] = useState('ALL');
   const fileInputRef = useRef(null);
 
+  const uniqueBlocks = React.useMemo(() => {
+    const defaultBlocks = ['MAIN BLOCK', "A' BLOCK", "B' BLOCK", "C' BLOCK", 'SCIENCE BLOCK'];
+    const blocksInHalls = (halls || []).map(h => (h.block || '').trim()).filter(Boolean);
+    return ['ALL', ...Array.from(new Set([...defaultBlocks, ...blocksInHalls]))];
+  }, [halls]);
+
   const filteredHalls = React.useMemo(() => {
-    if (!searchQuery.trim()) return halls;
+    let result = halls || [];
+    if (selectedBlockFilter !== 'ALL') {
+      result = result.filter(h => (h.block || '').trim().toUpperCase() === selectedBlockFilter.toUpperCase());
+    }
+    if (!searchQuery.trim()) return result;
     const q = searchQuery.toLowerCase().trim();
-    return halls.filter(h => {
+    return result.filter(h => {
       if (h.name && h.name.toLowerCase().includes(q)) return true;
+      if (h.block && h.block.toLowerCase().includes(q)) return true;
       if (h.capacity && String(h.capacity).includes(q)) return true;
       if (h.benches && String(h.benches).includes(q)) return true;
       if (h.csvData && typeof h.csvData === 'object') {
@@ -37,18 +49,21 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
       }
       return false;
     });
-  }, [halls, searchQuery]);
+  }, [halls, selectedBlockFilter, searchQuery]);
 
   const handleStartEdit = (hall) => {
     setEditingHall(hall);
     const benchCount = hall.benches || (hall.rows && hall.columns ? hall.rows * hall.columns : 0);
-    const cap = hall.capacity !== undefined && hall.capacity !== null ? hall.capacity : (benchCount * 2);
+    const spb = hall.seatsPerBench ? parseInt(hall.seatsPerBench) : 2;
+    const cap = benchCount * spb;
     setEditFormData({
       name: hall.name || '',
+      block: hall.block || '',
       rows: hall.rows || 0,
       columns: hall.columns || 0,
       benches: benchCount,
-      capacity: cap
+      capacity: cap,
+      seatsPerBench: spb
     });
   };
 
@@ -57,15 +72,20 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
     setIsSaving(true);
     try {
       const targetId = editingHall._id || editingHall.name;
+      const spb = parseInt(editFormData.seatsPerBench) || 2;
+      const benches = parseInt(editFormData.benches) || 0;
+      const cap = benches * spb;
       const res = await fetch(`http://localhost:5000/api/halls/${targetId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: editFormData.name,
+          block: editFormData.block,
           rows: parseInt(editFormData.rows) || 1,
           columns: parseInt(editFormData.columns) || 1,
-          benches: parseInt(editFormData.benches) || 0,
-          capacity: parseInt(editFormData.capacity) || 0
+          benches: benches,
+          capacity: cap,
+          seatsPerBench: spb
         })
       });
       const data = await res.json();
@@ -83,30 +103,60 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
     }
   };
 
+  const handleSeedOfficialHalls = async () => {
+    if (!window.confirm("Load the official 43 examination halls across 5 blocks? Existing matching halls will be updated without modifying any exam snapshots.")) return;
+    setIsUploading(true);
+    try {
+      const res = await fetch('http://localhost:5000/api/halls/seed-official', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        if (refreshData) refreshData();
+      } else {
+        alert('Error seeding halls: ' + (data.error || data.message));
+      }
+    } catch (e) {
+      console.error('Failed to seed official halls:', e);
+      alert('Failed to seed official halls.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleQuickToggleSeats = async (hall, newSpb) => {
+    const targetId = hall._id || hall.name;
+    const benches = hall.benches || (hall.rows && hall.columns ? hall.rows * hall.columns : 0);
+    const newCap = benches > 0 ? (benches * newSpb) : (hall.capacity || 0);
+    try {
+      const res = await fetch(`http://localhost:5000/api/halls/${targetId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: hall.name,
+          block: hall.block || '',
+          rows: hall.rows,
+          columns: hall.columns,
+          benches: benches,
+          capacity: newCap,
+          seatsPerBench: newSpb
+        })
+      });
+      if (res.ok) {
+        if (refreshData) refreshData();
+      } else {
+        const err = await res.json();
+        alert('Error updating seats: ' + (err.error || err.message));
+      }
+    } catch (e) {
+      console.error('Failed to quick toggle seats:', e);
+    }
+  };
+
   const totalHallsCount = (halls || []).length;
   const totalCapacity   = (halls || []).reduce((sum, h) => sum + (h && h.capacity ? h.capacity : 0), 0);
   const avgBenches      = totalHallsCount > 0
     ? Math.round((halls || []).reduce((sum, h) => sum + (h && h.benches ? h.benches : 0), 0) / totalHallsCount)
     : 0;
 
-  const csvHeaders = React.useMemo(() => {
-    const hallWithData = halls.find(h => h.csvData && Object.keys(h.csvData).some(k => !/^column[_-]?rows?$/i.test(k.trim())));
-    if (hallWithData && hallWithData.csvData) {
-      return Object.keys(hallWithData.csvData).filter(k => !/^column[_-]?rows?$/i.test(k.trim()));
-    }
-    return null;
-  }, [halls]);
-
-  const getCellValue = (hall, header) => {
-    if (hall.csvData && hall.csvData[header] !== undefined) return hall.csvData[header];
-    const h = header.toLowerCase();
-    if (h.includes('hall') || h.includes('name') || h.includes('room') || h.includes('block')) return hall.name;
-    if (h.includes('row'))      return hall.rows;
-    if (h.includes('col'))      return hall.columns;
-    if (h.includes('bench'))    return hall.benches;
-    if (h.includes('capacity')) return hall.capacity;
-    return hall[header] || '';
-  };
 
   const handleDrag = (e) => {
     e.preventDefault(); e.stopPropagation();
@@ -142,7 +192,7 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
         const response = await fetch('http://localhost:5000/api/halls/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ csvText: manualCsvText }),
+          body: JSON.stringify({ csvText: manualCsvText, seatsPerBench: 2 }),
         });
         const data = await response.json();
         if (data.success) { alert(data.message); setManualCsvText(''); refreshData(); }
@@ -150,6 +200,7 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
       } else {
         const formData = new FormData();
         formData.append('file', selectedFile);
+        formData.append('seatsPerBench', 2);
         const response = await fetch('http://localhost:5000/api/halls/upload', { method: 'POST', body: formData });
         const data = await response.json();
         if (data.success) { alert(data.message); setSelectedFile(null); refreshData(); }
@@ -225,13 +276,24 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
                 </div>
                 <h3>Import Halls via CSV</h3>
               </div>
-              <button
-                className="btn-secondary"
-                onClick={() => setCsvTextMode(!csvTextMode)}
-                style={{ padding: '6px 12px', fontSize: '12px' }}
-              >
-                {csvTextMode ? '📁 File Upload' : '📋 Paste CSV'}
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  className="btn-primary"
+                  onClick={handleSeedOfficialHalls}
+                  disabled={isUploading}
+                  style={{ padding: '6px 12px', fontSize: '12px', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
+                  title="Load the 43 official examination halls across 5 blocks"
+                >
+                  🏛️ Load 43 Official Halls
+                </button>
+                <button
+                  className="btn-secondary"
+                  onClick={() => setCsvTextMode(!csvTextMode)}
+                  style={{ padding: '6px 12px', fontSize: '12px' }}
+                >
+                  {csvTextMode ? '📁 File Upload' : '📋 Paste CSV'}
+                </button>
+              </div>
             </div>
 
             {csvTextMode ? (
@@ -411,6 +473,40 @@ Lab Block,6,4`}
             </div>
           )}
 
+          {halls.length > 0 && uniqueBlocks.length > 2 && (
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', margin: '4px 0' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Block:
+              </span>
+              {uniqueBlocks.map(block => {
+                const isActive = selectedBlockFilter.toUpperCase() === block.toUpperCase();
+                const count = block === 'ALL'
+                  ? halls.length
+                  : halls.filter(h => (h.block || '').trim().toUpperCase() === block.toUpperCase()).length;
+                return (
+                  <button
+                    key={block}
+                    type="button"
+                    onClick={() => setSelectedBlockFilter(block)}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      fontSize: '11.5px',
+                      fontWeight: isActive ? 700 : 500,
+                      border: isActive ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
+                      background: isActive ? 'rgba(79,70,229,0.1)' : 'var(--bg-app)',
+                      color: isActive ? 'var(--color-primary)' : 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    {block} <span style={{ opacity: 0.7, fontSize: '10px' }}>({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {halls.length === 0 ? (
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -429,75 +525,138 @@ Lab Block,6,4`}
                 No halls registered yet
               </p>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-                Import a CSV file to register halls
+                Click "Load 43 Official Halls" or import a CSV file to register halls
               </p>
             </div>
           ) : filteredHalls.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '13px' }}>
-              No halls match "{searchQuery}"
+              No halls match "{searchQuery}" in {selectedBlockFilter}
             </div>
           ) : (
             <div className="table-wrapper hall-records-table-wrapper">
               <table className="data-table sticky-header-table">
                 <thead>
                   <tr>
-                    {csvHeaders ? (
-                      csvHeaders.map(h => <th key={h}>{h}</th>)
-                    ) : (
-                      <>
-                        <th>Hall Name</th>
-                        <th>Rows</th>
-                        <th>Columns</th>
-                        <th>Benches</th>
-                        <th>Capacity</th>
-                      </>
-                    )}
+                    <th style={{ width: '40px' }}>#</th>
+                    <th>Block</th>
+                    <th>Hall No</th>
+                    <th>Benches</th>
+                    <th>Seats / Bench</th>
+                    <th>Capacity</th>
+                    <th>Layout</th>
                     <th style={{ textAlign: 'right' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredHalls.map((h) => (
-                    <tr key={h._id}>
-                      {csvHeaders ? (
-                        csvHeaders.map((col, idx) => (
-                          <td key={col} style={idx === 0 ? { fontWeight: 700 } : {}}>
-                            {getCellValue(h, col)}
-                          </td>
-                        ))
-                      ) : (
-                        <>
-                          <td style={{ fontWeight: 700 }}>{h.name}</td>
-                          <td>{h.rows}</td>
-                          <td>{h.columns}</td>
-                          <td>{h.benches}</td>
-                          <td>
-                            <span className="status-pill info" style={{ fontWeight: 700 }}>
-                              {h.capacity}
-                            </span>
-                          </td>
-                        </>
-                      )}
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
-                          <button
-                            className="btn-icon"
-                            onClick={() => handleStartEdit(h)}
-                            title={`Edit ${h.name}`}
-                            style={{ color: 'var(--color-primary)', background: 'rgba(79,70,229,0.08)' }}
-                          >
-                            <Edit2 size={14} />
-                          </button>
-                          <button
-                            className="btn-icon danger"
-                            onClick={() => { if (window.confirm(`Delete "${h.name}"?`)) onDeleteHall(h._id); }}
-                            title={`Delete ${h.name}`}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredHalls.map((h, rowIdx) => {
+                    const benchCount = h.benches || (h.rows && h.columns ? h.rows * h.columns : 0);
+                    const spb = h.seatsPerBench || 2;
+                    const capacity = h.capacity !== undefined ? h.capacity : (benchCount * spb);
+                    return (
+                      <tr key={h._id || h.name}>
+                        <td style={{ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600 }}>
+                          {h.idx || (rowIdx + 1)}
+                        </td>
+                        <td>
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            background: 'rgba(79,70,229,0.08)',
+                            color: 'var(--color-primary)',
+                            border: '1px solid rgba(79,70,229,0.15)'
+                          }}>
+                            {h.block || 'General'}
+                          </span>
+                        </td>
+                        <td style={{ fontWeight: 800, fontSize: '13px', color: 'var(--text-primary)' }}>
+                          {h.name}
+                        </td>
+                        <td style={{ fontWeight: 600 }}>
+                          {benchCount}
+                        </td>
+                        <td>
+                          <div style={{
+                            display: 'inline-flex',
+                            padding: '2px',
+                            background: 'var(--bg-app)',
+                            borderRadius: '8px',
+                            border: '1px solid var(--border-color)',
+                            gap: '2px'
+                          }}>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickToggleSeats(h, 2)}
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                background: spb === 2 ? 'var(--color-primary)' : 'transparent',
+                                color: spb === 2 ? '#fff' : 'var(--text-secondary)',
+                                boxShadow: spb === 2 ? '0 1px 4px rgba(79,70,229,0.3)' : 'none',
+                                transition: 'all 0.15s'
+                              }}
+                              title="Set 2 seats per bench for this hall"
+                            >
+                              2 Seats
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickToggleSeats(h, 3)}
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                background: spb === 3 ? '#8b5cf6' : 'transparent',
+                                color: spb === 3 ? '#fff' : 'var(--text-secondary)',
+                                boxShadow: spb === 3 ? '0 1px 4px rgba(139,92,246,0.3)' : 'none',
+                                transition: 'all 0.15s'
+                              }}
+                              title="Set 3 seats per bench for this hall"
+                            >
+                              3 Seats
+                            </button>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="status-pill info" style={{ fontWeight: 800 }}>
+                            {capacity} Seats
+                          </span>
+                        </td>
+                        <td style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                          {h.columnRows && h.columnRows.length > 0
+                            ? `${h.columns} cols (${h.columnRows.join(', ')} rows)`
+                            : `${h.rows}×${h.columns} grid`}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                            <button
+                              className="btn-icon"
+                              onClick={() => handleStartEdit(h)}
+                              title={`Edit ${h.name}`}
+                              style={{ color: 'var(--color-primary)', background: 'rgba(79,70,229,0.08)' }}
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              className="btn-icon danger"
+                              onClick={() => { if (window.confirm(`Delete "${h.name}"?`)) onDeleteHall(h._id); }}
+                              title={`Delete ${h.name}`}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -536,13 +695,88 @@ Lab Block,6,4`}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div className="form-group">
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Hall Name</label>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Block Name</label>
+                <input
+                  type="text"
+                  list="block-suggestions"
+                  className="form-control"
+                  placeholder="e.g. MAIN BLOCK, A' BLOCK, SCIENCE BLOCK"
+                  value={editFormData.block}
+                  onChange={(e) => setEditFormData({ ...editFormData, block: e.target.value })}
+                />
+                <datalist id="block-suggestions">
+                  <option value="MAIN BLOCK" />
+                  <option value="A' BLOCK" />
+                  <option value="B' BLOCK" />
+                  <option value="C' BLOCK" />
+                  <option value="SCIENCE BLOCK" />
+                </datalist>
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Hall Name / Number</label>
                 <input
                   type="text"
                   className="form-control"
                   value={editFormData.name}
                   onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
                 />
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
+                  Bench Configuration
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newSpb = 2;
+                      const b = parseInt(editFormData.benches) || 0;
+                      setEditFormData({
+                        ...editFormData,
+                        seatsPerBench: newSpb,
+                        capacity: b * newSpb
+                      });
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: (editFormData.seatsPerBench || 2) === 2 ? '1.5px solid var(--color-primary)' : '1px solid var(--border-color)',
+                      background: (editFormData.seatsPerBench || 2) === 2 ? 'rgba(79,70,229,0.1)' : 'var(--bg-app)',
+                      color: (editFormData.seatsPerBench || 2) === 2 ? 'var(--color-primary)' : 'var(--text-secondary)',
+                      fontWeight: 700,
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    👥 2 Seats / Bench
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newSpb = 3;
+                      const b = parseInt(editFormData.benches) || 0;
+                      setEditFormData({
+                        ...editFormData,
+                        seatsPerBench: newSpb,
+                        capacity: b * newSpb
+                      });
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: editFormData.seatsPerBench === 3 ? '1.5px solid #8b5cf6' : '1px solid var(--border-color)',
+                      background: editFormData.seatsPerBench === 3 ? 'rgba(139,92,246,0.1)' : 'var(--bg-app)',
+                      color: editFormData.seatsPerBench === 3 ? '#8b5cf6' : 'var(--text-secondary)',
+                      fontWeight: 700,
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    👥 3 Seats / Bench
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -556,7 +790,8 @@ Lab Block,6,4`}
                     onChange={(e) => {
                       const val = e.target.value === '' ? '' : parseInt(e.target.value);
                       const b = isNaN(val) || val === '' ? 0 : val;
-                      const c = b * 2;
+                      const spb = parseInt(editFormData.seatsPerBench) || 2;
+                      const c = b * spb;
                       setEditFormData({
                         ...editFormData,
                         benches: val,
@@ -577,7 +812,8 @@ Lab Block,6,4`}
                     onChange={(e) => {
                       const val = e.target.value === '' ? '' : parseInt(e.target.value);
                       const c = isNaN(val) || val === '' ? 0 : val;
-                      const b = Math.round(c / 2);
+                      const spb = parseInt(editFormData.seatsPerBench) || 2;
+                      const b = Math.round(c / spb);
                       setEditFormData({
                         ...editFormData,
                         capacity: val,
@@ -586,7 +822,32 @@ Lab Block,6,4`}
                     }}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1.5px solid var(--color-primary)', background: 'var(--bg-app)', color: 'var(--text-primary)', fontWeight: 700 }}
                   />
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Auto-calculated (2 seats / bench)</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Auto-calculated ({editFormData.seatsPerBench || 2} seats / bench)</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Rows</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-control"
+                    value={editFormData.rows}
+                    onChange={(e) => setEditFormData({ ...editFormData, rows: parseInt(e.target.value) || 1 })}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-app)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+                <div className="form-group">
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Columns</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-control"
+                    value={editFormData.columns}
+                    onChange={(e) => setEditFormData({ ...editFormData, columns: parseInt(e.target.value) || 1 })}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-app)', color: 'var(--text-primary)' }}
+                  />
                 </div>
               </div>
             </div>

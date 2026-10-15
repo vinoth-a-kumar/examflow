@@ -15,6 +15,15 @@ import {
   Armchair
 } from 'lucide-react';
 
+// Helper to get local date string YYYY-MM-DD avoiding timezone off-by-one errors
+const getLocalDateString = (d = new Date()) => {
+  const dateObj = new Date(d);
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, onUpdateExam, refreshData }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [examDate, setExamDate] = useState('');
@@ -252,14 +261,67 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
   const [editSubjectCodeSearch, setEditSubjectCodeSearch] = useState('');
   const [editActiveYearFilter, setEditActiveYearFilter] = useState('ALL');
 
+  // Local date validation and assigned subject codes tracking
+  const todayStr = getLocalDateString();
+  const [dateError, setDateError] = useState('');
+  const [editDateError, setEditDateError] = useState('');
+  const [serverAssignedCodes, setServerAssignedCodes] = useState({});
+
+  const fetchServerAssignedCodes = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/exams/assigned-subject-codes');
+      if (res.ok) {
+        const data = await res.json();
+        setServerAssignedCodes(data.details || {});
+      }
+    } catch (err) {
+      console.error("Failed to fetch assigned subject codes", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchServerAssignedCodes();
+  }, [modalOpen, editModalOpen, exams]);
+
+  // Check if a subject code is already assigned to any exam (or another exam if excludeExamId is provided)
+  const getSubjectCodeAssignment = (cleanCode, excludeExamId = null) => {
+    if (!cleanCode) return null;
+    const serverEntry = serverAssignedCodes[cleanCode];
+    if (serverEntry) {
+      if (!excludeExamId || String(serverEntry.examId) !== String(excludeExamId)) {
+        return serverEntry;
+      }
+    }
+    const fromExams = (exams || []).find(e => {
+      if (excludeExamId && String(e._id) === String(excludeExamId)) return false;
+      return (e.subjectCodes || []).some(c => (c || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === cleanCode);
+    });
+    if (fromExams) {
+      return {
+        code: cleanCode,
+        examId: String(fromExams._id),
+        examName: fromExams.name || 'Exam',
+        date: fromExams.date,
+        session: fromExams.session
+      };
+    }
+    return null;
+  };
+
   // Helper: Calculate hall capacity based on bench config (2 or 3 seats/bench) & uploaded hall details (2*SEATS / 3*SEATS)
   const getHallCapacityForBenchConfig = (hall, seatsPerBenchConfig) => {
     if (!hall) return 0;
     const spb = parseInt(seatsPerBenchConfig) || 2;
 
+    const benchCount = hall.benches || (hall.rows && hall.columns ? hall.rows * hall.columns : 0);
+    if (benchCount > 0) {
+      return benchCount * spb;
+    }
+
     if (hall.capacity !== undefined && hall.capacity !== null && !isNaN(parseInt(hall.capacity)) && parseInt(hall.capacity) > 0) {
-      if (spb === 2) return parseInt(hall.capacity);
-      if (spb === 3) return Math.round((parseInt(hall.capacity) / 2) * 3);
+      const defaultSpb = hall.seatsPerBench ? parseInt(hall.seatsPerBench) : 2;
+      if (spb === defaultSpb) return parseInt(hall.capacity);
+      return Math.round((parseInt(hall.capacity) / defaultSpb) * spb);
     }
 
     if (hall.csvData) {
@@ -277,12 +339,23 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
       }
     }
 
-    const benchCount = hall.benches || (hall.rows && hall.columns ? hall.rows * hall.columns : 0);
-    if (benchCount > 0) {
-      return benchCount * spb;
-    }
-
     return hall.capacity || 0;
+  };
+
+  // Group halls by block, preserving configured hall order
+  const hallsByBlock = useMemo(() => {
+    const map = {};
+    (halls || []).forEach(h => {
+      const b = (h.block || 'GENERAL').trim();
+      if (!map[b]) map[b] = [];
+      map[b].push(h);
+    });
+    return map;
+  }, [halls]);
+
+  const sortHallsByConfiguredOrder = (hallNames) => {
+    const nameToIdx = new Map((halls || []).map((h, i) => [h.name, h.idx !== undefined ? h.idx : i]));
+    return [...hallNames].sort((a, b) => (nameToIdx.get(a) || 0) - (nameToIdx.get(b) || 0));
   };
 
   // Helper: Extract all subject codes for a student
@@ -290,18 +363,35 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     if (!student) return [];
     const codes = [];
     if (student.csvData && typeof student.csvData === 'object') {
-      Object.values(student.csvData).forEach(val => {
-        if (val) {
-          String(val).split(/\s+/).forEach(tok => {
-            const clean = tok.trim().toUpperCase();
-            if (clean.length >= 2 && clean.length <= 25 && /^[A-Z0-9\-_/]+$/.test(clean)) {
-              codes.push(clean);
-            }
-          });
-        }
-      });
+      const keys = Object.keys(student.csvData);
+      const subKey = keys.find(k => /subjects?\s*appearing|sub.*code|courses?/i.test(k));
+      if (subKey && student.csvData[subKey]) {
+        String(student.csvData[subKey]).split(/\s+/).forEach(tok => {
+          const clean = tok.trim().toUpperCase();
+          if (clean.length >= 2 && clean.length <= 25 && /^[A-Z0-9\-_/]+$/.test(clean) && !/^\d+$/.test(clean)) {
+            codes.push(clean);
+          }
+        });
+      }
+      
+      if (codes.length === 0) {
+        Object.entries(student.csvData).forEach(([k, val]) => {
+          if (/^(sno|sl|s_no|id|sex|gender|dob|community|comm|fee|phone|mobile|email|name|student_name|regno|reg_no|rollno|roll_no)$/i.test(k.trim())) return;
+          if (val) {
+            String(val).split(/\s+/).forEach(tok => {
+              const clean = tok.trim().toUpperCase();
+              if (clean.length >= 2 && clean.length <= 25 && /^[A-Z0-9\-_/]+$/.test(clean) && !/^\d+$/.test(clean)) {
+                codes.push(clean);
+              }
+            });
+          }
+        });
+      }
     }
-    if (student.subjectCode) codes.push(student.subjectCode.toUpperCase());
+    if (student.subjectCode) {
+      const clean = String(student.subjectCode).trim().toUpperCase();
+      if (!/^\d+$/.test(clean)) codes.push(clean);
+    }
     return [...new Set(codes)];
   };
 
@@ -363,9 +453,9 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
       if (avail && typeof avail.vacantSeats === 'number') {
         return sum + avail.vacantSeats;
       }
-      return sum + (h ? getHallCapacityForBenchConfig(h, seatsPerBench) : 0);
+      return sum + (h ? getHallCapacityForBenchConfig(h, h.seatsPerBench || 2) : 0);
     }, 0);
-  }, [selectedHalls, halls, seatsPerBench, examDate, hallAvailability]);
+  }, [selectedHalls, halls, examDate, hallAvailability]);
 
   // Real-time metrics calculations for Edit Exam Modal (deduplicated unique physical students)
   const editTotalStudentsSelected = useMemo(() => {
@@ -386,9 +476,11 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
       if (avail && typeof avail.vacantSeats === 'number') {
         return sum + avail.vacantSeats;
       }
-      return sum + (h ? getHallCapacityForBenchConfig(h, editSeatsPerBench) : 0);
+      const savedSnap = editingExam && editingExam.hallSnapshots && (editingExam.hallSnapshots[hallName] || editingExam.hallSnapshots[String(h?._id)]);
+      const effectiveSpb = savedSnap ? savedSnap.seatsPerBench : (h?.seatsPerBench || 2);
+      return sum + (h ? getHallCapacityForBenchConfig(h, effectiveSpb) : 0);
     }, 0);
-  }, [editSelectedHalls, halls, editSeatsPerBench, editExamDate, editHallAvailability]);
+  }, [editSelectedHalls, halls, editExamDate, editHallAvailability, editingExam]);
 
   // Helper: Filter subject codes directly by search query & year (no department grouping)
   const filterSubjectCodes = (codes, searchQuery, yearFilter) => {
@@ -467,7 +559,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
 
     const fetchAvailability = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/halls/availability?date=${examDate}&session=${session}&seatsPerBench=${seatsPerBench}`);
+        const response = await fetch(`http://localhost:5000/api/halls/availability?date=${examDate}&session=${session}`);
         if (response.ok) {
           const data = await response.json();
           setHallAvailability(data);
@@ -479,7 +571,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     
     fetchRemaining();
     fetchAvailability();
-  }, [examDate, session, seatsPerBench]);
+  }, [examDate, session]);
 
   useEffect(() => {
     if (!editExamDate || !editingExam) {
@@ -502,7 +594,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
 
     const fetchEditAvailability = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/halls/availability?date=${editExamDate}&session=${editSession}&excludeExamId=${editingExam._id}&seatsPerBench=${editSeatsPerBench}`);
+        const response = await fetch(`http://localhost:5000/api/halls/availability?date=${editExamDate}&session=${editSession}&excludeExamId=${editingExam._id}`);
         if (response.ok) {
           const data = await response.json();
           setEditHallAvailability(data);
@@ -514,7 +606,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     
     fetchEditRemaining();
     fetchEditAvailability();
-  }, [editExamDate, editSession, editingExam, editSeatsPerBench]);
+  }, [editExamDate, editSession, editingExam]);
 
   // Find all occupied halls on the selected date and session
   const occupiedHallsOnDate = React.useMemo(() => {
@@ -542,9 +634,8 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
   // Calculate metrics
   const totalExamsCount = exams.length;
   
-  // Future exams (date >= today)
-  const todayStr = new Date().toISOString().split('T')[0];
-  const upcomingExamsCount = exams.filter(e => e.date >= todayStr).length;
+  // Future exams (date >= todayStr)
+  const upcomingExamsCount = exams.filter(e => (e.date || '').split('T')[0] >= todayStr).length;
   
   // Halls assigned across all exams
   const totalAssignedHalls = exams.reduce((sum, e) => sum + (e.assignedHalls?.length || 0), 0);
@@ -561,20 +652,52 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     if (selectedHalls.includes(hallName)) {
       setSelectedHalls(selectedHalls.filter(h => h !== hallName));
     } else {
-      setSelectedHalls([...selectedHalls, hallName]);
+      setSelectedHalls(sortHallsByConfiguredOrder([...selectedHalls, hallName]));
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleBlockToggle = (blockName) => {
+    const blockHalls = (hallsByBlock[blockName] || []).filter(h => {
+      const status = examDate ? hallAvailability[h.name] : null;
+      return !(status && status.occupied);
+    });
+    const blockHallNames = blockHalls.map(h => h.name);
+    const allSelected = blockHallNames.length > 0 && blockHallNames.every(name => selectedHalls.includes(name));
+    
+    if (allSelected) {
+      setSelectedHalls(selectedHalls.filter(name => !blockHallNames.includes(name)));
+    } else {
+      const merged = Array.from(new Set([...selectedHalls, ...blockHallNames]));
+      setSelectedHalls(sortHallsByConfiguredOrder(merged));
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!examDate) {
       alert("Exam Date is required.");
+      return;
+    }
+    const dateOnly = examDate.split('T')[0];
+    if (dateOnly < todayStr) {
+      alert(`Invalid exam date (${dateOnly}). Exams can only be scheduled for today (${todayStr}) or future dates.`);
       return;
     }
     if (selectedSubjectCodes.length === 0) {
       alert("Please select at least one subject code.");
       return;
     }
+
+    // Verify no already-assigned codes
+    const duplicateCodes = selectedSubjectCodes.filter(c => {
+      const clean = c.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      return !!getSubjectCodeAssignment(clean);
+    });
+    if (duplicateCodes.length > 0) {
+      alert(`Subject code(s) already assigned to an exam: ${duplicateCodes.join(', ')}. Reusing assigned subject codes across exams is not permitted.`);
+      return;
+    }
+
     if (selectedHalls.length === 0) {
       alert("Please assign at least one hall.");
       return;
@@ -584,7 +707,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
       ? selectedSubjectCodes.slice(0, 3).join(', ') 
       : 'Exam';
 
-    onAddExam({
+    const success = await onAddExam({
       name: generatedExamName,
       subjectCodes: selectedSubjectCodes,
       departments: [],
@@ -595,16 +718,20 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
       time: time
     });
 
-    // Reset and close
-    setExamDate('');
-    setSession('FN');
-    setTime('10:00 AM - 01:00 PM');
-    setSelectedSubjectCodes([]);
-    setSelectedHalls([]);
-    setSeatsPerBench(2);
-    setSubjectCodeSearch('');
-    setActiveYearFilter('ALL');
-    setModalOpen(false);
+    if (success !== false) {
+      // Reset and close
+      setExamDate('');
+      setDateError('');
+      setSession('FN');
+      setTime('10:00 AM - 01:00 PM');
+      setSelectedSubjectCodes([]);
+      setSelectedHalls([]);
+      setSeatsPerBench(2);
+      setSubjectCodeSearch('');
+      setActiveYearFilter('ALL');
+      setModalOpen(false);
+      fetchServerAssignedCodes();
+    }
   };
 
   const handleEditSubjectCodeToggle = (code) => {
@@ -619,20 +746,52 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     if (editSelectedHalls.includes(hallName)) {
       setEditSelectedHalls(editSelectedHalls.filter(h => h !== hallName));
     } else {
-      setEditSelectedHalls([...editSelectedHalls, hallName]);
+      setEditSelectedHalls(sortHallsByConfiguredOrder([...editSelectedHalls, hallName]));
     }
   };
 
-  const handleEditSubmit = (e) => {
+  const handleEditBlockToggle = (blockName) => {
+    const blockHalls = (hallsByBlock[blockName] || []).filter(h => {
+      const status = editExamDate ? editHallAvailability[h.name] : null;
+      return !(status && status.occupied);
+    });
+    const blockHallNames = blockHalls.map(h => h.name);
+    const allSelected = blockHallNames.length > 0 && blockHallNames.every(name => editSelectedHalls.includes(name));
+    
+    if (allSelected) {
+      setEditSelectedHalls(editSelectedHalls.filter(name => !blockHallNames.includes(name)));
+    } else {
+      const merged = Array.from(new Set([...editSelectedHalls, ...blockHallNames]));
+      setEditSelectedHalls(sortHallsByConfiguredOrder(merged));
+    }
+  };
+
+  const handleEditSubmit = async (e) => {
     e.preventDefault();
     if (!editExamDate) {
       alert("Exam Date is required.");
+      return;
+    }
+    const dateOnly = editExamDate.split('T')[0];
+    if (dateOnly < todayStr) {
+      alert(`Invalid exam date (${dateOnly}). Exams can only be scheduled for today (${todayStr}) or future dates.`);
       return;
     }
     if (editSelectedSubjectCodes.length === 0) {
       alert("Please select at least one subject code.");
       return;
     }
+
+    // Verify no duplicate codes assigned to other exams
+    const duplicateCodes = editSelectedSubjectCodes.filter(c => {
+      const clean = c.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      return !!getSubjectCodeAssignment(clean, editingExam?._id);
+    });
+    if (duplicateCodes.length > 0) {
+      alert(`Subject code(s) already assigned to another exam: ${duplicateCodes.join(', ')}. Reusing assigned subject codes across exams is not permitted.`);
+      return;
+    }
+
     if (editSelectedHalls.length === 0) {
       alert("Please assign at least one hall.");
       return;
@@ -642,7 +801,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
       ? editSelectedSubjectCodes.slice(0, 3).join(', ') 
       : 'Exam';
 
-    onUpdateExam(editingExam._id, {
+    const success = await onUpdateExam(editingExam._id, {
       name: generatedEditExamName,
       subjectCodes: editSelectedSubjectCodes,
       departments: [],
@@ -653,17 +812,21 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
       time: editTime
     });
 
-    // Reset and close
-    setEditingExam(null);
-    setEditExamDate('');
-    setEditSession('FN');
-    setEditTime('');
-    setEditSelectedSubjectCodes([]);
-    setEditSelectedHalls([]);
-    setEditSeatsPerBench(2);
-    setEditSubjectCodeSearch('');
-    setEditActiveYearFilter('ALL');
-    setEditModalOpen(false);
+    if (success !== false) {
+      // Reset and close
+      setEditingExam(null);
+      setEditExamDate('');
+      setEditDateError('');
+      setEditSession('FN');
+      setEditTime('');
+      setEditSelectedSubjectCodes([]);
+      setEditSelectedHalls([]);
+      setEditSeatsPerBench(2);
+      setEditSubjectCodeSearch('');
+      setEditActiveYearFilter('ALL');
+      setEditModalOpen(false);
+      fetchServerAssignedCodes();
+    }
   };
 
   const getStatusClass = (status) => {
@@ -683,7 +846,10 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
           <p>Create, manage and schedule examinations.</p>
         </div>
         
-        <button className="btn-primary" onClick={() => setModalOpen(true)}>
+        <button className="btn-primary" onClick={() => {
+          setDateError('');
+          setModalOpen(true);
+        }}>
           <Plus size={18} />
           <span>Create Exam</span>
         </button>
@@ -732,7 +898,6 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                 <th>Subject Code(s)</th>
                 <th>Date</th>
                 <th>Session & Time</th>
-                <th>Seats/Bench</th>
                 <th>Students Count</th>
                 <th>Assigned Halls</th>
                 <th>Status</th>
@@ -742,7 +907,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
             <tbody>
               {exams.length === 0 ? (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
+                  <td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
                     No examinations scheduled yet. Click "Create Exam" to schedule.
                   </td>
                 </tr>
@@ -769,11 +934,6 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                           {e.time}
                         </div>
                       )}
-                    </td>
-                    <td>
-                      <span className="status-pill info" style={{ fontWeight: 600 }}>
-                        {e.seatsPerBench || 2} Seats
-                      </span>
                     </td>
                     <td>
                       <div style={{ fontWeight: 600 }}>{e.studentsCount}</div>
@@ -814,6 +974,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                           onClick={() => {
                             setEditingExam(e);
                             setEditExamDate(e.date.split('T')[0]);
+                            setEditDateError('');
                             setEditSession(e.session);
                             setEditTime(e.time || (e.session === 'FN' ? '10:00 AM - 01:00 PM' : '02:00 PM - 05:00 PM'));
                             setEditSelectedSubjectCodes(e.subjectCodes || []);
@@ -961,7 +1122,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                     </p>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.3fr', gap: '16px', alignItems: 'center', background: 'var(--bg-card)', padding: '14px 16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'center', background: 'var(--bg-card)', padding: '14px 16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                     {/* Column 1: Exam Date */}
                     <div className="form-group" style={{ margin: 0 }}>
                       <label htmlFor="examDate" style={{ fontWeight: 700, fontSize: '12px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)' }}>
@@ -971,10 +1132,30 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                         type="date" 
                         id="examDate" 
                         value={examDate}
-                        onChange={(e) => setExamDate(e.target.value)}
+                        min={todayStr}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setExamDate(val);
+                          if (val && val < todayStr) {
+                            setDateError(`Exams cannot be scheduled for past dates. Please select today (${todayStr}) or a future date.`);
+                          } else {
+                            setDateError('');
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const val = e.target.value;
+                          if (val && val < todayStr) {
+                            setDateError(`Exams cannot be scheduled for past dates. Please select today (${todayStr}) or a future date.`);
+                          }
+                        }}
                         required
-                        style={{ height: '38px', fontSize: '13px', borderRadius: '8px', padding: '0 12px', border: '1px solid var(--border-color)', background: 'var(--bg-app)', width: '100%', fontWeight: 600 }}
+                        style={{ height: '38px', fontSize: '13px', borderRadius: '8px', padding: '0 12px', border: dateError ? '1px solid #ef4444' : '1px solid var(--border-color)', background: 'var(--bg-app)', width: '100%', fontWeight: 600 }}
                       />
+                      {dateError && (
+                        <div style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px', fontWeight: 600 }}>
+                          ⚠️ {dateError}
+                        </div>
+                      )}
                     </div>
 
                     {/* Column 2: Session */}
@@ -1009,22 +1190,6 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                         </button>
                       </div>
                     </div>
-
-                    {/* Column 3: Bench Configuration */}
-                    <div className="form-group" style={{ margin: 0 }}>
-                      <label htmlFor="seatsPerBench" style={{ fontWeight: 700, fontSize: '12px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)' }}>
-                        🪑 Bench Configuration *
-                      </label>
-                      <select 
-                        id="seatsPerBench" 
-                        value={seatsPerBench}
-                        onChange={(e) => setSeatsPerBench(parseInt(e.target.value))}
-                        style={{ height: '38px', fontSize: '12.5px', padding: '0 10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-app)', width: '100%', fontWeight: 600 }}
-                      >
-                        <option value={2}>👥 2 Students / Bench</option>
-                        <option value={3}>👥 3 Students / Bench</option>
-                      </select>
-                    </div>
                   </div>
                 </div>
 
@@ -1058,7 +1223,11 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                     </p>
                   ) : (() => {
                     const { filteredCodes } = filterSubjectCodes(availableSubjectCodes, subjectCodeSearch, activeYearFilter);
-                    const allFilteredSelected = filteredCodes.length > 0 && filteredCodes.every(c => selectedSubjectCodes.includes(c.code));
+                    const selectableFilteredCodes = filteredCodes.filter(f => {
+                      const clean = f.code.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+                      return !getSubjectCodeAssignment(clean);
+                    });
+                    const allFilteredSelected = selectableFilteredCodes.length > 0 && selectableFilteredCodes.every(c => selectedSubjectCodes.includes(c.code));
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {/* Search + Year Filter + Select All */}
@@ -1073,12 +1242,12 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                               style={{ paddingLeft: '32px', fontSize: '12px', height: '34px', borderRadius: '8px', border: '1px solid var(--border-color)', width: '100%' }}
                             />
                           </div>
-                          {filteredCodes.length > 0 && (
+                          {selectableFilteredCodes.length > 0 && (
                             <button type="button" onClick={() => {
                               if (allFilteredSelected) {
-                                setSelectedSubjectCodes(prev => prev.filter(c => !filteredCodes.map(f => f.code).includes(c)));
+                                setSelectedSubjectCodes(prev => prev.filter(c => !selectableFilteredCodes.map(f => f.code).includes(c)));
                               } else {
-                                const toAdd = filteredCodes.map(f => f.code).filter(c => !selectedSubjectCodes.includes(c));
+                                const toAdd = selectableFilteredCodes.map(f => f.code).filter(c => !selectedSubjectCodes.includes(c));
                                 setSelectedSubjectCodes(prev => [...prev, ...toAdd]);
                               }
                             }} style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '9999px', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: 700, background: allFilteredSelected ? 'var(--color-primary)' : 'var(--bg-card)', color: allFilteredSelected ? '#fff' : 'var(--text-secondary)', transition: 'all 0.2s' }}>
@@ -1108,6 +1277,8 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                           ) : (
                             filteredCodes.map(({ code }) => {
                               const cleanCode = code.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+                              const assignment = getSubjectCodeAssignment(cleanCode);
+                              const isAssigned = !!assignment;
                               const count = examDate ? (remainingCounts[code.toUpperCase()] || 0) : 1;
                               const isSelected = selectedSubjectCodes.includes(code);
 
@@ -1120,14 +1291,21 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                                 });
                               }
                               const hasConflict = !isSelected && conflictCount > 0;
-                              const isDisabled = (examDate && count === 0) || hasConflict;
+                              const isDisabled = isAssigned || (examDate && count === 0) || hasConflict;
 
                               return (
                                 <button type="button" key={code}
-                                  className={`checkbox-btn ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
+                                  className={`checkbox-btn ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''} ${isAssigned ? 'assigned' : ''}`}
                                   onClick={() => { if (!isDisabled) handleSubjectCodeToggle(code); }}
                                   disabled={isDisabled}
-                                  style={isDisabled ? {
+                                  style={isAssigned ? {
+                                    opacity: 0.55,
+                                    cursor: 'not-allowed',
+                                    backgroundColor: 'var(--bg-app)',
+                                    borderColor: 'var(--border-color)',
+                                    color: 'var(--text-muted)',
+                                    fontSize: '12px', padding: '7px 14px', borderRadius: '8px'
+                                  } : isDisabled ? {
                                     opacity: 0.55,
                                     cursor: 'not-allowed',
                                     backgroundColor: hasConflict ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-app)',
@@ -1136,7 +1314,9 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                                     fontSize: '12px', padding: '7px 14px', borderRadius: '8px'
                                   } : { fontSize: '12px', padding: '7px 14px', borderRadius: '8px' }}
                                   title={
-                                    hasConflict
+                                    isAssigned
+                                      ? `Unavailable: Already assigned to exam "${assignment.examName}" (${assignment.date ? assignment.date.split('T')[0] : ''} ${assignment.session || ''})`
+                                      : hasConflict
                                       ? `⚠️ Cannot select: ${conflictCount} student(s) overlap with already selected subjects`
                                       : isDisabled
                                       ? 'No remaining students for this code'
@@ -1146,8 +1326,22 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                                   }
                                 >
                                   {isSelected && <Check size={11} style={{ marginRight: '4px' }} />}
-                                  <span style={{ fontWeight: 700 }}>{code}</span>
-                                  {hasConflict ? (
+                                  <span style={{ fontWeight: 700, textDecoration: isAssigned ? 'line-through' : 'none' }}>{code}</span>
+                                  {isAssigned ? (
+                                    <span style={{
+                                      fontSize: '9px',
+                                      marginLeft: '5px',
+                                      padding: '1px 5px',
+                                      borderRadius: '4px',
+                                      background: 'rgba(100, 116, 139, 0.2)',
+                                      color: 'var(--text-secondary)',
+                                      fontWeight: 800,
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.03em'
+                                    }}>
+                                      Assigned
+                                    </span>
+                                  ) : hasConflict ? (
                                     <span style={{ fontSize: '9.5px', marginLeft: '4px', color: '#ef4444', fontWeight: 800 }}>
                                       ⚠️ Conflict ({conflictCount})
                                     </span>
@@ -1164,65 +1358,151 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                   })()}
                 </div>
 
-                {/* ── Section 3: Hall Allocation Cards ─────────────── */}
-                <div style={{ background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                {/* ── Section 3: Hall Allocation Cards (Block Grouped & Selectable) ─────────────── */}
+                <div style={{ background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Armchair size={16} style={{ color: 'var(--color-primary)' }} />
                       <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: 700, color: 'var(--text-primary)' }}>3. Assign Examination Halls *</h4>
                     </div>
                     {selectedHalls.length > 0 && (
-                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '9999px', background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>
-                        {selectedHalls.length} halls ({totalAssignedCapacity} seats)
+                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '9999px', background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>
+                        ✓ {selectedHalls.length} halls ({totalAssignedCapacity} seats)
                       </span>
                     )}
                   </div>
+
+                  {/* Block Selection Pills */}
+                  {Object.keys(hallsByBlock).length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', background: 'var(--bg-card)', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Select Block:
+                      </span>
+                      {Object.entries(hallsByBlock).map(([blockName, blockHalls]) => {
+                        const selectableHalls = blockHalls.filter(h => !(examDate && hallAvailability[h.name]?.occupied));
+                        const selectedCount = selectableHalls.filter(h => selectedHalls.includes(h.name)).length;
+                        const allInBlockSelected = selectableHalls.length > 0 && selectedCount === selectableHalls.length;
+                        const isPartiallySelected = selectedCount > 0 && selectedCount < selectableHalls.length;
+                        return (
+                          <button
+                            key={blockName}
+                            type="button"
+                            onClick={() => handleBlockToggle(blockName)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '11.5px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              border: allInBlockSelected ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
+                              background: allInBlockSelected ? 'var(--color-primary)' : isPartiallySelected ? 'rgba(79,70,229,0.12)' : 'var(--bg-app)',
+                              color: allInBlockSelected ? '#fff' : isPartiallySelected ? 'var(--color-primary)' : 'var(--text-secondary)',
+                              transition: 'all 0.15s ease',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px'
+                            }}
+                          >
+                            <span>{blockName}</span>
+                            <span style={{
+                              fontSize: '10px',
+                              padding: '1px 5px',
+                              borderRadius: '9999px',
+                              background: allInBlockSelected ? 'rgba(255,255,255,0.25)' : 'var(--bg-card)',
+                              color: allInBlockSelected ? '#fff' : 'var(--text-muted)'
+                            }}>
+                              {selectedCount}/{selectableHalls.length}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {halls.length === 0 ? (
                     <p style={{ fontSize: '12px', color: 'var(--color-error)', fontWeight: 600, margin: 0 }}>
                       No halls available. Please add halls in Hall Management first!
                     </p>
                   ) : (
-                    <div className="checkbox-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '8px' }}>
-                      {halls.map((h) => {
-                        const status = examDate ? hallAvailability[h.name] : null;
-                        const isOccupied = status ? status.occupied : false;
-                        const effectiveCap = getHallCapacityForBenchConfig(h, seatsPerBench);
-                        const vacantText = status ? status.msg : `${effectiveCap} Seats`;
-                        const isSelected = selectedHalls.includes(h.name);
-                        const benchCount = h.benches || (h.rows && h.columns ? h.rows * h.columns : 0);
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '360px', overflowY: 'auto', paddingRight: '4px' }}>
+                      {Object.entries(hallsByBlock).map(([blockName, blockHalls]) => {
+                        const selectableHalls = blockHalls.filter(h => !(examDate && hallAvailability[h.name]?.occupied));
+                        const selectedCount = selectableHalls.filter(h => selectedHalls.includes(h.name)).length;
+                        const allInBlockSelected = selectableHalls.length > 0 && selectedCount === selectableHalls.length;
+
                         return (
-                          <button
-                            type="button"
-                            key={h._id}
-                            className={`checkbox-btn ${isSelected ? 'selected' : ''} ${isOccupied ? 'disabled' : ''}`}
-                            onClick={() => handleHallToggle(h.name)}
-                            disabled={isOccupied}
-                            style={{
-                              padding: '8px 12px',
-                              borderRadius: '10px',
-                              fontSize: '12px',
-                              textAlign: 'left',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '2px',
-                              border: isSelected ? '1.5px solid var(--color-primary)' : '1px solid var(--border-color)',
-                              background: isSelected ? 'rgba(79,70,229,0.08)' : isOccupied ? 'var(--bg-app)' : 'var(--bg-card)',
-                              opacity: isOccupied ? 0.5 : 1,
-                              cursor: isOccupied ? 'not-allowed' : 'pointer',
-                              transition: 'all 0.15s'
-                            }}
-                            title={isOccupied ? "Hall has no vacant seats left at this date/session" : ""}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span style={{ fontWeight: 800, fontSize: '12.5px', color: 'var(--text-primary)' }}>{h.name}</span>
-                              {isSelected && <Check size={12} style={{ color: 'var(--color-primary)' }} />}
+                          <div key={blockName} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '11.5px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.02em' }}>
+                                  🏛️ {blockName}
+                                </span>
+                                <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                                  ({blockHalls.length} halls)
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleBlockToggle(blockName)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'var(--color-primary)',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px'
+                                }}
+                              >
+                                {allInBlockSelected ? 'Deselect Block' : 'Select Entire Block'}
+                              </button>
                             </div>
-                            <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
-                              <span>{benchCount > 0 ? `${benchCount} Benches` : `${h.rows}×${h.columns} Grid`} ({seatsPerBench} seats/bench)</span>
-                              <span style={{ fontWeight: 700, color: isOccupied ? 'var(--color-error)' : 'var(--color-primary)' }}>{vacantText}</span>
+
+                            <div className="checkbox-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '8px' }}>
+                              {blockHalls.map((h) => {
+                                const status = examDate ? hallAvailability[h.name] : null;
+                                const isOccupied = status ? status.occupied : false;
+                                const effectiveCap = getHallCapacityForBenchConfig(h, h.seatsPerBench || 2);
+                                const vacantText = status ? status.msg : `${effectiveCap} Seats`;
+                                const isSelected = selectedHalls.includes(h.name);
+                                const benchCount = h.benches || (h.rows && h.columns ? h.rows * h.columns : 0);
+                                return (
+                                  <button
+                                    type="button"
+                                    key={h._id || h.name}
+                                    className={`checkbox-btn ${isSelected ? 'selected' : ''} ${isOccupied ? 'disabled' : ''}`}
+                                    onClick={() => handleHallToggle(h.name)}
+                                    disabled={isOccupied}
+                                    style={{
+                                      padding: '8px 12px',
+                                      borderRadius: '10px',
+                                      fontSize: '12px',
+                                      textAlign: 'left',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '2px',
+                                      border: isSelected ? '1.5px solid var(--color-primary)' : '1px solid var(--border-color)',
+                                      background: isSelected ? 'rgba(79,70,229,0.08)' : isOccupied ? 'var(--bg-app)' : 'var(--bg-card)',
+                                      opacity: isOccupied ? 0.5 : 1,
+                                      cursor: isOccupied ? 'not-allowed' : 'pointer',
+                                      transition: 'all 0.15s'
+                                    }}
+                                    title={isOccupied ? "Hall has no vacant seats left at this date/session" : ""}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                      <span style={{ fontWeight: 800, fontSize: '12.5px', color: 'var(--text-primary)' }}>{h.name}</span>
+                                      {isSelected && <Check size={12} style={{ color: 'var(--color-primary)' }} />}
+                                    </div>
+                                    <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>{benchCount > 0 ? `${benchCount} Benches` : `${h.rows}×${h.columns} Grid`} ({h.seatsPerBench || 2} spb)</span>
+                                      <span style={{ fontWeight: 700, color: isOccupied ? 'var(--color-error)' : 'var(--color-primary)' }}>{vacantText}</span>
+                                    </div>
+                                  </button>
+                                );
+                              })}
                             </div>
-                          </button>
+                          </div>
                         );
                       })}
                     </div>
@@ -1368,7 +1648,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                     </p>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.3fr', gap: '16px', alignItems: 'center', background: 'var(--bg-card)', padding: '14px 16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'center', background: 'var(--bg-card)', padding: '14px 16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                     {/* Column 1: Exam Date */}
                     <div className="form-group" style={{ margin: 0 }}>
                       <label htmlFor="editExamDate" style={{ fontWeight: 700, fontSize: '12px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)' }}>
@@ -1378,10 +1658,30 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                         type="date" 
                         id="editExamDate" 
                         value={editExamDate}
-                        onChange={(e) => setEditExamDate(e.target.value)}
+                        min={todayStr}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditExamDate(val);
+                          if (val && val < todayStr) {
+                            setEditDateError(`Exams cannot be scheduled for past dates. Please select today (${todayStr}) or a future date.`);
+                          } else {
+                            setEditDateError('');
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const val = e.target.value;
+                          if (val && val < todayStr) {
+                            setEditDateError(`Exams cannot be scheduled for past dates. Please select today (${todayStr}) or a future date.`);
+                          }
+                        }}
                         required
-                        style={{ height: '38px', fontSize: '13px', borderRadius: '8px', padding: '0 12px', border: '1px solid var(--border-color)', background: 'var(--bg-app)', width: '100%', fontWeight: 600 }}
+                        style={{ height: '38px', fontSize: '13px', borderRadius: '8px', padding: '0 12px', border: editDateError ? '1px solid #ef4444' : '1px solid var(--border-color)', background: 'var(--bg-app)', width: '100%', fontWeight: 600 }}
                       />
+                      {editDateError && (
+                        <div style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px', fontWeight: 600 }}>
+                          ⚠️ {editDateError}
+                        </div>
+                      )}
                     </div>
 
                     {/* Column 2: Session */}
@@ -1416,22 +1716,6 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                         </button>
                       </div>
                     </div>
-
-                    {/* Column 3: Bench Configuration */}
-                    <div className="form-group" style={{ margin: 0 }}>
-                      <label htmlFor="editSeatsPerBench" style={{ fontWeight: 700, fontSize: '12px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)' }}>
-                        🪑 Bench Configuration *
-                      </label>
-                      <select 
-                        id="editSeatsPerBench" 
-                        value={editSeatsPerBench}
-                        onChange={(e) => setEditSeatsPerBench(parseInt(e.target.value))}
-                        style={{ height: '38px', fontSize: '12.5px', padding: '0 10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-app)', width: '100%', fontWeight: 600 }}
-                      >
-                        <option value={2}>👥 2 Students / Bench</option>
-                        <option value={3}>👥 3 Students / Bench</option>
-                      </select>
-                    </div>
                   </div>
                 </div>
 
@@ -1465,7 +1749,11 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                     </p>
                   ) : (() => {
                     const { filteredCodes } = filterSubjectCodes(availableSubjectCodes, editSubjectCodeSearch, editActiveYearFilter);
-                    const allFilteredSelected = filteredCodes.length > 0 && filteredCodes.every(c => editSelectedSubjectCodes.includes(c.code));
+                    const editSelectableFilteredCodes = filteredCodes.filter(f => {
+                      const clean = f.code.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+                      return !getSubjectCodeAssignment(clean, editingExam?._id);
+                    });
+                    const allFilteredSelected = editSelectableFilteredCodes.length > 0 && editSelectableFilteredCodes.every(c => editSelectedSubjectCodes.includes(c.code));
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {/* Search + Year Filter + Select All */}
@@ -1480,12 +1768,12 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                               style={{ paddingLeft: '32px', fontSize: '12px', height: '34px', borderRadius: '8px', border: '1px solid var(--border-color)', width: '100%' }}
                             />
                           </div>
-                          {filteredCodes.length > 0 && (
+                          {editSelectableFilteredCodes.length > 0 && (
                             <button type="button" onClick={() => {
                               if (allFilteredSelected) {
-                                setEditSelectedSubjectCodes(prev => prev.filter(c => !filteredCodes.map(f => f.code).includes(c)));
+                                setEditSelectedSubjectCodes(prev => prev.filter(c => !editSelectableFilteredCodes.map(f => f.code).includes(c)));
                               } else {
-                                const toAdd = filteredCodes.map(f => f.code).filter(c => !editSelectedSubjectCodes.includes(c));
+                                const toAdd = editSelectableFilteredCodes.map(f => f.code).filter(c => !editSelectedSubjectCodes.includes(c));
                                 setEditSelectedSubjectCodes(prev => [...prev, ...toAdd]);
                               }
                             }} style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '9999px', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: 700, background: allFilteredSelected ? 'var(--color-primary)' : 'var(--bg-card)', color: allFilteredSelected ? '#fff' : 'var(--text-secondary)', transition: 'all 0.2s' }}>
@@ -1515,6 +1803,8 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                           ) : (
                             filteredCodes.map(({ code }) => {
                               const cleanCode = code.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+                              const assignment = getSubjectCodeAssignment(cleanCode, editingExam?._id);
+                              const isAssigned = !!assignment;
                               const count = editExamDate ? (editRemainingCounts[code.toUpperCase()] || 0) : 1;
                               const isSelected = editSelectedSubjectCodes.includes(code);
 
@@ -1527,14 +1817,21 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                                 });
                               }
                               const hasConflict = !isSelected && conflictCount > 0;
-                              const isDisabled = (editExamDate && count === 0) || hasConflict;
+                              const isDisabled = isAssigned || (editExamDate && count === 0) || hasConflict;
 
                               return (
                                 <button type="button" key={code}
-                                  className={`checkbox-btn ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
+                                  className={`checkbox-btn ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''} ${isAssigned ? 'assigned' : ''}`}
                                   onClick={() => { if (!isDisabled) handleEditSubjectCodeToggle(code); }}
                                   disabled={isDisabled}
-                                  style={isDisabled ? {
+                                  style={isAssigned ? {
+                                    opacity: 0.55,
+                                    cursor: 'not-allowed',
+                                    backgroundColor: 'var(--bg-app)',
+                                    borderColor: 'var(--border-color)',
+                                    color: 'var(--text-muted)',
+                                    fontSize: '12px', padding: '7px 14px', borderRadius: '8px'
+                                  } : isDisabled ? {
                                     opacity: 0.55,
                                     cursor: 'not-allowed',
                                     backgroundColor: hasConflict ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-app)',
@@ -1543,7 +1840,9 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                                     fontSize: '12px', padding: '7px 14px', borderRadius: '8px'
                                   } : { fontSize: '12px', padding: '7px 14px', borderRadius: '8px' }}
                                   title={
-                                    hasConflict
+                                    isAssigned
+                                      ? `Unavailable: Already assigned to exam "${assignment.examName}" (${assignment.date ? assignment.date.split('T')[0] : ''} ${assignment.session || ''})`
+                                      : hasConflict
                                       ? `⚠️ Cannot select: ${conflictCount} student(s) overlap with already selected subjects`
                                       : isDisabled
                                       ? 'No remaining students for this code'
@@ -1553,8 +1852,22 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                                   }
                                 >
                                   {isSelected && <Check size={11} style={{ marginRight: '4px' }} />}
-                                  <span style={{ fontWeight: 700 }}>{code}</span>
-                                  {hasConflict ? (
+                                  <span style={{ fontWeight: 700, textDecoration: isAssigned ? 'line-through' : 'none' }}>{code}</span>
+                                  {isAssigned ? (
+                                    <span style={{
+                                      fontSize: '9px',
+                                      marginLeft: '5px',
+                                      padding: '1px 5px',
+                                      borderRadius: '4px',
+                                      background: 'rgba(100, 116, 139, 0.2)',
+                                      color: 'var(--text-secondary)',
+                                      fontWeight: 800,
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.03em'
+                                    }}>
+                                      Assigned
+                                    </span>
+                                  ) : hasConflict ? (
                                     <span style={{ fontSize: '9.5px', marginLeft: '4px', color: '#ef4444', fontWeight: 800 }}>
                                       ⚠️ Conflict ({conflictCount})
                                     </span>
@@ -1571,65 +1884,163 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                   })()}
                 </div>
 
-                {/* ── Section 3: Hall Allocation Cards ─────────────── */}
-                <div style={{ background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                {/* ── Section 3: Hall Allocation Cards (Block Grouped & Selectable) ─────────────── */}
+                <div style={{ background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Armchair size={16} style={{ color: 'var(--color-primary)' }} />
                       <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: 700, color: 'var(--text-primary)' }}>3. Assign Examination Halls *</h4>
                     </div>
                     {editSelectedHalls.length > 0 && (
-                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '9999px', background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>
-                        {editSelectedHalls.length} halls ({editTotalAssignedCapacity} seats)
+                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '9999px', background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>
+                        ✓ {editSelectedHalls.length} halls ({editTotalAssignedCapacity} seats)
                       </span>
                     )}
                   </div>
+
+                  {/* Block Selection Pills */}
+                  {Object.keys(hallsByBlock).length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', background: 'var(--bg-card)', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Select Block:
+                      </span>
+                      {Object.entries(hallsByBlock).map(([blockName, blockHalls]) => {
+                        const selectableHalls = blockHalls.filter(h => !(editExamDate && editHallAvailability[h.name]?.occupied));
+                        const selectedCount = selectableHalls.filter(h => editSelectedHalls.includes(h.name)).length;
+                        const allInBlockSelected = selectableHalls.length > 0 && selectedCount === selectableHalls.length;
+                        const isPartiallySelected = selectedCount > 0 && selectedCount < selectableHalls.length;
+                        return (
+                          <button
+                            key={blockName}
+                            type="button"
+                            onClick={() => handleEditBlockToggle(blockName)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '11.5px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              border: allInBlockSelected ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
+                              background: allInBlockSelected ? 'var(--color-primary)' : isPartiallySelected ? 'rgba(79,70,229,0.12)' : 'var(--bg-app)',
+                              color: allInBlockSelected ? '#fff' : isPartiallySelected ? 'var(--color-primary)' : 'var(--text-secondary)',
+                              transition: 'all 0.15s ease',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px'
+                            }}
+                          >
+                            <span>{blockName}</span>
+                            <span style={{
+                              fontSize: '10px',
+                              padding: '1px 5px',
+                              borderRadius: '9999px',
+                              background: allInBlockSelected ? 'rgba(255,255,255,0.25)' : 'var(--bg-card)',
+                              color: allInBlockSelected ? '#fff' : 'var(--text-muted)'
+                            }}>
+                              {selectedCount}/{selectableHalls.length}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {halls.length === 0 ? (
                     <p style={{ fontSize: '12px', color: 'var(--color-error)', fontWeight: 600, margin: 0 }}>
                       No halls available. Please add halls in Hall Management first!
                     </p>
                   ) : (
-                    <div className="checkbox-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '8px' }}>
-                      {halls.map((h) => {
-                        const status = editExamDate ? editHallAvailability[h.name] : null;
-                        const isOccupied = status ? status.occupied : false;
-                        const editEffectiveCap = getHallCapacityForBenchConfig(h, editSeatsPerBench);
-                        const vacantText = status ? status.msg : `${editEffectiveCap} Seats`;
-                        const isSelected = editSelectedHalls.includes(h.name);
-                        const benchCount = h.benches || (h.rows && h.columns ? h.rows * h.columns : 0);
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '360px', overflowY: 'auto', paddingRight: '4px' }}>
+                      {Object.entries(hallsByBlock).map(([blockName, blockHalls]) => {
+                        const selectableHalls = blockHalls.filter(h => !(editExamDate && editHallAvailability[h.name]?.occupied));
+                        const selectedCount = selectableHalls.filter(h => editSelectedHalls.includes(h.name)).length;
+                        const allInBlockSelected = selectableHalls.length > 0 && selectedCount === selectableHalls.length;
+
                         return (
-                          <button
-                            type="button"
-                            key={h._id}
-                            className={`checkbox-btn ${isSelected ? 'selected' : ''} ${isOccupied ? 'disabled' : ''}`}
-                            onClick={() => handleEditHallToggle(h.name)}
-                            disabled={isOccupied}
-                            style={{
-                              padding: '8px 12px',
-                              borderRadius: '10px',
-                              fontSize: '12px',
-                              textAlign: 'left',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '2px',
-                              border: isSelected ? '1.5px solid var(--color-primary)' : '1px solid var(--border-color)',
-                              background: isSelected ? 'rgba(79,70,229,0.08)' : isOccupied ? 'var(--bg-app)' : 'var(--bg-card)',
-                              opacity: isOccupied ? 0.5 : 1,
-                              cursor: isOccupied ? 'not-allowed' : 'pointer',
-                              transition: 'all 0.15s'
-                            }}
-                            title={isOccupied ? "Hall has no vacant seats left at this date/session" : ""}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <span style={{ fontWeight: 800, fontSize: '12.5px', color: 'var(--text-primary)' }}>{h.name}</span>
-                              {isSelected && <Check size={12} style={{ color: 'var(--color-primary)' }} />}
+                          <div key={blockName} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '11.5px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.02em' }}>
+                                  🏛️ {blockName}
+                                </span>
+                                <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                                  ({blockHalls.length} halls)
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleEditBlockToggle(blockName)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'var(--color-primary)',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px'
+                                }}
+                              >
+                                {allInBlockSelected ? 'Deselect Block' : 'Select Entire Block'}
+                              </button>
                             </div>
-                            <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
-                              <span>{benchCount > 0 ? `${benchCount} Benches` : `${h.rows}×${h.columns} Grid`} ({editSeatsPerBench} seats/bench)</span>
-                              <span style={{ fontWeight: 700, color: isOccupied ? 'var(--color-error)' : 'var(--color-primary)' }}>{vacantText}</span>
+
+                            <div className="checkbox-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '8px' }}>
+                              {blockHalls.map((h) => {
+                                const status = editExamDate ? editHallAvailability[h.name] : null;
+                                const isOccupied = status ? status.occupied : false;
+                                const savedSnap = editingExam && editingExam.hallSnapshots && 
+                                  (editingExam.hallSnapshots[h.name] || editingExam.hallSnapshots[String(h._id)]);
+                                const currentHallSpb = h.seatsPerBench || 2;
+                                const examSpb = savedSnap ? savedSnap.seatsPerBench : currentHallSpb;
+                                const editEffectiveCap = getHallCapacityForBenchConfig(h, examSpb);
+                                const vacantText = status ? status.msg : `${editEffectiveCap} Seats`;
+                                const isSelected = editSelectedHalls.includes(h.name);
+                                const benchCount = h.benches || (h.rows && h.columns ? h.rows * h.columns : 0);
+                                return (
+                                  <button
+                                    type="button"
+                                    key={h._id || h.name}
+                                    className={`checkbox-btn ${isSelected ? 'selected' : ''} ${isOccupied ? 'disabled' : ''}`}
+                                    onClick={() => handleEditHallToggle(h.name)}
+                                    disabled={isOccupied}
+                                    style={{
+                                      padding: '8px 12px',
+                                      borderRadius: '10px',
+                                      fontSize: '12px',
+                                      textAlign: 'left',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '3px',
+                                      border: isSelected ? '1.5px solid var(--color-primary)' : '1px solid var(--border-color)',
+                                      background: isSelected ? 'rgba(79,70,229,0.08)' : isOccupied ? 'var(--bg-app)' : 'var(--bg-card)',
+                                      opacity: isOccupied ? 0.5 : 1,
+                                      cursor: isOccupied ? 'not-allowed' : 'pointer',
+                                      transition: 'all 0.15s'
+                                    }}
+                                    title={isOccupied ? "Hall has no vacant seats left at this date/session" : ""}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                      <span style={{ fontWeight: 800, fontSize: '12.5px', color: 'var(--text-primary)' }}>{h.name}</span>
+                                      {isSelected && <Check size={12} style={{ color: 'var(--color-primary)' }} />}
+                                    </div>
+                                    <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>{benchCount > 0 ? `${benchCount} Benches` : `${h.rows}×${h.columns} Grid`} ({currentHallSpb} spb default)</span>
+                                      <span style={{ fontWeight: 700, color: isOccupied ? 'var(--color-error)' : 'var(--color-primary)' }}>{vacantText}</span>
+                                    </div>
+                                    {savedSnap && (
+                                      <div style={{ fontSize: '9.5px', color: savedSnap.seatsPerBench !== currentHallSpb ? '#d97706' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
+                                        <span>📋 Saved Snapshot: {savedSnap.seatsPerBench} seats/bench ({savedSnap.capacity} cap)</span>
+                                        {savedSnap.seatsPerBench !== currentHallSpb && (
+                                          <span style={{ fontSize: '8.5px', padding: '1px 4px', borderRadius: '3px', background: 'rgba(245,158,11,0.15)', color: '#d97706', fontWeight: 700 }}>Modified Default</span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </button>
+                                );
+                              })}
                             </div>
-                          </button>
+                          </div>
                         );
                       })}
                     </div>
@@ -1794,22 +2205,29 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                       <table className="data-table sticky-header-table" style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%' }}>
                         <thead>
                           <tr>
-                            <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '20%' }}>CLASS/ CODE NO</th>
-                            <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '50%' }}>REGISTER NO</th>
+                            <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '22%' }}>CLASS/ CODE NO</th>
+                            <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '48%' }}>REGISTER NO</th>
                             <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '15%' }}>CANDIDATE NO</th>
                             <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '15%' }}>TOTAL CANDIDATE NO</th>
                           </tr>
                         </thead>
                         <tbody>
                           {loc.classes.map((cls, idx) => (
-                            <tr key={cls.classCode}>
-                              <td style={{ border: '1px solid var(--border-color)', padding: '10px 8px', textAlign: 'center', fontWeight: 'bold' }}>
-                                {cls.classCode}
+                            <tr key={`${cls.degree || ''}-${cls.subjectCode || ''}-${cls.classCode || idx}`}>
+                              <td style={{ border: '1px solid var(--border-color)', padding: '10px 8px', textAlign: 'center' }}>
+                                <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-primary)' }}>
+                                  {cls.degree || cls.classCode}
+                                </div>
+                                {cls.subjectCode && (
+                                  <div style={{ fontSize: '12px', color: 'var(--color-primary, #4F46E5)', fontWeight: 600, marginTop: '2px' }}>
+                                    {cls.subjectCode}
+                                  </div>
+                                )}
                               </td>
                               <td style={{ border: '1px solid var(--border-color)', padding: '10px 8px', textAlign: 'center', fontSize: '13px' }}>
                                 {cls.summarizedRange}
                               </td>
-                              <td style={{ border: '1px solid var(--border-color)', padding: '10px 8px', textAlign: 'center' }}>
+                              <td style={{ border: '1px solid var(--border-color)', padding: '10px 8px', textAlign: 'center', fontWeight: 'bold' }}>
                                 {cls.count}
                               </td>
                               {idx === 0 && (

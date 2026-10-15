@@ -1,0 +1,212 @@
+[
+  {
+    "id": "1792037460222_axz8u",
+    "type": "hall",
+    "message": "Hall Layout Updated",
+    "detail": "Updated layout for M03: 3 Cols, 13 Benches (39 Seats) for 2026-11-22 FN.",
+    "time": "2026-10-15T04:11:00.222Z"
+  },
+  {
+    "id": "1792037460099_zhefe",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Layout Test Exam 3-Seat. Seated 26 students across 1 halls.",
+    "time": "2026-10-15T04:11:00.099Z"
+  },
+  {
+    "id": "1792037459742_qonz6",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Layout Test Exam 3-Seat. Seated 26 students across 1 halls.",
+    "time": "2026-10-15T04:10:59.742Z"
+  },
+  {
+    "id": "1792037459305_98gl1",
+    "type": "exam",
+    "message": "Exam Scheduled",
+    "detail": "Layout Test Exam 3-Seat scheduled for 2026-11-22 (FN). Assigned to 1 halls.",
+    "time": "2026-10-15T04:10:59.305Z"
+  },
+  {
+    "id": "1792037459095_ramqd",
+    "type": "hall",
+    "message": "Hall Layout Updated",
+    "detail": "Updated layout for M02: 4 Cols, 13 Benches (26 Seats) for 2026-11-20 FN.",
+    "time": "2026-10-15T04:10:59.095Z"
+  },
+  {
+    "id": "1792037458963_f8b0j",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Unrelated Exam Different Date. Seated 26 students across 1 halls.",
+    "time": "2026-10-15T04:10:58.963Z"
+  },
+  {
+    "id": "1792037458720_02pmm",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Unrelated Exam Different Date. Seated 26 students across 1 halls.",
+    "time": "2026-10-15T04:10:58.720Z"
+  },
+  {
+    "id": "1792037458476_y7awx",
+    "type": "exam",
+    "message": "Exam Scheduled",
+    "detail": "Unrelated Exam Different Date scheduled for 2026-11-25 (AN). Assigned to 1 halls.",
+    "time": "2026-10-15T04:10:58.476Z"
+  },
+  {
+    "id": "1792037458204_su9kl",
+    "type": "hall",
+    "message": "Hall Layout Updated",
+    "detail": "Updated layout for M02: 3 Cols, 13 Benches (26 Seats) for 2026-11-20 FN.",
+    "time": "2026-10-15T04:10:58.204Z"
+  },
+  {
+    "id": "1792037458084_6ajlu",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Layout Test Exam 2-Seat. Seated 26 students across 1 halls.",
+    "time": "2026-10-15T04:10:58.084Z"
+  },
+  {
+    "id": "1792037457748_tlq0a",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Layout Test Exam 2-Seat. Seated 26 students across 1 halls.",
+    "time": "2026-10-15T04:10:57.748Z"
+  },
+  {
+    "id": "1792037457424_ynboz",
+    "type": "exam",
+    "message": "Exam Scheduled",
+    "detail": "Layout Test Exam 2-Seat scheduled for 2026-11-20 (FN). Assigned to 1 halls.",
+    "time": "2026-10-15T04:10:57.424Z"
+  },
+  {
+    "id": "1792037442477_z6aqk",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "A01 (A' BLOCK) updated: 34 seats (17 benches, 2 seats/bench).",
+    "time": "2026-10-15T04:10:42.477Z"
+  },
+  {
+    "id": "1792037442450_la7ij",
+    "type": "exam",
+    "message": "Exam Cancelled",
+    "detail": "Automated Test Exam 2 was deleted.",
+    "time": "2026-10-15T04:10:42.450Z"
+  },
+  {
+    "id": "1792037442393_qkajk",
+    "type": "exam",
+    "message": "Exam Cancelled",
+    "detail": "Automated Test Exam 1 - Explicitly Edited was deleted.",
+    "time": "2026-10-15T04:10:42.393Z"
+  },
+  {
+    "id": "1792037442331_uqmz7",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Automated Test Exam 2. Seated 1 students across 2 halls.",
+    "time": "2026-10-15T04:10:42.331Z"
+  },
+  {
+    "id": "1792037442057_ivble",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Automated Test Exam 1 - Explicitly Edited. Seated 1 students across 3 halls.",
+    "time": "2026-10-15T04:10:42.057Z"
+  },
+  {
+    "id": "1792037441608_8lkie",
+    "type": "exam",
+    "message": "Exam Updated",
+    "detail": "Automated Test Exam 1 - Explicitly Edited configuration was updated.",
+    "time": "2026-10-15T04:10:41.608Z"
+  },
+  {
+    "id": "1792037441604_uy47r",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Automated Test Exam 1 - Explicitly Edited. Seated 1 students across 3 halls.",
+    "time": "2026-10-15T04:10:41.604Z"
+  },
+  {
+    "id": "1792037441208_uosre",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Automated Test Exam 1 - Explicitly Edited. Seated 1 students across 3 halls.",
+    "time": "2026-10-15T04:10:41.208Z"
+  },
+  {
+    "id": "1792037440804_wopvs",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Automated Test Exam 1 - Explicitly Edited. Seated 1 students across 3 halls.",
+    "time": "2026-10-15T04:10:40.804Z"
+  },
+  {
+    "id": "1792037440288_5vz0e",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Automated Test Exam 2. Seated 1 students across 2 halls.",
+    "time": "2026-10-15T04:10:40.288Z"
+  },
+  {
+    "id": "1792037439979_ppcjd",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Automated Test Exam 2. Seated 1 students across 2 halls.",
+    "time": "2026-10-15T04:10:39.979Z"
+  },
+  {
+    "id": "1792037439677_tltkg",
+    "type": "exam",
+    "message": "Exam Scheduled",
+    "detail": "Automated Test Exam 2 scheduled for 2026-11-27 (AN). Assigned to 2 halls.",
+    "time": "2026-10-15T04:10:39.677Z"
+  },
+  {
+    "id": "1792037439612_ahscn",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "A01 (A' BLOCK) updated: 30 seats (15 benches, 2 seats/bench).",
+    "time": "2026-10-15T04:10:39.612Z"
+  },
+  {
+    "id": "1792037439583_amab4",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Automated Test Exam 1. Seated 1 students across 2 halls.",
+    "time": "2026-10-15T04:10:39.583Z"
+  },
+  {
+    "id": "1792037439270_hj23p",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Automated Test Exam 1. Seated 1 students across 2 halls.",
+    "time": "2026-10-15T04:10:39.270Z"
+  },
+  {
+    "id": "1792037438962_pw8q3",
+    "type": "exam",
+    "message": "Exam Scheduled",
+    "detail": "Automated Test Exam 1 scheduled for 2026-11-26 (FN). Assigned to 2 halls.",
+    "time": "2026-10-15T04:10:38.962Z"
+  },
+  {
+    "id": "1792037438854_u1io5",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "A01 (A' BLOCK) updated: 51 seats (17 benches, 3 seats/bench).",
+    "time": "2026-10-15T04:10:38.854Z"
+  },
+  {
+    "id": "1792037438814_1cv6i",
+    "type": "hall",
+    "message": "Official Halls Seeded",
+    "detail": "Successfully configured 43 official halls across 5 blocks.",
+    "time": "2026-10-15T04:10:38.814Z"
+  }
+]

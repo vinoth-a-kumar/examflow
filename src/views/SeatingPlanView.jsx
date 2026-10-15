@@ -20,12 +20,15 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
   const [selectedSession, setSelectedSession] = useState('FN');
   const [selectedHallId, setSelectedHallId] = useState('');
   const [showAllUnseated, setShowAllUnseated] = useState(false);
-  const [showAllSeating, setShowAllSeating] = useState(false);
+  const [showAllSeating, setShowAllSeating] = useState(true);
   const [seatingPlan, setSeatingPlan] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [viewFormat, setViewFormat] = useState('university');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState('ALL');
+  const [selectedSubCodeFilter, setSelectedSubCodeFilter] = useState('ALL');
+  const [selectedLevelFilter, setSelectedLevelFilter] = useState('ALL');
+  const [rosterHallScope, setRosterHallScope] = useState('ALL');
   const [rosterData, setRosterData] = useState(null);
   const [showLabelExportMenu, setShowLabelExportMenu] = useState(false);
   const [allHallsLabelSequence, setAllHallsLabelSequence] = useState([]);
@@ -43,7 +46,8 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
   const fetchAllHallsLabelSequence = useCallback(async () => {
     if (!selectedDate || !selectedSession) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/seating/labels/download-csv?date=${selectedDate}&session=${selectedSession}`);
+      const base = window.API_BASE || 'http://localhost:5000';
+      const response = await fetch(`${base}/api/seating/labels/download-csv?date=${selectedDate}&session=${selectedSession}`);
       if (response.ok) {
         const text = await response.text();
         const regNos = text.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
@@ -67,19 +71,22 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
 
   const handleDownloadLabelsPdf = () => {
     if (!selectedDate || !selectedSession) return;
-    const url = `http://localhost:5000/api/seating/labels/download-pdf?date=${selectedDate}&session=${selectedSession}`;
+    const base = window.API_BASE || 'http://localhost:5000';
+    const url = `${base}/api/seating/labels/download-pdf?date=${selectedDate}&session=${selectedSession}`;
     window.open(url, '_blank');
   };
 
   const handleDownloadLabelsExcel = () => {
     if (!selectedDate || !selectedSession) return;
-    const url = `http://localhost:5000/api/seating/labels/download-excel?date=${selectedDate}&session=${selectedSession}`;
+    const base = window.API_BASE || 'http://localhost:5000';
+    const url = `${base}/api/seating/labels/download-excel?date=${selectedDate}&session=${selectedSession}`;
     window.open(url, '_blank');
   };
 
   const handleDownloadLabelsCsv = () => {
     if (!selectedDate || !selectedSession) return;
-    const url = `http://localhost:5000/api/seating/labels/download-csv?date=${selectedDate}&session=${selectedSession}`;
+    const base = window.API_BASE || 'http://localhost:5000';
+    const url = `${base}/api/seating/labels/download-csv?date=${selectedDate}&session=${selectedSession}`;
     window.open(url, '_blank');
   };
 
@@ -102,6 +109,9 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
   // Handle Date change in seating plan, auto-selecting available session
   const handleDateChange = (newDate) => {
     setSelectedDate(newDate);
+    setSelectedDeptFilter('ALL');
+    setSelectedSubCodeFilter('ALL');
+    setSelectedLevelFilter('ALL');
     if (newDate && exams) {
       const examsOnDate = exams.filter(e => e.date && e.date.split('T')[0] === newDate);
       if (examsOnDate.length > 0) {
@@ -120,15 +130,36 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
     return (exams || []).filter(e => e.date && e.date.split('T')[0] === selectedDate && e.session === selectedSession);
   }, [exams, selectedDate, selectedSession]);
 
-  // Find all halls assigned to any exams on the selected date and session
+  // Find all halls assigned to any exams on the selected date and session strictly in configured hall order
   const examHalls = React.useMemo(() => {
-    const hallNames = new Set();
+    const result = [];
+    const seen = new Set();
     examsOnSelectedDate.forEach(e => {
-      if (e.assignedHalls) {
-        e.assignedHalls.forEach(h => hallNames.add(h));
+      if (Array.isArray(e.assignedHalls)) {
+        e.assignedHalls.forEach(hIdentifier => {
+          const key = String(hIdentifier).trim();
+          const lowerKey = key.toLowerCase();
+          if (!seen.has(lowerKey)) {
+            seen.add(lowerKey);
+            let hallObj = null;
+            if (e.hallSnapshots) {
+              hallObj = e.hallSnapshots[key] ||
+                        e.hallSnapshots[String(key)] ||
+                        Object.values(e.hallSnapshots).find(s => s && (s.name === key || String(s._id) === key));
+            }
+            if (!hallObj && Array.isArray(halls)) {
+              hallObj = halls.find(h => h && (h.name === key || String(h._id) === key));
+            }
+            if (hallObj) {
+              result.push(hallObj);
+            } else {
+              result.push({ _id: key, name: key });
+            }
+          }
+        });
       }
     });
-    return (halls || []).filter(h => h && hallNames.has(h.name));
+    return result;
   }, [halls, examsOnSelectedDate]);
 
 
@@ -163,22 +194,69 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
     return match ? match.time : (selectedSession === 'FN' ? '10:00 AM - 01:00 PM' : '02:00 PM - 05:00 PM');
   }, [selectedDate, selectedSession, exams]);
 
-  // Handle download Excel action (Department-wise or All Departments)
+  // Dynamically extract all available Subject Codes for the selected Date and Session (UG first, then PG)
+  const availableSubCodesForDate = useMemo(() => {
+    if (!selectedDate || !selectedSession || !exams) return [];
+    const targetDateStr = selectedDate.split('T')[0];
+    const examsOnDate = exams.filter(e => e.date && e.date.split('T')[0] === targetDateStr && e.session === selectedSession);
+    const codes = new Set();
+    examsOnDate.forEach(e => {
+      (e.subjectCodes || []).forEach(c => {
+        if (c && c.trim()) codes.add(c.trim().toUpperCase());
+      });
+    });
+    (rosterData?.subjectCodes || []).forEach(c => {
+      if (c && c.trim()) codes.add(c.trim().toUpperCase());
+    });
+    const allCodes = Array.from(codes);
+    if (rosterData?.subjectCodes && rosterData.subjectCodes.length > 0) {
+      const backendOrder = rosterData.subjectCodes;
+      return allCodes.sort((a, b) => {
+        const idxA = backendOrder.indexOf(a);
+        const idxB = backendOrder.indexOf(b);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return a.localeCompare(b);
+      });
+    }
+    return allCodes.sort();
+  }, [selectedDate, selectedSession, exams, rosterData]);
+
+  // Handle download Excel action (Department-wise or All Departments, Subject-wise or All Subjects, Level-wise or All Levels)
   const handleDownloadExcel = () => {
     if (!selectedDate || !selectedSession) return;
-    let url = `http://localhost:5000/api/seating/download-roster?date=${selectedDate}&session=${selectedSession}&department=${selectedDeptFilter}`;
-    if (selectedHallId) {
-      url += `&hallId=${selectedHallId}`;
+    const base = window.API_BASE || 'http://localhost:5000';
+    let url = `${base}/api/seating/download-roster?date=${selectedDate}&session=${selectedSession}&department=${selectedDeptFilter}`;
+    if (selectedSubCodeFilter && selectedSubCodeFilter !== 'ALL') {
+      url += `&subjectCodes=${encodeURIComponent(selectedSubCodeFilter)}`;
+    }
+    if (selectedLevelFilter && selectedLevelFilter !== 'ALL') {
+      url += `&level=${encodeURIComponent(selectedLevelFilter)}`;
+    }
+    if (rosterHallScope === 'CURRENT' && selectedHallId) {
+      url += `&hallId=${encodeURIComponent(selectedHallId)}`;
+    } else {
+      url += `&hallId=ALL`;
     }
     window.open(url, '_blank');
   };
 
-  // Handle download PDF action
+  // Handle download PDF action (Department-wise or All Departments, Subject-wise or All Subjects, Level-wise or All Levels)
   const handleDownloadRosterPdf = () => {
     if (!selectedDate || !selectedSession) return;
-    let url = `http://localhost:5000/api/seating/roster/download-pdf?date=${selectedDate}&session=${selectedSession}&department=${selectedDeptFilter}`;
-    if (selectedHallId) {
-      url += `&hallId=${selectedHallId}`;
+    const base = window.API_BASE || 'http://localhost:5000';
+    let url = `${base}/api/seating/roster/download-pdf?date=${selectedDate}&session=${selectedSession}&department=${selectedDeptFilter}`;
+    if (selectedSubCodeFilter && selectedSubCodeFilter !== 'ALL') {
+      url += `&subjectCodes=${encodeURIComponent(selectedSubCodeFilter)}`;
+    }
+    if (selectedLevelFilter && selectedLevelFilter !== 'ALL') {
+      url += `&level=${encodeURIComponent(selectedLevelFilter)}`;
+    }
+    if (rosterHallScope === 'CURRENT' && selectedHallId) {
+      url += `&hallId=${encodeURIComponent(selectedHallId)}`;
+    } else {
+      url += `&hallId=ALL`;
     }
     window.open(url, '_blank');
   };
@@ -187,7 +265,17 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
     if (!selectedDate || !selectedSession) return;
     try {
       let url = `http://localhost:5000/api/seating/attendance-roster?date=${selectedDate}&session=${selectedSession}&department=${selectedDeptFilter}`;
-      if (selectedHallId) url += `&hallId=${selectedHallId}`;
+      if (selectedSubCodeFilter && selectedSubCodeFilter !== 'ALL') {
+        url += `&subjectCodes=${encodeURIComponent(selectedSubCodeFilter)}`;
+      }
+      if (selectedLevelFilter && selectedLevelFilter !== 'ALL') {
+        url += `&level=${encodeURIComponent(selectedLevelFilter)}`;
+      }
+      if (rosterHallScope === 'CURRENT' && selectedHallId) {
+        url += `&hallId=${encodeURIComponent(selectedHallId)}`;
+      } else {
+        url += `&hallId=ALL`;
+      }
       const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
@@ -196,7 +284,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
     } catch (err) {
       console.error(err);
     }
-  }, [selectedDate, selectedSession, selectedDeptFilter, selectedHallId]);
+  }, [selectedDate, selectedSession, selectedDeptFilter, selectedSubCodeFilter, selectedLevelFilter, rosterHallScope, selectedHallId]);
 
   useEffect(() => {
     if (selectedDate && selectedSession) {
@@ -209,6 +297,12 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
   }, [halls, selectedHallId]);
 
   const colsCount = useMemo(() => {
+    if (seatingPlan && seatingPlan.hallSnapshot && seatingPlan.hallSnapshot.columns) {
+      return seatingPlan.hallSnapshot.columns;
+    }
+    if (seatingPlan && seatingPlan.columns) {
+      return seatingPlan.columns;
+    }
     if (seatingPlan && seatingPlan.seatingGrid && seatingPlan.seatingGrid.length > 0) {
       const maxCol = Math.max(...seatingPlan.seatingGrid.map(b => b.col || parseInt(String(b.benchCode || '').replace(/^[A-Za-z]+/, '') || 1)));
       if (maxCol && !isNaN(maxCol) && maxCol > 0) return maxCol;
@@ -243,18 +337,21 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
     return 17;
   };
 
-  // Open Layout Modal and prefill with current Hall values
+  // Open Layout Modal and prefill with current Hall values (prioritizing exam's saved hallSnapshot)
   const openLayoutModal = () => {
-    if (selectedHall) {
+    const activeSnapshot = seatingPlan?.hallSnapshot || null;
+    if (selectedHall || activeSnapshot) {
       const examMatch = examsOnSelectedDate[0];
-      const spb = examMatch?.seatsPerBench || 2;
-      const maxBenches = getHallMaxBenches(selectedHall, spb);
-      const cols = selectedHall.columns || 1;
+      const spb = activeSnapshot?.seatsPerBench || selectedHall?.seatsPerBench || examMatch?.seatsPerBench || 2;
+      const maxBenches = getHallMaxBenches(selectedHall || activeSnapshot, spb);
+      const cols = activeSnapshot?.columns || selectedHall?.columns || 1;
 
       let cRows = [];
-      if (Array.isArray(selectedHall.columnRows) && selectedHall.columnRows.length >= cols) {
+      if (activeSnapshot && Array.isArray(activeSnapshot.columnRows) && activeSnapshot.columnRows.length >= cols) {
+        cRows = activeSnapshot.columnRows.slice(0, cols).map(n => Math.max(1, parseInt(n) || 1));
+      } else if (selectedHall && Array.isArray(selectedHall.columnRows) && selectedHall.columnRows.length >= cols) {
         cRows = selectedHall.columnRows.slice(0, cols).map(n => Math.max(1, parseInt(n) || 1));
-      } else if (selectedHall.csvData && Array.isArray(selectedHall.csvData.columnRows) && selectedHall.csvData.columnRows.length >= cols) {
+      } else if (selectedHall?.csvData && Array.isArray(selectedHall.csvData.columnRows) && selectedHall.csvData.columnRows.length >= cols) {
         cRows = selectedHall.csvData.columnRows.slice(0, cols).map(n => Math.max(1, parseInt(n) || 1));
       } else {
         const baseR = Math.floor(maxBenches / cols);
@@ -346,76 +443,65 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
     }
   };
 
-  // Save Hall Layout (Rows & Columns) & Re-allocate Seating Arrangement
+  // Save Hall Layout (Rows & Columns) & Persist Seating Arrangement
   const handleSaveLayout = async () => {
-    if (!selectedHall) return;
+    if (!selectedHall && !seatingPlan?.hallSnapshot) return;
     const c = parseInt(customCols) || 1;
     const cRows = columnRows.slice(0, c).map(n => Math.max(1, parseInt(n) || 1));
     const maxR = Math.max(...cRows, 1);
     const totalB = cRows.reduce((sum, r) => sum + r, 0);
     const spb = parseInt(customSeatsPerBench) || 2;
     const totalCap = totalB * spb;
+    const assignedCount = (seatingPlan?.attendanceRoster && seatingPlan.attendanceRoster.length) || seatingPlan?.totalStudents || 0;
+
+    if (assignedCount > 0 && totalCap < assignedCount) {
+      alert(`Cannot update layout: New capacity (${totalCap} seats) cannot accommodate the ${assignedCount} students currently assigned to this hall.`);
+      return;
+    }
 
     setIsSavingLayout(true);
     setLayoutSuccessMsg('');
 
     try {
-      // 1. Update Hall dimensions in backend DB
-      const targetId = selectedHall._id || selectedHall.name;
-      const res = await fetch(`http://localhost:5000/api/halls/${targetId}`, {
-        method: 'PUT',
+      const res = await fetch('http://localhost:5000/api/seating/update-layout', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: selectedHall.name,
-          rows: maxR,
+          date: selectedDate,
+          session: selectedSession,
+          hallId: selectedHallId || selectedHall?._id || selectedHall?.name,
+          examId: seatingPlan?.examId || examsOnSelectedDate[0]?._id,
           columns: c,
+          rows: maxR,
           columnRows: cRows,
           benches: totalB,
-          capacity: totalCap
+          seatsPerBench: spb
         })
       });
 
+      const data = await res.json();
       if (!res.ok) {
-        const errData = await res.json();
-        alert('Failed to update hall layout: ' + (errData.error || errData.message));
+        alert('Failed to update hall layout: ' + (data.error || data.message || 'Unknown error'));
         setIsSavingLayout(false);
         return;
       }
 
-      // 2. Refresh global halls state across the application
-      if (refreshData) {
-        await refreshData();
+      if (data.plan) {
+        setSeatingPlan(data.plan);
       }
 
-      // 3. If Date and Session are selected, immediately regenerate seating plan with new layout
-      if (selectedDate && selectedSession && selectedHallId) {
-        const genRes = await fetch('http://localhost:5000/api/seating/generate-by-date-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            date: selectedDate,
-            session: selectedSession,
-            hallId: selectedHallId,
-            seatsPerBench: spb
-          })
-        });
-        if (genRes.ok) {
-          const newPlan = await genRes.json();
-          setSeatingPlan(newPlan);
-          setErrorMsg('');
-        }
-        await fetchRosterData();
-        await fetchAllHallsLabelSequence();
-      }
+      await fetchRosterData();
+      await fetchAllHallsLabelSequence();
 
-      setLayoutSuccessMsg(`Hall ${selectedHall.name} layout saved: ${c} Columns (${cRows.join(', ')} rows) · ${totalB} Benches!`);
+      const hallDisplayName = selectedHall?.name || seatingPlan?.hallName || 'Hall';
+      setLayoutSuccessMsg(`Hall ${hallDisplayName} layout saved: ${c} Columns (${cRows.join(', ')} rows) · ${totalB} Benches!`);
       setTimeout(() => {
         setIsLayoutModalOpen(false);
         setLayoutSuccessMsg('');
       }, 1000);
     } catch (err) {
       console.error('Error saving hall layout:', err);
-      alert('Error updating layout.');
+      alert('Error updating layout: ' + err.message);
     } finally {
       setIsSavingLayout(false);
     }
@@ -517,7 +603,8 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
       alert('Please select Date, Session, and Hall to download PDF.');
       return;
     }
-    const url = `http://localhost:5000/api/seating/layout/download-pdf?date=${selectedDate}&session=${selectedSession}&hallId=${selectedHallId}`;
+    const base = window.API_BASE || 'http://localhost:5000';
+    const url = `${base}/api/seating/layout/download-pdf?date=${selectedDate}&session=${selectedSession}&hallId=${selectedHallId}`;
     window.open(url, '_blank');
   };
 
@@ -591,9 +678,6 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
       return;
     }
 
-    const collegeName = collegeDetails?.name || "RAJAPALAYAM RAJUS' COLLEGE (AUTONOMOUS)";
-    const collegeAddress = collegeDetails?.address || "Affiliated to Madurai Kamaraj University | Re-accredited with 'A' Grade by NAAC";
-
     printWin.document.write(`
       <!DOCTYPE html>
       <html>
@@ -616,32 +700,6 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
             background: #ffffff;
             margin: 0;
             padding: 8px;
-          }
-          .header-container {
-            text-align: center;
-            border-bottom: 2px solid #334155;
-            padding-bottom: 8px;
-            margin-bottom: 10px;
-          }
-          .college-title {
-            font-size: 16px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin: 0 0 2px 0;
-            color: #0f172a;
-          }
-          .college-subtitle {
-            font-size: 11px;
-            color: #475569;
-            margin: 0 0 6px 0;
-          }
-          .doc-title {
-            font-size: 13px;
-            font-weight: 800;
-            text-decoration: underline;
-            letter-spacing: 0.5px;
-            color: #1e293b;
           }
           .meta-grid {
             display: grid;
@@ -776,13 +834,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
       <body>
         <div class="no-print-toolbar">
           <button class="btn-action" onclick="window.print()">🖨️ Print Document</button>
-          <a class="btn-action" href="http://localhost:5000/api/seating/layout/download-pdf?date=${selectedDate}&session=${selectedSession}&hallId=${selectedHallId}" style="text-decoration:none; display:inline-block;" target="_blank">📥 Download PDF File</a>
-        </div>
-
-        <div class="header-container">
-          <h1 class="college-title">${collegeName}</h1>
-          <p class="college-subtitle">${collegeAddress}</p>
-          <div class="doc-title">EXAMINATION SEATING ARRANGEMENT</div>
+          <a class="btn-action" href="${window.API_BASE || 'http://localhost:5000'}/api/seating/layout/download-pdf?date=${selectedDate}&session=${selectedSession}&hallId=${selectedHallId}" style="text-decoration:none; display:inline-block;" target="_blank">📥 Download PDF File</a>
         </div>
 
         <div class="meta-grid">
@@ -1114,7 +1166,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                       }
                     }
                     const totalBenches = seatingPlan.totalBenches || 0;
-                    const seatsPerBench = seatingPlan.seatsPerBench || 2;
+                    const seatsPerBench = seatingPlan?.hallSnapshot?.seatsPerBench || selectedHall?.seatsPerBench || seatingPlan.seatsPerBench || 2;
                     const cap = totalBenches * seatsPerBench;
                     const students = (seatingPlan.attendanceRoster && seatingPlan.attendanceRoster.length) || (seatingPlan.totalStudents || 0);
                     if (seatingPlan.emptySeats !== undefined && seatingPlan.emptySeats !== null) {
@@ -1364,7 +1416,12 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                         
                         <div className="bench-seats">
                           <div className={`bench-seat ${bench.seat1 ? 'seat-left' : 'empty'}`} title={bench.seat1 ? `${bench.seat1.name} (${bench.seat1.department}${bench.seat1.subjectCode ? ' - ' + bench.seat1.subjectCode : ''})` : 'Empty'}>
-                            {bench.seat1 ? bench.seat1.registerNo : 'Empty'}
+                            {bench.seat1 ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.2 }}>
+                                <span>{bench.seat1.registerNo}</span>
+                                <span style={{ fontSize: '9px', fontWeight: 800, opacity: 0.85 }}>{bench.seat1.department}</span>
+                              </div>
+                            ) : 'Empty'}
                           </div>
                           
                           <div className="bench-divider" />
@@ -1372,15 +1429,30 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                           {bench.seat3 !== undefined && (
                             <>
                               <div className={`bench-seat ${bench.seat2 ? 'seat-middle' : 'empty'}`} title={bench.seat2 ? `${bench.seat2.name} (${bench.seat2.department}${bench.seat2.subjectCode ? ' - ' + bench.seat2.subjectCode : ''})` : 'Empty'}>
-                                {bench.seat2 ? bench.seat2.registerNo : 'Empty'}
+                                {bench.seat2 ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.2 }}>
+                                    <span>{bench.seat2.registerNo}</span>
+                                    <span style={{ fontSize: '9px', fontWeight: 800, opacity: 0.85 }}>{bench.seat2.department}</span>
+                                  </div>
+                                ) : 'Empty'}
                               </div>
                               <div className="bench-divider" />
                             </>
                           )}
                           
-                          <div className={`bench-seat ${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? 'seat-right' : 'empty'}`} title={(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? `${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).name} (${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).department}${(bench.seat3 !== undefined ? bench.seat3 : bench.seat2).subjectCode ? ' - ' + (bench.seat3 !== undefined ? bench.seat3 : bench.seat2).subjectCode : ''})` : 'Empty'}>
-                            {(bench.seat3 !== undefined ? bench.seat3 : bench.seat2) ? (bench.seat3 !== undefined ? bench.seat3 : bench.seat2).registerNo : 'Empty'}
-                          </div>
+                          {(() => {
+                            const rightStudent = bench.seat3 !== undefined ? bench.seat3 : bench.seat2;
+                            return (
+                              <div className={`bench-seat ${rightStudent ? 'seat-right' : 'empty'}`} title={rightStudent ? `${rightStudent.name} (${rightStudent.department}${rightStudent.subjectCode ? ' - ' + rightStudent.subjectCode : ''})` : 'Empty'}>
+                                {rightStudent ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.2 }}>
+                                    <span>{rightStudent.registerNo}</span>
+                                    <span style={{ fontSize: '9px', fontWeight: 800, opacity: 0.85 }}>{rightStudent.department}</span>
+                                  </div>
+                                ) : 'Empty'}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     );
@@ -1420,10 +1492,54 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                   Export as formatted Excel (.xlsx) or print university-style attendance sheets by Department and Subject Code.
                 </p>
               </div>
-              <div className="no-print" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="no-print" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* Subject Code Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Subject:</label>
+                  <select
+                    value={selectedSubCodeFilter}
+                    onChange={(e) => setSelectedSubCodeFilter(e.target.value)}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-app)',
+                      color: 'var(--text-primary)',
+                      fontWeight: 'bold',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="ALL">All Subjects</option>
+                    {availableSubCodesForDate.map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Scope / Hall Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Hall Scope:</label>
+                  <select
+                    value={rosterHallScope}
+                    onChange={(e) => setRosterHallScope(e.target.value)}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-app)',
+                      color: 'var(--text-primary)',
+                      fontWeight: 'bold',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="ALL">All Halls (All Students)</option>
+                    <option value="CURRENT">Current Hall ({selectedHall ? selectedHall.name : 'Selected'})</option>
+                  </select>
+                </div>
+
                 {/* Department Selector */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Dept:</label>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Dept:</label>
                   <select
                     value={selectedDeptFilter}
                     onChange={(e) => setSelectedDeptFilter(e.target.value)}
@@ -1434,13 +1550,35 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                       background: 'var(--bg-app)',
                       color: 'var(--text-primary)',
                       fontWeight: 'bold',
-                      fontSize: '13px'
+                      fontSize: '12px'
                     }}
                   >
                     <option value="ALL">All Departments</option>
                     {(rosterData?.departments || []).map(dept => (
                       <option key={dept} value={dept}>{dept}</option>
                     ))}
+                  </select>
+                </div>
+
+                {/* Academic Level Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Level:</label>
+                  <select
+                    value={selectedLevelFilter}
+                    onChange={(e) => setSelectedLevelFilter(e.target.value)}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-app)',
+                      color: 'var(--text-primary)',
+                      fontWeight: 'bold',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="ALL">All Levels (UG first, then PG)</option>
+                    <option value="UG">UG Only</option>
+                    <option value="PG">PG Only</option>
                   </select>
                 </div>
 
@@ -1483,6 +1621,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                     <tr>
                       <th>Register No</th>
                       <th>Name</th>
+                      <th>Department</th>
                       <th>Bench</th>
                       <th>Seat Position</th>
                     </tr>
@@ -1490,15 +1629,27 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                   <tbody>
                     {(!seatingPlan || !seatingPlan.attendanceRoster || seatingPlan.attendanceRoster.length === 0) ? (
                       <tr>
-                        <td colSpan="4" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px' }}>
+                        <td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '16px' }}>
                           No student seats allocated in this hall.
                         </td>
                       </tr>
                     ) : (
                       seatingPlan.attendanceRoster.map((item, idx) => (
                         <tr key={`${item.registerNo || 'rost'}-${idx}`}>
-                          <td style={{ fontWeight: 600 }}>{item.registerNo}</td>
+                          <td style={{ fontWeight: 600 }}>
+                            {item.registerNo}
+                            {item.isArrear ? (
+                              <span style={{ marginLeft: '6px', fontSize: '10px', padding: '1px 6px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', fontWeight: 800 }}>
+                                ARREAR
+                              </span>
+                            ) : null}
+                          </td>
                           <td>{item.name}</td>
+                          <td>
+                            <span className="status-pill info" style={{ fontSize: '11px', padding: '2px 8px', fontWeight: 'bold' }}>
+                              {item.department || 'GENERAL'}
+                            </span>
+                          </td>
                           <td style={{ fontWeight: 'bold' }}>{item.bench}</td>
                           <td>
                             <span className={`status-pill ${item.seat === 'Left' ? 'success' : 'info'}`} style={{ fontSize: '11px', padding: '2px 8px' }}>
@@ -1524,6 +1675,28 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
 
                 return (
                   <div className="university-rosters-scroll-container">
+                    {/* Header info badge showing segregation rule */}
+                    <div className="no-print" style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 16px',
+                      marginBottom: '16px',
+                      background: 'var(--bg-app)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-color)',
+                      fontSize: '13px',
+                      flexWrap: 'wrap',
+                      gap: '8px'
+                    }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                        Subject: <strong style={{ color: 'var(--primary-color)' }}>{selectedSubCodeFilter === 'ALL' ? 'All Subjects' : selectedSubCodeFilter}</strong> · Level: <strong style={{ color: selectedLevelFilter === 'UG' ? '#059669' : selectedLevelFilter === 'PG' ? '#4f46e5' : 'var(--text-primary)' }}>{selectedLevelFilter === 'ALL' ? 'UG first, then PG' : selectedLevelFilter}</strong> · Total Sheets: <strong>{pages.length}</strong> · Total Candidates: <strong>{rosterData.totalStudents || pages.reduce((sum, p) => sum + (p.students?.length || 0), 0)}</strong>
+                      </span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                        📋 25 candidates/sheet · UG sheets shown first, then PG · Each department strictly separated onto a fresh sheet
+                      </span>
+                    </div>
+
                     <div className="university-rosters-wrapper">
                     {pages.map((page, pIdx) => {
                       const blankRowsCount = Math.max(0, 25 - (page.students ? page.students.length : 0));
@@ -1538,6 +1711,37 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                             marginBottom: '32px'
                           }}
                         >
+                          {/* Department Banner (Screen Only) */}
+                          <div className="no-print" style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '14px',
+                            padding: '6px 14px',
+                            background: 'var(--bg-app)',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--border-color)',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            color: 'var(--text-secondary)'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 800,
+                                background: page.academicLevel === 'UG' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(99, 102, 241, 0.15)',
+                                color: page.academicLevel === 'UG' ? '#059669' : '#4f46e5',
+                                border: page.academicLevel === 'UG' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(99, 102, 241, 0.3)'
+                              }}>
+                                {page.academicLevel || 'UG'}
+                              </span>
+                              <span>Subject: <strong style={{ color: 'var(--primary-color)' }}>{page.subjectCode}</strong> · Dept: <strong>{page.deptName}</strong> ({page.degree || page.deptName})</span>
+                            </div>
+                            <span>Sheet {page.pageNum} of {page.totalPages} • Candidates: {page.students.length} / 25</span>
+                          </div>
+
                           {/* Official Header - Repeated on Every Page */}
                           <div className="uni-roster-header">
                             <h1 className="uni-title">MADURAI KAMARAJ UNIVERSITY EXAMINATIONS</h1>
@@ -1574,7 +1778,9 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                               {page.students.map((student, idx) => (
                                 <tr key={`${student.registerNo || 'std'}-${idx}`}>
                                   <td className="text-center" style={{ fontWeight: 'bold' }}>{page.startIndex + idx}</td>
-                                  <td style={{ fontWeight: 600 }}>{student.registerNo}</td>
+                                  <td style={{ fontWeight: 600 }}>
+                                    {student.registerNo}
+                                  </td>
                                   <td className="text-uppercase">{student.name}</td>
                                   <td className="empty-sig-cell"></td>
                                 </tr>
@@ -1639,11 +1845,32 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
           if (!studentRegNos || studentRegNos.length === 0) {
             studentRegNos = [];
             if (seatingPlan && Array.isArray(seatingPlan.seatingGrid)) {
-              seatingPlan.seatingGrid.forEach(bench => {
-                if (bench.seat1 && bench.seat1.registerNo) studentRegNos.push(bench.seat1.registerNo);
-                if (bench.seat2 && bench.seat2.registerNo) studentRegNos.push(bench.seat2.registerNo);
-                if (bench.seat3 && bench.seat3.registerNo) studentRegNos.push(bench.seat3.registerNo);
-              });
+              const cols = seatingPlan.columns || 4;
+              const colRows = seatingPlan.columnRows || [];
+              const benchMap = new Map();
+              seatingPlan.seatingGrid.forEach(b => { if (b && b.benchCode) benchMap.set(b.benchCode, b); });
+              for (let c = 1; c <= cols; c++) {
+                const rCount = colRows[c - 1] !== undefined ? colRows[c - 1] : 6;
+                if (c % 2 === 1) {
+                  for (let r = 0; r < rCount; r++) {
+                    const b = benchMap.get(`${String.fromCharCode(65 + r)}${c}`);
+                    if (b && !b.isPlaceholder) {
+                      if (b.seat1?.registerNo) studentRegNos.push(b.seat1.registerNo);
+                      if (b.seat2?.registerNo) studentRegNos.push(b.seat2.registerNo);
+                      if (b.seat3?.registerNo) studentRegNos.push(b.seat3.registerNo);
+                    }
+                  }
+                } else {
+                  for (let r = rCount - 1; r >= 0; r--) {
+                    const b = benchMap.get(`${String.fromCharCode(65 + r)}${c}`);
+                    if (b && !b.isPlaceholder) {
+                      if (b.seat1?.registerNo) studentRegNos.push(b.seat1.registerNo);
+                      if (b.seat2?.registerNo) studentRegNos.push(b.seat2.registerNo);
+                      if (b.seat3?.registerNo) studentRegNos.push(b.seat3.registerNo);
+                    }
+                  }
+                }
+              }
             }
           }
 
@@ -2015,17 +2242,19 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
               const activeRows = columnRows.slice(0, c).map(n => Math.max(1, parseInt(n) || 1));
               const totalBenchesCount = activeRows.reduce((a, b) => a + b, 0);
               const totalCapacityCount = totalBenchesCount * spb;
+              const assignedCount = (seatingPlan?.attendanceRoster && seatingPlan.attendanceRoster.length) || seatingPlan?.totalStudents || 0;
+              const isInsufficient = assignedCount > 0 && totalCapacityCount < assignedCount;
               const isMatched = totalBenchesCount === maxBenches;
               const isExceeded = totalBenchesCount > maxBenches;
 
               return (
                 <div style={{
-                  background: isExceeded 
+                  background: (isExceeded || isInsufficient)
                     ? 'rgba(239, 68, 68, 0.08)' 
                     : isMatched 
                       ? 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(79,70,229,0.05))' 
                       : 'linear-gradient(135deg, rgba(79,70,229,0.06), rgba(139,92,246,0.03))',
-                  border: isExceeded 
+                  border: (isExceeded || isInsufficient)
                     ? '1.5px solid #ef4444' 
                     : isMatched 
                       ? '1.5px solid #10b981' 
@@ -2050,10 +2279,10 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                     </div>
                     <div>
                       <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', display: 'block' }}>Seating Capacity</span>
-                      <span style={{ fontSize: '20px', fontWeight: 800, color: isExceeded ? '#ef4444' : '#10b981' }}>
+                      <span style={{ fontSize: '20px', fontWeight: 800, color: (isExceeded || isInsufficient) ? '#ef4444' : '#10b981' }}>
                         {totalCapacityCount}
                       </span>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>Seats ({spb} per bench)</span>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>Seats ({spb} per bench){assignedCount > 0 ? ` · ${assignedCount} assigned` : ''}</span>
                     </div>
                     <div>
                       <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', display: 'block' }}>Columns Breakdown</span>
@@ -2063,7 +2292,21 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                     </div>
                   </div>
 
-                  {isMatched && (
+                  {isInsufficient && (
+                    <div style={{
+                      fontSize: '11.5px',
+                      fontWeight: 700,
+                      color: '#dc2626',
+                      background: 'rgba(239,68,68,0.12)',
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      textAlign: 'center'
+                    }}>
+                      ⚠ Cannot Accommodate Students! Hall currently has {assignedCount} assigned students, but new layout only provides {totalCapacityCount} seats.
+                    </div>
+                  )}
+
+                  {!isInsufficient && isMatched && (
                     <div style={{
                       fontSize: '11.5px',
                       fontWeight: 700,
@@ -2077,7 +2320,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                     </div>
                   )}
 
-                  {!isMatched && !isExceeded && (
+                  {!isInsufficient && !isMatched && !isExceeded && (
                     <div style={{
                       fontSize: '11.5px',
                       fontWeight: 600,
@@ -2147,7 +2390,8 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                   const maxB = getHallMaxBenches(selectedHall, spb);
                   const act = columnRows.slice(0, c).map(n => Math.max(1, parseInt(n) || 1));
                   const tot = act.reduce((a, b) => a + b, 0);
-                  return tot === 0 || tot > maxB;
+                  const assigned = (seatingPlan?.attendanceRoster && seatingPlan.attendanceRoster.length) || seatingPlan?.totalStudents || 0;
+                  return tot === 0 || tot > maxB || (assigned > 0 && tot * spb < assigned);
                 })()}
                 style={{
                   padding: '10px 22px',

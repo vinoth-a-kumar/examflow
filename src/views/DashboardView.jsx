@@ -64,7 +64,11 @@ function DashboardView({ stats, activities, setTab, onClearActivities }) {
   const capacityFormatted = `${totalCapacity.toLocaleString()} / ${cap3Val.toLocaleString()}`;
 
   const totalStudentsInDist = departmentDistribution.reduce((sum, d) => sum + d.count, 0);
-  const colors = ['#4f46e5', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#14b8a6'];
+  const colors = [
+    '#4f46e5', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444',
+    '#06b6d4', '#ec4899', '#14b8a6', '#6366f1', '#84cc16',
+    '#f97316', '#3b82f6'
+  ];
 
   let accumulatedPercentage = 0;
 
@@ -175,7 +179,7 @@ function DashboardView({ stats, activities, setTab, onClearActivities }) {
                       accumulatedPercentage += percentage;
                       return (
                         <circle
-                          key={dept.department}
+                          key={dept.department || dept.degree || idx}
                           cx="21" cy="21" r="15.915"
                           fill="transparent"
                           stroke={colors[idx % colors.length]}
@@ -196,10 +200,10 @@ function DashboardView({ stats, activities, setTab, onClearActivities }) {
 
               <div className="chart-legend" style={{ flex: 1, minWidth: '180px' }}>
                 {departmentDistribution.map((dept, idx) => (
-                  <div className="legend-item" key={dept.department}>
+                  <div className="legend-item" key={dept.department || dept.degree || idx}>
                     <div className="legend-label">
                       <div className="legend-dot" style={{ backgroundColor: colors[idx % colors.length] }} />
-                      <span style={{ fontWeight: 600 }}>{dept.department}</span>
+                      <span style={{ fontWeight: 600 }}>{dept.department || dept.degree}</span>
                     </div>
                     <span className="legend-val">{dept.count.toLocaleString()} <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: '11px' }}>({dept.percentage}%)</span></span>
                   </div>

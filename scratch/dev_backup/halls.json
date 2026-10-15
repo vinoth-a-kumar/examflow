@@ -1,0 +1,746 @@
+[
+  {
+    "_id": "timfgewmv893206",
+    "name": "M02",
+    "block": "MAIN BLOCK",
+    "benches": 13,
+    "seatsPerBench": 2,
+    "capacity": 26,
+    "rows": 4,
+    "columns": 4,
+    "columnRows": [
+      3,
+      3,
+      3,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 1,
+    "csvData": {
+      "seatsPerBench": 13
+    }
+  },
+  {
+    "_id": "6uwr7knmv89320o",
+    "name": "M03",
+    "block": "MAIN BLOCK",
+    "benches": 13,
+    "seatsPerBench": 2,
+    "capacity": 26,
+    "rows": 5,
+    "columns": 3,
+    "columnRows": [
+      5,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 2
+  },
+  {
+    "_id": "w2yxy88mv893216",
+    "name": "M04",
+    "block": "MAIN BLOCK",
+    "benches": 13,
+    "seatsPerBench": 2,
+    "capacity": 26,
+    "rows": 5,
+    "columns": 3,
+    "columnRows": [
+      5,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 3
+  },
+  {
+    "_id": "vt5j6kwmv89321n",
+    "name": "M05",
+    "block": "MAIN BLOCK",
+    "benches": 13,
+    "seatsPerBench": 2,
+    "capacity": 26,
+    "rows": 5,
+    "columns": 3,
+    "columnRows": [
+      5,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 4
+  },
+  {
+    "_id": "p0yoxe7mv893224",
+    "name": "M06",
+    "block": "MAIN BLOCK",
+    "benches": 13,
+    "seatsPerBench": 2,
+    "capacity": 26,
+    "rows": 5,
+    "columns": 3,
+    "columnRows": [
+      5,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 5
+  },
+  {
+    "_id": "ek7qjtgmv89322m",
+    "name": "M07",
+    "block": "MAIN BLOCK",
+    "benches": 13,
+    "seatsPerBench": 2,
+    "capacity": 26,
+    "rows": 5,
+    "columns": 3,
+    "columnRows": [
+      5,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 6
+  },
+  {
+    "_id": "h6hbimpmv893234",
+    "name": "M10",
+    "block": "MAIN BLOCK",
+    "benches": 17,
+    "seatsPerBench": 2,
+    "capacity": 34,
+    "rows": 6,
+    "columns": 3,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 7
+  },
+  {
+    "_id": "njhn7lbmv89323l",
+    "name": "M11",
+    "block": "MAIN BLOCK",
+    "benches": 17,
+    "seatsPerBench": 2,
+    "capacity": 34,
+    "rows": 6,
+    "columns": 3,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 8
+  },
+  {
+    "_id": "tzt9qg7mv893241",
+    "name": "M12",
+    "block": "MAIN BLOCK",
+    "benches": 17,
+    "seatsPerBench": 2,
+    "capacity": 34,
+    "rows": 6,
+    "columns": 3,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 9
+  },
+  {
+    "_id": "b1eneiemv89324h",
+    "name": "M14",
+    "block": "MAIN BLOCK",
+    "benches": 17,
+    "seatsPerBench": 2,
+    "capacity": 34,
+    "rows": 6,
+    "columns": 3,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 10
+  },
+  {
+    "_id": "46mpot7mv89324z",
+    "name": "M16",
+    "block": "MAIN BLOCK",
+    "benches": 17,
+    "seatsPerBench": 2,
+    "capacity": 34,
+    "rows": 6,
+    "columns": 3,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 11
+  },
+  {
+    "_id": "q359uabmv89325g",
+    "name": "M19",
+    "block": "MAIN BLOCK",
+    "benches": 17,
+    "seatsPerBench": 2,
+    "capacity": 34,
+    "rows": 6,
+    "columns": 3,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 12
+  },
+  {
+    "_id": "zpylsmtmv89325x",
+    "name": "M23",
+    "block": "MAIN BLOCK",
+    "benches": 17,
+    "seatsPerBench": 2,
+    "capacity": 34,
+    "rows": 6,
+    "columns": 3,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 13
+  },
+  {
+    "_id": "sd3o9egmv89326e",
+    "name": "M24",
+    "block": "MAIN BLOCK",
+    "benches": 17,
+    "seatsPerBench": 2,
+    "capacity": 34,
+    "rows": 6,
+    "columns": 3,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 14
+  },
+  {
+    "_id": "8rdxhukmv89326v",
+    "name": "M25",
+    "block": "MAIN BLOCK",
+    "benches": 17,
+    "seatsPerBench": 2,
+    "capacity": 34,
+    "rows": 6,
+    "columns": 3,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 15
+  },
+  {
+    "_id": "m4ypxj0mv89327c",
+    "name": "A01",
+    "block": "A' BLOCK",
+    "benches": 17,
+    "seatsPerBench": 2,
+    "capacity": 34,
+    "rows": 6,
+    "columns": 3,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 16,
+    "csvData": {
+      "seatsPerBench": 17
+    }
+  },
+  {
+    "_id": "eem6dgbmv89327w",
+    "name": "A02",
+    "block": "A' BLOCK",
+    "benches": 17,
+    "seatsPerBench": 2,
+    "capacity": 34,
+    "rows": 6,
+    "columns": 3,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 17
+  },
+  {
+    "_id": "tdrinr4mv89328e",
+    "name": "A03",
+    "block": "A' BLOCK",
+    "benches": 17,
+    "seatsPerBench": 2,
+    "capacity": 34,
+    "rows": 6,
+    "columns": 3,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 18
+  },
+  {
+    "_id": "p0dl2xemv89328x",
+    "name": "A06",
+    "block": "A' BLOCK",
+    "benches": 15,
+    "seatsPerBench": 2,
+    "capacity": 30,
+    "rows": 5,
+    "columns": 3,
+    "columnRows": [
+      5,
+      5,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 19
+  },
+  {
+    "_id": "qt1a7b1mv89329g",
+    "name": "A07",
+    "block": "A' BLOCK",
+    "benches": 15,
+    "seatsPerBench": 2,
+    "capacity": 30,
+    "rows": 5,
+    "columns": 3,
+    "columnRows": [
+      5,
+      5,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 20
+  },
+  {
+    "_id": "teuecqdmv89329x",
+    "name": "A08",
+    "block": "A' BLOCK",
+    "benches": 15,
+    "seatsPerBench": 2,
+    "capacity": 30,
+    "rows": 5,
+    "columns": 3,
+    "columnRows": [
+      5,
+      5,
+      5
+    ],
+    "columnGaps": null,
+    "idx": 21
+  },
+  {
+    "_id": "1hvo45smv8932af",
+    "name": "B01",
+    "block": "B' BLOCK",
+    "benches": 16,
+    "seatsPerBench": 2,
+    "capacity": 32,
+    "rows": 4,
+    "columns": 4,
+    "columnRows": [
+      4,
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 22
+  },
+  {
+    "_id": "0u6oqnomv8932av",
+    "name": "B02",
+    "block": "B' BLOCK",
+    "benches": 16,
+    "seatsPerBench": 2,
+    "capacity": 32,
+    "rows": 4,
+    "columns": 4,
+    "columnRows": [
+      4,
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 23
+  },
+  {
+    "_id": "kdveucvmv8932bc",
+    "name": "B03",
+    "block": "B' BLOCK",
+    "benches": 16,
+    "seatsPerBench": 2,
+    "capacity": 32,
+    "rows": 4,
+    "columns": 4,
+    "columnRows": [
+      4,
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 24
+  },
+  {
+    "_id": "ntgvjhzmv8932bt",
+    "name": "B04",
+    "block": "B' BLOCK",
+    "benches": 16,
+    "seatsPerBench": 2,
+    "capacity": 32,
+    "rows": 4,
+    "columns": 4,
+    "columnRows": [
+      4,
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 25
+  },
+  {
+    "_id": "2f8x5tqmv8932ca",
+    "name": "B05",
+    "block": "B' BLOCK",
+    "benches": 16,
+    "seatsPerBench": 2,
+    "capacity": 32,
+    "rows": 4,
+    "columns": 4,
+    "columnRows": [
+      4,
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 26
+  },
+  {
+    "_id": "s9wnuo1mv8932ct",
+    "name": "B06",
+    "block": "B' BLOCK",
+    "benches": 16,
+    "seatsPerBench": 2,
+    "capacity": 32,
+    "rows": 4,
+    "columns": 4,
+    "columnRows": [
+      4,
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 27
+  },
+  {
+    "_id": "sub3u0hmv8932db",
+    "name": "C02",
+    "block": "C' BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 28
+  },
+  {
+    "_id": "cl7a0enmv8932du",
+    "name": "C03",
+    "block": "C' BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 29
+  },
+  {
+    "_id": "nb5a1admv8932ea",
+    "name": "C04",
+    "block": "C' BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 30
+  },
+  {
+    "_id": "rlgfpesmv8932et",
+    "name": "C05",
+    "block": "C' BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 31
+  },
+  {
+    "_id": "gb4yna5mv8932fd",
+    "name": "C06",
+    "block": "C' BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 32
+  },
+  {
+    "_id": "jhwh7i5mv8932fv",
+    "name": "S01",
+    "block": "SCIENCE BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 33
+  },
+  {
+    "_id": "whoao3pmv8932gc",
+    "name": "S02",
+    "block": "SCIENCE BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 34
+  },
+  {
+    "_id": "60xi64jmv8932gs",
+    "name": "S03",
+    "block": "SCIENCE BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 35
+  },
+  {
+    "_id": "axuiuikmv8932hb",
+    "name": "S05",
+    "block": "SCIENCE BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 36
+  },
+  {
+    "_id": "bknxqcqmv8932hu",
+    "name": "S06",
+    "block": "SCIENCE BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 37
+  },
+  {
+    "_id": "vh31nzamv8932id",
+    "name": "S10",
+    "block": "SCIENCE BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 38
+  },
+  {
+    "_id": "fga2lykmv8932iv",
+    "name": "S11",
+    "block": "SCIENCE BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 39
+  },
+  {
+    "_id": "pzs54n5mv8932jb",
+    "name": "S12",
+    "block": "SCIENCE BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 40
+  },
+  {
+    "_id": "o6am5aomv8932jt",
+    "name": "S15",
+    "block": "SCIENCE BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 41
+  },
+  {
+    "_id": "lhn7ez5mv8932ka",
+    "name": "S16",
+    "block": "SCIENCE BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 42
+  },
+  {
+    "name": "S17",
+    "block": "SCIENCE BLOCK",
+    "benches": 12,
+    "seatsPerBench": 2,
+    "capacity": 24,
+    "rows": 4,
+    "columns": 3,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "columnGaps": null,
+    "idx": 43,
+    "_id": "n1mqy9vmv8932ks"
+  }
+]

@@ -12,6 +12,7 @@
 /build
 
 # misc
+_audit_backup/
 .DS_Store
 .env
 .env.*
