@@ -2014,7 +2014,6 @@ body {
 
 .footer-row {
   display: flex;
-  justify-content: space-between;
   margin-bottom: 12px;
 }
 
@@ -2022,9 +2021,20 @@ body {
   flex: 1;
   display: flex;
   align-items: center;
+  text-align: left;
 }
 
-.footer-cell.text-right { justify-content: flex-end; }
+.footer-cell.left-col {
+  flex: 0 0 52%;
+  width: 52%;
+  justify-content: flex-start;
+}
+
+.footer-cell.right-col {
+  flex: 0 0 48%;
+  width: 48%;
+  justify-content: flex-start;
+}
 
 .bottom-line {
   flex-grow: 1;
@@ -2037,7 +2047,7 @@ body {
 
 .sig-row {
   margin-top: 36px !important;
-  border-top: 1px dashed var(--border-color);
+  border-top: none !important;
   padding-top: 16px;
 }
 

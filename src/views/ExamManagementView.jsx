@@ -57,15 +57,17 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
   const [locLoading, setLocLoading] = useState(false);
   const [locError, setLocError] = useState('');
 
-  // Dropdown states for Location and Nominal Roll download menus
+  // Dropdown states for Location, Nominal Roll, and Invigilator Report download menus
   const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
   const [nominalDropdownOpen, setNominalDropdownOpen] = useState(false);
+  const [invigilatorDropdownOpen, setInvigilatorDropdownOpen] = useState(false);
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
       if (!e.target.closest('.download-dropdown-wrapper')) {
         setLocationDropdownOpen(false);
         setNominalDropdownOpen(false);
+        setInvigilatorDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -383,6 +385,132 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     }
   };
 
+  const handleDownloadInvigilatorReportPdf = async () => {
+    if (!locDate || !locSession) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/seating/download-invigilator-report-pdf?date=${locDate}&session=${locSession}`);
+      
+      const contentType = response.headers.get('content-type') || '';
+      
+      if (!response.ok || contentType.includes('application/json')) {
+        let errorMsg = 'Failed to download Invigilator Report PDF.';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errData.message || errorMsg;
+        } catch (_) {
+          const text = await response.text();
+          if (text) errorMsg = text;
+        }
+        setLocError(errorMsg);
+        alert(errorMsg);
+        return;
+      }
+
+      const rawBlob = await response.blob();
+      const pdfBlob = new Blob([rawBlob], { type: 'application/pdf' });
+
+      let filename = '';
+      const disposition = response.headers.get('content-disposition');
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (match && match[1]) {
+          filename = match[1].replace(/['"]/g, '').trim();
+        }
+      }
+
+      if (!filename || !filename.toLowerCase().endsWith('.pdf')) {
+        let formattedDate = locDate;
+        try {
+          const d = new Date(locDate);
+          if (!isNaN(d.getTime())) {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            formattedDate = `${dd}-${mm}-${yyyy}`;
+          }
+        } catch (_) {}
+        filename = `Invigilator_Report_${formattedDate}_${locSession}.pdf`;
+      }
+
+      const objectUrl = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      console.error('Error downloading Invigilator Report PDF:', err);
+      setLocError('Failed to download Invigilator Report PDF: ' + err.message);
+      alert('Failed to download Invigilator Report PDF: ' + err.message);
+    }
+  };
+
+  const handleDownloadInvigilatorReportExcel = async () => {
+    if (!locDate || !locSession) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/seating/download-invigilator-report-excel?date=${locDate}&session=${locSession}`);
+      
+      const contentType = response.headers.get('content-type') || '';
+      
+      if (!response.ok || contentType.includes('application/json')) {
+        let errorMsg = 'Failed to download Invigilator Report Excel file.';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errData.message || errorMsg;
+        } catch (_) {
+          const text = await response.text();
+          if (text) errorMsg = text;
+        }
+        setLocError(errorMsg);
+        alert(errorMsg);
+        return;
+      }
+
+      const rawBlob = await response.blob();
+      const excelBlob = new Blob([rawBlob], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+
+      let filename = '';
+      const disposition = response.headers.get('content-disposition');
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (match && match[1]) {
+          filename = match[1].replace(/['"]/g, '').trim();
+        }
+      }
+
+      if (!filename || !filename.toLowerCase().endsWith('.xlsx')) {
+        let formattedDate = locDate;
+        try {
+          const d = new Date(locDate);
+          if (!isNaN(d.getTime())) {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            formattedDate = `${dd}-${mm}-${yyyy}`;
+          }
+        } catch (_) {}
+        filename = `Invigilator_Report_${formattedDate}_${locSession}.xlsx`;
+      }
+
+      const objectUrl = window.URL.createObjectURL(excelBlob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      console.error('Error downloading Invigilator Report Excel:', err);
+      setLocError('Failed to download Invigilator Report Excel: ' + err.message);
+      alert('Failed to download Invigilator Report Excel: ' + err.message);
+    }
+  };
+
   // Edit states
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingExam, setEditingExam] = useState(null);
@@ -498,6 +626,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     return map;
   }, [halls]);
 
+  // eslint-disable-next-line no-unused-vars
   const sortHallsByConfiguredOrder = (hallNames) => {
     const nameToIdx = new Map((halls || []).map((h, i) => [h.name, h.idx !== undefined ? h.idx : i]));
     return [...hallNames].sort((a, b) => (nameToIdx.get(a) || 0) - (nameToIdx.get(b) || 0));
@@ -797,7 +926,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     if (selectedHalls.includes(hallName)) {
       setSelectedHalls(selectedHalls.filter(h => h !== hallName));
     } else {
-      setSelectedHalls(sortHallsByConfiguredOrder([...selectedHalls, hallName]));
+      setSelectedHalls([...selectedHalls, hallName]);
     }
   };
 
@@ -812,8 +941,8 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     if (allSelected) {
       setSelectedHalls(selectedHalls.filter(name => !blockHallNames.includes(name)));
     } else {
-      const merged = Array.from(new Set([...selectedHalls, ...blockHallNames]));
-      setSelectedHalls(sortHallsByConfiguredOrder(merged));
+      const toAdd = blockHallNames.filter(name => !selectedHalls.includes(name));
+      setSelectedHalls([...selectedHalls, ...toAdd]);
     }
   };
 
@@ -891,7 +1020,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     if (editSelectedHalls.includes(hallName)) {
       setEditSelectedHalls(editSelectedHalls.filter(h => h !== hallName));
     } else {
-      setEditSelectedHalls(sortHallsByConfiguredOrder([...editSelectedHalls, hallName]));
+      setEditSelectedHalls([...editSelectedHalls, hallName]);
     }
   };
 
@@ -906,8 +1035,8 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     if (allSelected) {
       setEditSelectedHalls(editSelectedHalls.filter(name => !blockHallNames.includes(name)));
     } else {
-      const merged = Array.from(new Set([...editSelectedHalls, ...blockHallNames]));
-      setEditSelectedHalls(sortHallsByConfiguredOrder(merged));
+      const toAdd = blockHallNames.filter(name => !editSelectedHalls.includes(name));
+      setEditSelectedHalls([...editSelectedHalls, ...toAdd]);
     }
   };
 
@@ -2458,6 +2587,99 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                   </div>
                 )}
               </div>
+
+              {/* Hall-wise Invigilator Report Download Dropdown */}
+              <div className="download-dropdown-wrapper" style={{ position: 'relative', display: 'inline-block' }}>
+                <button 
+                  type="button"
+                  className="btn-secondary" 
+                  onClick={() => {
+                    setInvigilatorDropdownOpen(prev => !prev);
+                    setLocationDropdownOpen(false);
+                    setNominalDropdownOpen(false);
+                  }}
+                  style={{ height: '42px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Download size={16} />
+                  <span>Hall-wise Invigilator Report</span>
+                  <ChevronDown size={14} style={{ marginLeft: '2px', transition: 'transform 0.2s', transform: invigilatorDropdownOpen ? 'rotate(180deg)' : 'none' }} />
+                </button>
+
+                {invigilatorDropdownOpen && (
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      left: 0,
+                      zIndex: 100,
+                      minWidth: '220px',
+                      backgroundColor: 'var(--surface-card, #ffffff)',
+                      border: '1px solid var(--border-color, #e5e7eb)',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      padding: '4px',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDownloadInvigilatorReportPdf();
+                        setInvigilatorDropdownOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '9px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: 'var(--text-primary, #111827)',
+                        cursor: 'pointer',
+                        borderRadius: '6px',
+                        transition: 'background-color 0.15s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover, #f3f4f6)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <FileText size={15} style={{ color: '#ef4444' }} />
+                      <span>Download PDF (.pdf)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDownloadInvigilatorReportExcel();
+                        setInvigilatorDropdownOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '9px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: 'var(--text-primary, #111827)',
+                        cursor: 'pointer',
+                        borderRadius: '6px',
+                        transition: 'background-color 0.15s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover, #f3f4f6)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
+                      <span>Download Excel (.xlsx)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -2507,7 +2729,8 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                       background: 'var(--bg-app)', 
                       borderRadius: 'var(--radius-sm)',
                       borderLeft: '4px solid var(--color-primary)',
-                      color: 'var(--text-primary)'
+                      color: 'var(--text-primary)',
+                      textAlign: 'center'
                     }}>
                       HALL NO. {loc.hallName}
                     </div>

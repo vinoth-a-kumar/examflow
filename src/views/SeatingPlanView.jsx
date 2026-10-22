@@ -1799,29 +1799,26 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                           {/* Official Footer Section - Repeated on Every Page */}
                           <div className="uni-roster-footer">
                             <div className="footer-row">
-                              <div className="footer-cell">
+                              <div className="footer-cell left-col">
                                 <strong>Absentees Reg. No.:</strong>
-                                <span className="bottom-line"></span>
                               </div>
-                              <div className="footer-cell text-right">
-                                <strong>Hall No.:</strong> {page.hallName || 'ALL'}
+                              <div className="footer-cell right-col">
+                                <strong>Hall No.:</strong>
                               </div>
                             </div>
-                            <div className="footer-row">
-                              <div className="footer-cell">
+                            <div className="footer-row" style={{ marginTop: '18px' }}>
+                              <div className="footer-cell left-col">
                                 <strong>Total No. of Absentees:</strong>
-                                <span className="bottom-line" style={{ maxWidth: '80px', minWidth: '60px' }}></span>
                               </div>
-                              <div className="footer-cell text-right">
+                              <div className="footer-cell right-col">
                                 <strong>Name of the Invigilator and College:</strong>
-                                <span className="bottom-line" style={{ minWidth: '220px' }}></span>
                               </div>
                             </div>
-                            <div className="footer-row sig-row">
-                              <div className="footer-cell" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                            <div className="footer-row sig-row" style={{ marginTop: '36px' }}>
+                              <div className="footer-cell left-col" style={{ fontWeight: 'bold', fontSize: '13px' }}>
                                 Signature of the Chief Superintendent
                               </div>
-                              <div className="footer-cell text-right" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                              <div className="footer-cell right-col" style={{ fontWeight: 'bold', fontSize: '13px' }}>
                                 Signature of the Invigilator
                               </div>
                             </div>
@@ -1865,24 +1862,72 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                   }
                 }
               });
-              for (let c = 1; c <= cols; c++) {
-                const rCount = Math.max(colMaxRowMap.get(c) || 0, colRows[c - 1] !== undefined ? colRows[c - 1] : (seatingPlan.rows || 6));
-                if (c % 2 === 1) { // Odd column: top to bottom
-                  for (let r = 0; r < rCount; r++) {
-                    const b = benchMap.get(`${getRowLetterHelper(r)}${c}`);
-                    if (b && !b.isPlaceholder) {
-                      if (b.seat1?.registerNo) studentRegNos.push(b.seat1.registerNo);
-                      if (b.seat2?.registerNo) studentRegNos.push(b.seat2.registerNo);
-                      if (b.seat3?.registerNo) studentRegNos.push(b.seat3.registerNo);
+
+              const distinctSubs = new Set();
+              let hasSeat3 = false;
+              benchMap.forEach(b => {
+                if (b && !b.isPlaceholder) {
+                  if (b.seat3) hasSeat3 = true;
+                  ['seat1', 'seat2', 'seat3'].forEach(k => {
+                    const st = b[k];
+                    if (st) {
+                      const sc = (st.subjectCode || st.code || '').trim().toUpperCase();
+                      if (sc && sc !== 'GENERAL' && sc !== 'UNKNOWN') distinctSubs.add(sc);
+                    }
+                  });
+                }
+              });
+              const isSingleSub = distinctSubs.size <= 1;
+              const is2SeatHall = (parseInt(seatingPlan.seatsPerBench) === 2) || (!hasSeat3 && benchMap.size > 0);
+
+              if (is2SeatHall && isSingleSub) {
+                for (let c = 1; c <= cols; c++) {
+                  const rCount = Math.max(colMaxRowMap.get(c) || 0, colRows[c - 1] !== undefined ? colRows[c - 1] : (seatingPlan.rows || 6));
+                  const colBenchCodes = [];
+                  if (c % 2 === 1) { // Odd column: top to bottom
+                    for (let r = 0; r < rCount; r++) {
+                      colBenchCodes.push(`${getRowLetterHelper(r)}${c}`);
+                    }
+                  } else { // Even column: bottom to top
+                    for (let r = rCount - 1; r >= 0; r--) {
+                      colBenchCodes.push(`${getRowLetterHelper(r)}${c}`);
                     }
                   }
-                } else { // Even column: bottom to top
-                  for (let r = rCount - 1; r >= 0; r--) {
-                    const b = benchMap.get(`${getRowLetterHelper(r)}${c}`);
-                    if (b && !b.isPlaceholder) {
-                      if (b.seat1?.registerNo) studentRegNos.push(b.seat1.registerNo);
-                      if (b.seat2?.registerNo) studentRegNos.push(b.seat2.registerNo);
-                      if (b.seat3?.registerNo) studentRegNos.push(b.seat3.registerNo);
+                  // 1. First extract Left seat (seat1) along column traversal
+                  colBenchCodes.forEach(code => {
+                    const b = benchMap.get(code);
+                    if (b && !b.isPlaceholder && b.seat1?.registerNo) {
+                      studentRegNos.push(b.seat1.registerNo);
+                    }
+                  });
+                  // 2. Next extract Right seat (seat2) along column traversal
+                  colBenchCodes.forEach(code => {
+                    const b = benchMap.get(code);
+                    if (b && !b.isPlaceholder && b.seat2?.registerNo) {
+                      studentRegNos.push(b.seat2.registerNo);
+                    }
+                  });
+                }
+              } else {
+                for (let c = 1; c <= cols; c++) {
+                  const rCount = Math.max(colMaxRowMap.get(c) || 0, colRows[c - 1] !== undefined ? colRows[c - 1] : (seatingPlan.rows || 6));
+                  if (c % 2 === 1) { // Odd column: top to bottom
+                    for (let r = 0; r < rCount; r++) {
+                      const b = benchMap.get(`${getRowLetterHelper(r)}${c}`);
+                      if (b && !b.isPlaceholder) {
+                        if (b.seat1?.registerNo) studentRegNos.push(b.seat1.registerNo);
+                        if (b.seat2?.registerNo) studentRegNos.push(b.seat2.registerNo);
+                        if (b.seat3?.registerNo) studentRegNos.push(b.seat3.registerNo);
+                      }
+                    }
+                  } else { // Even column: bottom to top
+                    for (let r = rCount - 1; r >= 0; r--) {
+                      const b = benchMap.get(`${getRowLetterHelper(r)}${c}`);
+                      if (b && !b.isPlaceholder) {
+                        if (b.seat1?.registerNo) studentRegNos.push(b.seat1.registerNo);
+                        if (b.seat2?.registerNo) studentRegNos.push(b.seat2.registerNo);
+                        if (b.seat3?.registerNo) studentRegNos.push(b.seat3.registerNo);
+                      }
                     }
                   }
                 }

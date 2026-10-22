@@ -12,8 +12,20 @@ window.getApiUrl = function(path) {
 
 const originalFetch = window.fetch;
 window.fetch = function (input, init) {
-  if (typeof input === 'string' && input.startsWith('http://localhost:5000')) {
-    input = input.replace('http://localhost:5000', window.API_BASE);
+  if (typeof input === 'string') {
+    if (input.startsWith('http://localhost:5000')) {
+      input = input.replace('http://localhost:5000', window.API_BASE);
+    } else if (input.startsWith('http://127.0.0.1:5000')) {
+      input = input.replace('http://127.0.0.1:5000', window.API_BASE);
+    }
+  } else if (input && typeof input.url === 'string') {
+    let newUrl = input.url;
+    if (newUrl.startsWith('http://localhost:5000')) {
+      newUrl = newUrl.replace('http://localhost:5000', window.API_BASE);
+    } else if (newUrl.startsWith('http://127.0.0.1:5000')) {
+      newUrl = newUrl.replace('http://127.0.0.1:5000', window.API_BASE);
+    }
+    input = new Request(newUrl, input);
   }
 
   try {
