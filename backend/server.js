@@ -2767,6 +2767,82 @@ function allocateStudentsToBenchesBySeatPosition(benchesList, students, seatsPer
   const effectiveCap = maxCap > 0 ? Math.min(maxCap, students.length) : students.length;
   const spb = parseInt(seatsPerBench) || 2;
 
+  // Check if this hall has a single subject code
+  const distinctSubCodes = new Set();
+  students.forEach(st => {
+    const sc = (st.subjectCode || getStudentSubCode(st) || '').trim().toUpperCase();
+    if (sc && sc !== 'GENERAL' && sc !== 'UNKNOWN') distinctSubCodes.add(sc);
+  });
+  const isSingleSubject = distinctSubCodes.size <= 1;
+
+  // FIX: 2 seats per bench with a single subject code selected
+  // Traverse column by column in W-order:
+  // For each column (Odd: top-to-bottom, Even: bottom-to-top):
+  // 1. Complete Left seat sequence (seat1) for that column
+  // 2. Complete Right seat sequence (seat2) for that column
+  if (spb === 2 && isSingleSubject) {
+    const colMap = new Map();
+    for (const bench of benchesList) {
+      let c = bench.col;
+      if (c === undefined || c === null) {
+        const m = String(bench.benchCode).match(/\d+$/);
+        c = m ? parseInt(m[0], 10) : 1;
+      }
+      if (!colMap.has(c)) {
+        colMap.set(c, []);
+      }
+      colMap.get(c).push(bench);
+    }
+
+    const colKeys = Array.from(colMap.keys()).sort((a, b) => a - b);
+    const slots = [];
+
+    colKeys.forEach(c => {
+      const colBenches = colMap.get(c);
+      // Odd column: Top to Bottom (A -> B -> C ...)
+      // Even column: Bottom to Top (... -> C -> B -> A)
+      if (c % 2 === 1) {
+        colBenches.sort((a, b) => getRowIndex(a.row || String(a.benchCode).replace(/\d+$/, '')) - getRowIndex(b.row || String(b.benchCode).replace(/\d+$/, '')));
+      } else {
+        colBenches.sort((a, b) => getRowIndex(b.row || String(b.benchCode).replace(/\d+$/, '')) - getRowIndex(a.row || String(a.benchCode).replace(/\d+$/, '')));
+      }
+
+      // 1. Complete Left seat sequence (seat1) for this column first
+      for (const bench of colBenches) {
+        if (!bench.seat1) {
+          slots.push({ bench, seatKey: 'seat1', pos: 'Left' });
+        }
+      }
+
+      // 2. Complete Right seat sequence (seat2) for this column next
+      for (const bench of colBenches) {
+        if (!bench.seat2) {
+          slots.push({ bench, seatKey: 'seat2', pos: 'Right' });
+        }
+      }
+    });
+
+    let seatedCount = 0;
+    const countToSeat = Math.min(effectiveCap, slots.length, students.length);
+    for (let i = 0; i < countToSeat; i++) {
+      const slot = slots[i];
+      const student = students[i];
+      slot.bench[slot.seatKey] = student;
+      seatedCount++;
+
+      if (typeof onAssign === 'function') {
+        onAssign(slot.bench, slot.seatKey, slot.pos, {
+          student,
+          dept: student.department || '',
+          code: student.subjectCode || '',
+          isSecondary: !!student.isSecondary
+        });
+      }
+    }
+
+    return { seatedCount };
+  }
+
   const trackDefs = spb === 3
     ? [
         { key: 'seat1', pos: 'Left' },
@@ -3197,7 +3273,12 @@ async function generateSeatingPlan(examId, hallId) {
   });
 
   const initialPoolForUnseated = subjectPools.flatMap(p => [...p.students]);
-  const startedPoolCodes = new Set();
+  // Track which subject-code pools have been started (partially allocated) so they get
+  // first priority in subsequent halls, preventing skipped students mid-group.
+  const inProgressPoolCodes = new Set(); // pool.code values that started but have remaining students
+  // Store each pool's original selection-priority index so ordering is stable across halls
+  const subjectPoolOriginalIndex = new Map();
+  subjectPools.forEach((p, idx) => subjectPoolOriginalIndex.set(p, idx));
 
   // Secondary candidate queue for other exams scheduled at the same date/session
   const secondaryQueue = [];
@@ -3310,10 +3391,19 @@ async function generateSeatingPlan(examId, hallId) {
     });
 
     const distinctCourseList = Array.from(courseMap.values());
+    // CRITICAL: Sort so that in-progress pools (started in a previous hall but still have
+    // remaining students) come FIRST, preserving their original selection priority among themselves.
+    // Untouched pools follow, also in their original selection-priority order.
+    // This guarantees that hall N+1 continues from exactly where hall N left off.
     distinctCourseList.sort((a, b) => {
-      const totA = a.reduce((sum, p) => sum + p.students.length, 0);
-      const totB = b.reduce((sum, p) => sum + p.students.length, 0);
-      return totB - totA;
+      const aHasInProgress = a.some(p => inProgressPoolCodes.has(p.code) && p.students.length > 0);
+      const bHasInProgress = b.some(p => inProgressPoolCodes.has(p.code) && p.students.length > 0);
+      if (aHasInProgress && !bHasInProgress) return -1;
+      if (!aHasInProgress && bHasInProgress) return 1;
+      // Within the same tier (both in-progress or both untouched), preserve original selection order
+      const minIdxA = Math.min(...a.map(p => subjectPoolOriginalIndex.get(p) ?? Infinity));
+      const minIdxB = Math.min(...b.map(p => subjectPoolOriginalIndex.get(p) ?? Infinity));
+      return minIdxA - minIdxB;
     });
 
     const allocations = new Map();
@@ -3371,11 +3461,19 @@ async function generateSeatingPlan(examId, hallId) {
     }
 
     // Splice allocated students from pools into hallStudents
+    // Maintain subjectPools order for hallStudents so track assignment inside the hall is stable
     for (const p of subjectPools) {
       const count = allocations.get(p) || 0;
       if (count > 0) {
         const taken = p.students.splice(0, count);
         hallStudents.push(...taken);
+        // Mark this pool as in-progress if it still has remaining students after this hall
+        if (p.students.length > 0) {
+          inProgressPoolCodes.add(p.code);
+        } else {
+          // Pool fully exhausted — remove from in-progress tracking
+          inProgressPoolCodes.delete(p.code);
+        }
       }
     }
 
@@ -4584,6 +4682,131 @@ async function buildAttendanceRosterPages({ date, session, subjectCodesInput = [
   };
 }
 
+// Helper to inject Legal paper size (paperSize="5"), portrait orientation, margins, and fitToPage in OpenXML worksheet XML
+function applyLegalPaperSizeToXlsxBuffer(buffer) {
+  try {
+    const zlib = require('zlib');
+    const files = [];
+    let pos = 0;
+    while (pos < buffer.length - 4) {
+      if (buffer[pos] === 0x50 && buffer[pos+1] === 0x4B && buffer[pos+2] === 0x03 && buffer[pos+3] === 0x04) {
+        const compMethod = buffer.readUInt16LE(pos + 8);
+        const modTime = buffer.readUInt16LE(pos + 10);
+        const modDate = buffer.readUInt16LE(pos + 12);
+        const compSize = buffer.readUInt32LE(pos + 18);
+        const uncompSize = buffer.readUInt32LE(pos + 22);
+        const fnameLen = buffer.readUInt16LE(pos + 26);
+        const extraLen = buffer.readUInt16LE(pos + 28);
+        const fname = buffer.toString('utf8', pos + 30, pos + 30 + fnameLen);
+        const dataStart = pos + 30 + fnameLen + extraLen;
+        const rawData = buffer.subarray(dataStart, dataStart + compSize);
+        let content;
+        if (compMethod === 8) {
+          content = zlib.inflateRawSync(rawData);
+        } else {
+          content = rawData;
+        }
+        files.push({ name: fname, content: content, modTime, modDate });
+        pos = dataStart + compSize;
+      } else {
+        pos++;
+      }
+    }
+
+    let modified = false;
+    for (const file of files) {
+      if (file.name.startsWith('xl/worksheets/sheet') && file.name.endsWith('.xml')) {
+        let xml = file.content.toString('utf8');
+        if (!xml.includes('<pageSetUpPr')) {
+          if (xml.includes('<sheetViews>')) {
+            xml = xml.replace('<sheetViews>', '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews>');
+          } else if (xml.includes('<sheetData')) {
+            xml = xml.replace('<sheetData', '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetData');
+          }
+        }
+        const legalPageSetupXml = '<pageSetup paperSize="5" orientation="portrait" fitToWidth="1" fitToHeight="0" scale="100"/>';
+        if (!xml.includes('<pageSetup')) {
+          if (xml.includes('</worksheet>')) {
+            xml = xml.replace('</worksheet>', legalPageSetupXml + '</worksheet>');
+          }
+        } else {
+          xml = xml.replace(/<pageSetup[^>]*\/>/g, legalPageSetupXml);
+        }
+        file.content = Buffer.from(xml, 'utf8');
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      const localChunks = [];
+      const cdChunks = [];
+      let curOffset = 0;
+
+      for (const file of files) {
+        const uncomp = file.content;
+        const comp = zlib.deflateRawSync(uncomp);
+        const crc = zlib.crc32(uncomp);
+        const fnameBuf = Buffer.from(file.name, 'utf8');
+
+        const lh = Buffer.alloc(30);
+        lh.writeUInt32LE(0x04034b50, 0);
+        lh.writeUInt16LE(20, 4);
+        lh.writeUInt16LE(0, 6);
+        lh.writeUInt16LE(8, 8);
+        lh.writeUInt16LE(file.modTime || 0, 10);
+        lh.writeUInt16LE(file.modDate || 0, 12);
+        lh.writeUInt32LE(crc, 14);
+        lh.writeUInt32LE(comp.length, 18);
+        lh.writeUInt32LE(uncomp.length, 22);
+        lh.writeUInt16LE(fnameBuf.length, 26);
+        lh.writeUInt16LE(0, 28);
+        localChunks.push(lh, fnameBuf, comp);
+
+        const cdh = Buffer.alloc(46);
+        cdh.writeUInt32LE(0x02014b50, 0);
+        cdh.writeUInt16LE(20, 4);
+        cdh.writeUInt16LE(20, 6);
+        cdh.writeUInt16LE(0, 8);
+        cdh.writeUInt16LE(8, 10);
+        cdh.writeUInt16LE(file.modTime || 0, 12);
+        cdh.writeUInt16LE(file.modDate || 0, 14);
+        cdh.writeUInt32LE(crc, 16);
+        cdh.writeUInt32LE(comp.length, 20);
+        cdh.writeUInt32LE(uncomp.length, 24);
+        cdh.writeUInt16LE(fnameBuf.length, 28);
+        cdh.writeUInt16LE(0, 30);
+        cdh.writeUInt16LE(0, 32);
+        cdh.writeUInt16LE(0, 34);
+        cdh.writeUInt16LE(0, 36);
+        cdh.writeUInt32LE(0, 38);
+        cdh.writeUInt32LE(curOffset, 42);
+        cdChunks.push(cdh, fnameBuf);
+
+        curOffset += 30 + fnameBuf.length + comp.length;
+      }
+
+      const cdOffset = curOffset;
+      const cdBuf = Buffer.concat(cdChunks);
+      const cdSize = cdBuf.length;
+
+      const eocd = Buffer.alloc(22);
+      eocd.writeUInt32LE(0x06054b50, 0);
+      eocd.writeUInt16LE(0, 4);
+      eocd.writeUInt16LE(0, 6);
+      eocd.writeUInt16LE(files.length, 8);
+      eocd.writeUInt16LE(files.length, 10);
+      eocd.writeUInt32LE(cdSize, 12);
+      eocd.writeUInt32LE(cdOffset, 16);
+      eocd.writeUInt16LE(0, 20);
+
+      return Buffer.concat([...localChunks, cdBuf, eocd]);
+    }
+  } catch (e) {
+    console.warn('Could not inject legal pageSetup into xlsx archive:', e);
+  }
+  return buffer;
+}
+
 // GET attendance roster JSON data grouped by Department + Subject Code (max 25/page)
 app.get('/api/seating/attendance-roster', async (req, res) => {
   try {
@@ -4697,13 +4920,13 @@ app.get('/api/seating/download-roster', async (req, res) => {
 
       // Each 25-student page in this department is rendered as an official 25-student table with header & footer
       pages.forEach((page, pIdx) => {
-        const rStart = pIdx * 38; // 38 rows per page block: 36 content rows + 2 spacer rows
+        const rStart = pIdx * 40; // 40 rows per page block: 38 content rows + 2 spacer rows
         const { degree, students, startIndex, hallName } = page;
         const pageDegree = degree || resolveStudentDegree((students && students[0]), deptName);
 
-        // Header
-        writeCell(rStart + 0, 0, 'MADURAI KAMARAJ UNIVERSITY EXAMINATIONS', true, 'center', 14, false, false, true);
-        writeCell(rStart + 1, 0, "RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM", true, 'center', 12, false, false, true);
+        // Header - Unwanted underline removed
+        writeCell(rStart + 0, 0, 'MADURAI KAMARAJ UNIVERSITY EXAMINATIONS', true, 'center', 14, false, false, false);
+        writeCell(rStart + 1, 0, "RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM", true, 'center', 12, false, false, false);
 
         writeCell(rStart + 2, 0, `DATE OF EXAM: ${formattedDate}`, true, 'left', 10);
         writeCell(rStart + 2, 3, `TIME OF EXAM : ${timeOfExam}`, true, 'right', 10);
@@ -4734,44 +4957,77 @@ app.get('/api/seating/download-roster', async (req, res) => {
         }
 
         const fStart = rStart + 32;
-        // Footer rows
+        // Footer section: consistent two-column layout (Col 0-1 Left, Col 2-3 Right)
         writeCell(fStart, 0, 'Absentees Reg. No.:', true, 'left', 10);
-        writeCell(fStart, 3, `Hall No.: ${hallName || 'ALL'}`, true, 'right', 10);
+        writeCell(fStart, 2, 'Hall No.:', true, 'left', 10);
 
-        writeCell(fStart + 1, 0, 'Total No. of Absentees:', true, 'left', 10);
-        writeCell(fStart + 1, 3, 'Name of the Invigilator and College:', true, 'right', 10);
+        writeCell(fStart + 1, 0, '', false, 'left', 10); // writing space for absentees
 
-        writeCell(fStart + 3, 0, 'Signature of the Chief Superintendent', true, 'left', 10);
-        writeCell(fStart + 3, 3, 'Signature of the Invigilator', true, 'right', 10);
+        writeCell(fStart + 2, 0, 'Total No. of Absentees:', true, 'left', 10);
+        writeCell(fStart + 2, 2, 'Name of the Invigilator and College:', true, 'left', 10);
+
+        writeCell(fStart + 3, 0, '', false, 'left', 10); // signature breathing space
+        writeCell(fStart + 4, 0, '', false, 'left', 10); // signature breathing space
+
+        writeCell(fStart + 5, 0, 'Signature of the Chief Superintendent', true, 'left', 10);
+        writeCell(fStart + 5, 2, 'Signature of the Invigilator', true, 'left', 10);
 
         allMerges.push(
           { s: { r: rStart + 0, c: 0 }, e: { r: rStart + 0, c: 3 } },
           { s: { r: rStart + 1, c: 0 }, e: { r: rStart + 1, c: 3 } },
           { s: { r: rStart + 2, c: 0 }, e: { r: rStart + 2, c: 2 } },
           { s: { r: rStart + 3, c: 0 }, e: { r: rStart + 3, c: 2 } },
-          { s: { r: fStart + 0, c: 0 }, e: { r: fStart + 0, c: 2 } },
-          { s: { r: fStart + 1, c: 0 }, e: { r: fStart + 1, c: 2 } },
-          { s: { r: fStart + 3, c: 0 }, e: { r: fStart + 3, c: 1 } }
+          { s: { r: fStart + 0, c: 0 }, e: { r: fStart + 0, c: 1 } },
+          { s: { r: fStart + 0, c: 2 }, e: { r: fStart + 0, c: 3 } },
+          { s: { r: fStart + 1, c: 0 }, e: { r: fStart + 1, c: 3 } },
+          { s: { r: fStart + 2, c: 0 }, e: { r: fStart + 2, c: 1 } },
+          { s: { r: fStart + 2, c: 2 }, e: { r: fStart + 2, c: 3 } },
+          { s: { r: fStart + 5, c: 0 }, e: { r: fStart + 5, c: 1 } },
+          { s: { r: fStart + 5, c: 2 }, e: { r: fStart + 5, c: 3 } }
         );
 
-        rowHeights[rStart + 0] = { hpt: 25 };
-        rowHeights[rStart + 1] = { hpt: 22 };
+        rowHeights[rStart + 0] = { hpt: 26 };
+        rowHeights[rStart + 1] = { hpt: 24 };
         rowHeights[rStart + 2] = { hpt: 20 };
         rowHeights[rStart + 3] = { hpt: 20 };
-        rowHeights[rStart + 5] = { hpt: 22 };
+        rowHeights[rStart + 4] = { hpt: 12 };
+        rowHeights[rStart + 5] = { hpt: 24 };
         for (let i = 0; i < 25; i++) {
-          rowHeights[rStart + 6 + i] = { hpt: 24 };
+          rowHeights[rStart + 6 + i] = { hpt: 25 };
         }
+        rowHeights[rStart + 31] = { hpt: 14 }; // spacer
+        rowHeights[fStart + 0] = { hpt: 20 };  // Absentees Reg. No. & Hall No.
+        rowHeights[fStart + 1] = { hpt: 22 };  // writing line
+        rowHeights[fStart + 2] = { hpt: 20 };  // Total Absentees & Invigilator
+        rowHeights[fStart + 3] = { hpt: 24 };  // signature space
+        rowHeights[fStart + 4] = { hpt: 24 };  // signature space
+        rowHeights[fStart + 5] = { hpt: 24 };  // Signatures
+        rowHeights[rStart + 38] = { hpt: 14 }; // inter-page spacer
+        rowHeights[rStart + 39] = { hpt: 14 }; // inter-page spacer
       });
 
       ws['!rows'] = rowHeights;
       finalizeWorksheet(XLSXLib, ws, allMerges);
-      ws['!pageSetup'] = { paperSize: 9, orientation: 'portrait', fitToWidth: 1 };
+      ws['!pageSetup'] = {
+        paperSize: 5,               // 5 = Legal (8.5 x 14 in)
+        orientation: 'portrait',
+        fitToWidth: 1,
+        fitToHeight: 0,
+        scale: 100
+      };
+      ws['!margins'] = {
+        left: 0.35,
+        right: 0.35,
+        top: 0.5,
+        bottom: 0.5,
+        header: 0.3,
+        footer: 0.3
+      };
       ws['!cols'] = [
         { wch: 8 },  // SL NO
-        { wch: 22 }, // REGISTER NUMBER
-        { wch: 38 }, // NAME OF THE CANDIDATE
-        { wch: 35 }  // SIGNATURE OF THE CANDIDATE
+        { wch: 24 }, // REGISTER NUMBER
+        { wch: 42 }, // NAME OF THE CANDIDATE
+        { wch: 36 }  // SIGNATURE OF THE CANDIDATE
       ];
 
       const cleanDept = deptName.replace(/[^A-Z0-9]/gi, '').substring(0, 10);
@@ -4788,7 +5044,11 @@ app.get('/api/seating/download-roster', async (req, res) => {
       XLSXLib.utils.book_append_sheet(wb, ws, sheetName);
     });
 
-    const buffer = XLSXLib.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    let buffer = XLSXLib.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    // Explicitly configure Legal paper (paperSize="5"), orientation, margins, and fitToPage in OpenXML worksheet XML
+    buffer = applyLegalPaperSizeToXlsxBuffer(buffer);
+
     const levelPart = level && level !== 'ALL' ? `${level.toUpperCase()}_` : '';
     const subPart = subjectCodes && subjectCodes !== 'ALL' ? `${subjectCodes.replace(/[^A-Z0-9]/gi, '_')}_` : '';
     const deptPart = department && department !== 'ALL' ? `${department.replace(/[^A-Z0-9]/gi, '_')}_` : '';
@@ -4803,7 +5063,7 @@ app.get('/api/seating/download-roster', async (req, res) => {
   }
 });
 
-// GET export attendance roster as printable A4 PDF file (.pdf)
+// GET export attendance roster as printable Legal PDF file (.pdf)
 app.get('/api/seating/roster/download-pdf', async (req, res) => {
   try {
     const { date, session, department, subjectCodes, hallId, level } = req.query;
@@ -4844,7 +5104,7 @@ app.get('/api/seating/roster/download-pdf', async (req, res) => {
 
     const PDFDocument = require('pdfkit');
     const doc = new PDFDocument({
-      size: 'A4',
+      size: 'legal', // 8.5 x 14 inches (612 x 1008 pt)
       margin: 25
     });
 
@@ -4862,34 +5122,35 @@ app.get('/api/seating/roster/download-pdf', async (req, res) => {
       res.send(pdfData);
     });
 
-    const pageW = 595.28;
+    const pageW = 612; // 8.5 in * 72 pt/in
+    const pageH = 1008; // 14.0 in * 72 pt/in
     const margin = 25;
-    const printableW = pageW - (2 * margin);
+    const printableW = pageW - (2 * margin); // 562 pt
 
     rosterData.pages.forEach((page, pIdx) => {
       if (pIdx > 0) doc.addPage();
 
       let y = margin;
 
-      // Header
-      doc.font('Helvetica-Bold').fontSize(14).text('MADURAI KAMARAJ UNIVERSITY EXAMINATIONS', margin, y, { align: 'center', width: printableW, underline: true });
-      y += 18;
-      doc.font('Helvetica-Bold').fontSize(12).text("RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM", margin, y, { align: 'center', width: printableW, underline: true });
+      // Header - Unwanted underline removed
+      doc.font('Helvetica-Bold').fontSize(14).text('MADURAI KAMARAJ UNIVERSITY EXAMINATIONS', margin, y, { align: 'center', width: printableW });
+      y += 20;
+      doc.font('Helvetica-Bold').fontSize(12).text("RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM", margin, y, { align: 'center', width: printableW });
       y += 24;
 
       // Meta info
-      doc.font('Helvetica-Bold').fontSize(9);
+      doc.font('Helvetica-Bold').fontSize(9.5);
       doc.text(`DATE OF EXAM: ${formattedDate}`, margin, y);
       doc.text(`TIME OF EXAM: ${timeOfExam}`, margin + 300, y, { align: 'right', width: printableW - 300 });
-      y += 14;
+      y += 16;
 
       const pageDegree = page.degree || resolveStudentDegree((page.students && page.students[0]), page.deptName);
       doc.text(`SUBJECT CODE: ${page.subjectCode.toUpperCase()}`, margin, y);
       doc.text(`DEGREE: ${pageDegree}`, margin + 300, y, { align: 'right', width: printableW - 300 });
-      y += 18;
+      y += 20;
 
-      // Table Header
-      const colWidths = [40, 115, 230, 160];
+      // Table Header (Width = 562)
+      const colWidths = [42, 120, 235, 165];
       const colX = [
         margin,
         margin + colWidths[0],
@@ -4897,18 +5158,18 @@ app.get('/api/seating/roster/download-pdf', async (req, res) => {
         margin + colWidths[0] + colWidths[1] + colWidths[2]
       ];
 
-      const headerH = 20;
+      const headerH = 22;
       doc.rect(margin, y, printableW, headerH).fillAndStroke('#EAEAEA', '#000000');
-      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(8);
+      doc.fillColor('#000000').font('Helvetica-Bold').fontSize(8.5);
 
       doc.text('SL NO', colX[0], y + 6, { width: colWidths[0], align: 'center' });
       doc.text('REGISTER NUMBER', colX[1], y + 6, { width: colWidths[1], align: 'center' });
-      doc.text('NAME OF THE CANDIDATE', colX[2] + 5, y + 6, { width: colWidths[2] - 5, align: 'left' });
+      doc.text('NAME OF THE CANDIDATE', colX[2] + 6, y + 6, { width: colWidths[2] - 12, align: 'left' });
       doc.text('SIGNATURE OF THE CANDIDATE', colX[3], y + 6, { width: colWidths[3], align: 'center' });
       y += headerH;
 
       // 25 Student Rows (filled + blank rows padded with continuous SL NO)
-      const rowH = 19;
+      const rowH = 22;
       for (let r = 0; r < 25; r++) {
         doc.rect(margin, y, printableW, rowH).stroke('#000000');
         // vertical grid lines
@@ -4917,31 +5178,36 @@ app.get('/api/seating/roster/download-pdf', async (req, res) => {
         doc.moveTo(colX[3], y).lineTo(colX[3], y + rowH).stroke('#000000');
 
         const currentSlNo = page.startIndex + r;
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#000000');
-        doc.text(`${currentSlNo}`, colX[0], y + 5, { width: colWidths[0], align: 'center' });
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#000000');
+        doc.text(`${currentSlNo}`, colX[0], y + 6, { width: colWidths[0], align: 'center' });
 
         if (r < page.students.length) {
           const st = page.students[r];
-          doc.text(st.registerNo || '', colX[1], y + 5, { width: colWidths[1], align: 'center' });
-          doc.font('Helvetica').fontSize(8);
-          doc.text((st.name || '').toUpperCase(), colX[2] + 5, y + 5, { width: colWidths[2] - 10, align: 'left' });
+          doc.text(st.registerNo || '', colX[1], y + 6, { width: colWidths[1], align: 'center' });
+          doc.font('Helvetica').fontSize(8.5);
+          doc.text((st.name || '').toUpperCase(), colX[2] + 6, y + 6, { width: colWidths[2] - 12, align: 'left' });
         }
         y += rowH;
       }
 
-      // Footer section
-      y += 12;
-      doc.font('Helvetica-Bold').fontSize(9).fillColor('#000000');
-      doc.text('Absentees Reg. No.: _____________________________________________', margin, y);
-      doc.text(`Hall No.: ${page.hallName || 'ALL'}`, margin + 350, y, { align: 'right', width: printableW - 350 });
-      y += 18;
+      // Footer section - Official layout: consistent two-column alignment (Left column at margin, Right column at rightColX)
+      y += 28;
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#000000');
+      const rightColX = margin + 280; // 305 pt (consistent right-side column boundary)
 
-      doc.text('Total No. of Absentees: ______________', margin, y);
-      doc.text('Name of the Invigilator and College: _______________________', margin + 200, y, { align: 'right', width: printableW - 200 });
-      y += 32;
+      // First row: Absentees Reg. No.: (left) and Hall No.: (right) - empty value after Hall No.:
+      doc.text('Absentees Reg. No.:', margin, y);
+      doc.text('Hall No.:', rightColX, y);
+      y += 44;
 
+      // Second row: Total No. of Absentees: (left) and Name of the Invigilator and College: (right)
+      doc.text('Total No. of Absentees:', margin, y);
+      doc.text('Name of the Invigilator and College:', rightColX, y);
+      y += 76;
+
+      // Third row: Signature of the Chief Superintendent (left) and Signature of the Invigilator (right)
       doc.text('Signature of the Chief Superintendent', margin, y);
-      doc.text('Signature of the Invigilator', margin + 300, y, { align: 'right', width: printableW - 300 });
+      doc.text('Signature of the Invigilator', rightColX, y);
     });
 
     doc.end();
@@ -5048,52 +5314,121 @@ function extractHallSavedSeatingSequence(plansForHall, hallSnapshot = null) {
   const hallStudents = [];
   const seenRegs = new Set();
 
-  for (let c = 1; c <= effectiveCols; c++) {
-    const rowsInCol = Math.max(colMaxRowMap.get(c) || 0, effectiveColRows[c - 1] !== undefined ? effectiveColRows[c - 1] : 6);
-    if (c % 2 === 1) { // Odd column: Top to Bottom
-      for (let r = 0; r < rowsInCol; r++) {
-        const code = `${getRowLetter(r)}${c}`;
-        const bench = mergedBenchMap.get(code);
-        if (bench && !bench.isPlaceholder) {
-          ['seat1', 'seat2', 'seat3'].forEach(sKey => {
-            const st = bench[sKey];
-            if (st && st.registerNo) {
-              const reg = String(st.registerNo).trim().toUpperCase();
-              if (!seenRegs.has(reg)) {
-                seenRegs.add(reg);
-                hallStudents.push({
-                  ...st,
-                  registerNo: reg,
-                  benchCode: code,
-                  seatKey: sKey,
-                  hallName: hallName
-                });
-              }
-            }
-          });
+  const distinctSubs = new Set();
+  let hasSeat3 = false;
+  for (const bench of mergedBenchMap.values()) {
+    if (bench && !bench.isPlaceholder) {
+      if (bench.seat3) hasSeat3 = true;
+      ['seat1', 'seat2', 'seat3'].forEach(k => {
+        const st = bench[k];
+        if (st) {
+          const sc = (st.subjectCode || st.code || '').trim().toUpperCase();
+          if (sc && sc !== 'GENERAL' && sc !== 'UNKNOWN') distinctSubs.add(sc);
+        }
+      });
+    }
+  }
+  const isSingleSub = distinctSubs.size <= 1;
+  const is2SeatHall = (parseInt(snapshot.seatsPerBench) === 2) || (!hasSeat3 && mergedBenchMap.size > 0);
+
+  if (is2SeatHall && isSingleSub) {
+    for (let c = 1; c <= effectiveCols; c++) {
+      const rowsInCol = Math.max(colMaxRowMap.get(c) || 0, effectiveColRows[c - 1] !== undefined ? effectiveColRows[c - 1] : 6);
+      const colBenchCodes = [];
+      if (c % 2 === 1) { // Odd column: Top to Bottom
+        for (let r = 0; r < rowsInCol; r++) {
+          colBenchCodes.push(`${getRowLetter(r)}${c}`);
+        }
+      } else { // Even column: Bottom to Top
+        for (let r = rowsInCol - 1; r >= 0; r--) {
+          colBenchCodes.push(`${getRowLetter(r)}${c}`);
         }
       }
-    } else { // Even column: Bottom to Top
-      for (let r = rowsInCol - 1; r >= 0; r--) {
-        const code = `${getRowLetter(r)}${c}`;
+
+      // 1. First extract Left seat (seat1) along column traversal
+      colBenchCodes.forEach(code => {
         const bench = mergedBenchMap.get(code);
-        if (bench && !bench.isPlaceholder) {
-          ['seat1', 'seat2', 'seat3'].forEach(sKey => {
-            const st = bench[sKey];
-            if (st && st.registerNo) {
-              const reg = String(st.registerNo).trim().toUpperCase();
-              if (!seenRegs.has(reg)) {
-                seenRegs.add(reg);
-                hallStudents.push({
-                  ...st,
-                  registerNo: reg,
-                  benchCode: code,
-                  seatKey: sKey,
-                  hallName: hallName
-                });
+        if (bench && !bench.isPlaceholder && bench.seat1 && bench.seat1.registerNo) {
+          const reg = String(bench.seat1.registerNo).trim().toUpperCase();
+          if (!seenRegs.has(reg)) {
+            seenRegs.add(reg);
+            hallStudents.push({
+              ...bench.seat1,
+              registerNo: reg,
+              benchCode: code,
+              seatKey: 'seat1',
+              hallName: hallName
+            });
+          }
+        }
+      });
+
+      // 2. Next extract Right seat (seat2) along column traversal
+      colBenchCodes.forEach(code => {
+        const bench = mergedBenchMap.get(code);
+        if (bench && !bench.isPlaceholder && bench.seat2 && bench.seat2.registerNo) {
+          const reg = String(bench.seat2.registerNo).trim().toUpperCase();
+          if (!seenRegs.has(reg)) {
+            seenRegs.add(reg);
+            hallStudents.push({
+              ...bench.seat2,
+              registerNo: reg,
+              benchCode: code,
+              seatKey: 'seat2',
+              hallName: hallName
+            });
+          }
+        }
+      });
+    }
+  } else {
+    for (let c = 1; c <= effectiveCols; c++) {
+      const rowsInCol = Math.max(colMaxRowMap.get(c) || 0, effectiveColRows[c - 1] !== undefined ? effectiveColRows[c - 1] : 6);
+      if (c % 2 === 1) { // Odd column: Top to Bottom
+        for (let r = 0; r < rowsInCol; r++) {
+          const code = `${getRowLetter(r)}${c}`;
+          const bench = mergedBenchMap.get(code);
+          if (bench && !bench.isPlaceholder) {
+            ['seat1', 'seat2', 'seat3'].forEach(sKey => {
+              const st = bench[sKey];
+              if (st && st.registerNo) {
+                const reg = String(st.registerNo).trim().toUpperCase();
+                if (!seenRegs.has(reg)) {
+                  seenRegs.add(reg);
+                  hallStudents.push({
+                    ...st,
+                    registerNo: reg,
+                    benchCode: code,
+                    seatKey: sKey,
+                    hallName: hallName
+                  });
+                }
               }
-            }
-          });
+            });
+          }
+        }
+      } else { // Even column: Bottom to Top
+        for (let r = rowsInCol - 1; r >= 0; r--) {
+          const code = `${getRowLetter(r)}${c}`;
+          const bench = mergedBenchMap.get(code);
+          if (bench && !bench.isPlaceholder) {
+            ['seat1', 'seat2', 'seat3'].forEach(sKey => {
+              const st = bench[sKey];
+              if (st && st.registerNo) {
+                const reg = String(st.registerNo).trim().toUpperCase();
+                if (!seenRegs.has(reg)) {
+                  seenRegs.add(reg);
+                  hallStudents.push({
+                    ...st,
+                    registerNo: reg,
+                    benchCode: code,
+                    seatKey: sKey,
+                    hallName: hallName
+                  });
+                }
+              }
+            });
+          }
         }
       }
     }
@@ -5878,10 +6213,36 @@ async function getLocationsSummaryData(date, session) {
     }
   } catch (err) {}
 
-  // Group plans by hallId / hallName
+  // Lookup maps for resolving between hallId and hallName
+  const allHalls = await Models.Hall.find();
+  const hallIdToName = new Map();
+  const hallNameToId = new Map();
+  allHalls.forEach(h => {
+    if (h && h.name) {
+      if (h._id) {
+        hallIdToName.set(String(h._id), h.name);
+        hallNameToId.set(h.name.toUpperCase(), String(h._id));
+      }
+    }
+  });
+  examsAtTime.forEach(e => {
+    if (e.hallSnapshots) {
+      Object.values(e.hallSnapshots).forEach(s => {
+        if (s && s.name) {
+          if (s._id) {
+            hallIdToName.set(String(s._id), s.name);
+            hallNameToId.set(s.name.toUpperCase(), String(s._id));
+          }
+        }
+      });
+    }
+  });
+
+  // Group plans by hallName (or resolved hall name from hallId)
   const hallPlans = {};
   plansForTime.forEach(p => {
-    const hKey = p.hallId || p.hallName;
+    const resolvedName = p.hallName || (p.hallId && hallIdToName.get(String(p.hallId))) || p.hallId;
+    const hKey = (resolvedName || '').trim().toUpperCase();
     if (!hallPlans[hKey]) {
       hallPlans[hKey] = [];
     }
@@ -5891,7 +6252,8 @@ async function getLocationsSummaryData(date, session) {
   const result = [];
 
   for (const [, plans] of Object.entries(hallPlans)) {
-    const hallName = plans[0].hallName;
+    const hallName = plans[0].hallName || hallIdToName.get(String(plans[0].hallId)) || '';
+    const hallId = plans[0].hallId || hallNameToId.get(hallName.toUpperCase()) || null;
     
     // Merge attendance rosters
     const attendanceRoster = [];
@@ -6006,29 +6368,43 @@ async function getLocationsSummaryData(date, session) {
 
     result.push({
       hallName,
+      hallId,
       totalStudents,
       classes
     });
   }
 
-  // Sort halls strictly in exam's configured hall order (e.g. A1 -> A2 -> A3)
+  // Sort halls strictly in exam's configured hall order (preserving saved selection order)
   const configuredHallOrder = [];
   examsAtTime.forEach(e => {
     (e.assignedHalls || []).forEach(h => {
       const hStr = String(h).trim();
-      if (!configuredHallOrder.includes(hStr)) {
-        configuredHallOrder.push(hStr);
+      const resolvedName = hallIdToName.get(hStr) || (e.hallSnapshots && e.hallSnapshots[hStr]?.name) || hStr;
+      if (!configuredHallOrder.some(name => name.toUpperCase() === resolvedName.toUpperCase())) {
+        configuredHallOrder.push(resolvedName);
       }
     });
   });
 
   result.sort((a, b) => {
-    const idxA = configuredHallOrder.findIndex(h => h === a.hallName || (a.hallId && h === String(a.hallId)));
-    const idxB = configuredHallOrder.findIndex(h => h === b.hallName || (b.hallId && h === String(b.hallId)));
+    const nameA = (a.hallName || '').trim().toUpperCase();
+    const nameB = (b.hallName || '').trim().toUpperCase();
+    const idA = a.hallId ? String(a.hallId) : '';
+    const idB = b.hallId ? String(b.hallId) : '';
+
+    const idxA = configuredHallOrder.findIndex(h => {
+      const hNorm = h.trim().toUpperCase();
+      return hNorm === nameA || (idA && hallIdToName.get(idA)?.toUpperCase() === hNorm);
+    });
+    const idxB = configuredHallOrder.findIndex(h => {
+      const hNorm = h.trim().toUpperCase();
+      return hNorm === nameB || (idB && hallIdToName.get(idB)?.toUpperCase() === hNorm);
+    });
+
     if (idxA !== -1 && idxB !== -1) return idxA - idxB;
     if (idxA !== -1) return -1;
     if (idxB !== -1) return 1;
-    return a.hallName.localeCompare(b.hallName);
+    return 0;
   });
 
   const timeOfExam = (examsAtTime[0] && examsAtTime[0].time) || (session === "FN" ? "10:00 AM - 01:00 PM" : "02:00 PM - 05:00 PM");
@@ -6162,7 +6538,7 @@ function generateExamLocationsPdf(doc, data) {
     // Hall Title Header Banner
     doc.rect(margin, currentY, printableW, hallTitleH).fillAndStroke("#E0E7FF", "#4F46E5");
     doc.font("Helvetica-Bold").fontSize(10).fillColor("#312E81")
-       .text(`HALL NO. ${hall.hallName}`, margin + 8, currentY + 5, { width: printableW - 16, align: "left" });
+       .text(`HALL NO. ${hall.hallName}`, margin, currentY + 5, { width: printableW, align: "center" });
     currentY += hallTitleH;
 
     // Table Header
@@ -6233,7 +6609,44 @@ function generateExamLocationsPdf(doc, data) {
   doc.end();
 }
 
-// Helper to build compact register number ranges (e.g. C4S24620 to C4S24640) for MKU Nominal Roll
+// Helper to format a register number range for Nominal Roll
+// Rule: Display complete first register number.
+// For ending register number, display only its last four digits when sharing the same prefix and unambiguous.
+// Example: C4A19151 to C4A19164 -> C4A19151 to 9164
+function formatNominalRollRange(rStart, rEnd) {
+  if (!rStart) return '';
+  if (!rEnd || rStart.original === rEnd.original || rStart.numVal === rEnd.numVal) {
+    return rStart.original;
+  }
+
+  const startOrig = rStart.original;
+  const endOrig = rEnd.original;
+
+  // If prefixes differ, display full register number
+  if (rStart.prefix !== rEnd.prefix) {
+    return `${startOrig} to ${endOrig}`;
+  }
+
+  const startDigits = rStart.numStr || '';
+  const endDigits = rEnd.numStr || '';
+
+  // The ending register number must have at least 4 digits in its numeric part
+  if (endDigits.length >= 4 && startDigits.length === endDigits.length) {
+    // Check that higher-order digits before the last 4 digits are identical (unambiguous)
+    const startLeading = startDigits.slice(0, -4);
+    const endLeading = endDigits.slice(0, -4);
+
+    if (startLeading === endLeading) {
+      const lastFour = endDigits.slice(-4);
+      return `${startOrig} to ${lastFour}`;
+    }
+  }
+
+  // Fallback to full register number if ambiguous or fewer than 4 digits
+  return `${startOrig} to ${endOrig}`;
+}
+
+// Helper to build compact register number ranges (e.g. C4A19151 to 9164) for MKU Nominal Roll
 function buildNominalRollRanges(regNos) {
   if (!regNos || regNos.length === 0) return [];
   const prefixGroups = {};
@@ -6282,7 +6695,7 @@ function buildNominalRollRanges(regNos) {
           ranges.push({ text: rStart.original, count: 1 });
         } else {
           ranges.push({
-            text: `${rStart.original} to ${rEnd.original}`,
+            text: formatNominalRollRange(rStart, rEnd),
             count: rEnd.numVal - rStart.numVal + 1
           });
         }
@@ -6295,7 +6708,7 @@ function buildNominalRollRanges(regNos) {
       ranges.push({ text: rStart.original, count: 1 });
     } else {
       ranges.push({
-        text: `${rStart.original} to ${rEnd.original}`,
+        text: formatNominalRollRange(rStart, rEnd),
         count: rEnd.numVal - rStart.numVal + 1
       });
     }
@@ -6306,11 +6719,11 @@ function buildNominalRollRanges(regNos) {
 
 // Helper to generate print-ready MKU Nominal Roll PDF document matching official University format
 function generateMkuNominalRollPdf(doc, data, groups) {
-  const pageW = 595.28;
-  const pageH = 841.89;
-  const margin = 35;
-  const printableW = pageW - (2 * margin); // 525.28 pt
-  const safeBottom = pageH - 45; // 796.89 pt
+  const pageW = 612; // Legal / Long Bond width: 8.5 in (612 pt)
+  const pageH = 1008; // Legal / Long Bond height: 14 in (1008 pt)
+  const margin = 36;
+  const printableW = pageW - (2 * margin); // 540 pt
+  const safeBottom = pageH - 45; // 963 pt
 
   // Format header month, year and session
   // In MKU, university semester examinations are officially titled:
@@ -6318,24 +6731,37 @@ function generateMkuNominalRollPdf(doc, data, groups) {
   let examMonth = "NOVEMBER";
   let examYear = new Date().getFullYear();
   try {
-    const d = new Date(data.targetDate);
-    if (!isNaN(d.getTime())) {
-      const m = d.getMonth();
+    const rawDateStr = String(data.targetDate || (data.examsAtTime && data.examsAtTime[0] && data.examsAtTime[0].date) || "");
+    const isoMatch = rawDateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    const dmyMatch = rawDateStr.match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
+    if (isoMatch) {
+      examYear = parseInt(isoMatch[1], 10);
+      const m = parseInt(isoMatch[2], 10) - 1;
       examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
-      examYear = d.getFullYear();
+    } else if (dmyMatch) {
+      examYear = parseInt(dmyMatch[3], 10);
+      const m = parseInt(dmyMatch[2], 10) - 1;
+      examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+    } else {
+      const d = new Date(rawDateStr);
+      if (!isNaN(d.getTime())) {
+        examYear = d.getFullYear();
+        const m = d.getMonth();
+        examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+      }
     }
   } catch (e) {}
 
   const sessionText = (data.session || "").toUpperCase().includes("AN") ? "A.N." : "F.N.";
   const examSubTitle = `${examMonth} - ${examYear} - ${sessionText}`;
 
-  // Column widths: Total = 525.28 pt
+  // Column widths: Total = 540 pt (Legal printable width)
   // Col 0: FOIL NO = 75 pt
   // Col 1: ABSENTS = 85 pt
-  // Col 2: [BLANK HEADER] (Department / Subject Code) = 100 pt
-  // Col 3: NOMINAL ROLL (Register Numbers) = 215.28 pt
-  // Col 4: TOTAL = 50 pt
-  const colW = [75, 85, 100, 215.28, 50];
+  // Col 2: [BLANK HEADER] (Department / Subject Code) = 110 pt
+  // Col 3: NOMINAL ROLL (Register Numbers) = 218 pt
+  // Col 4: TOTAL = 52 pt
+  const colW = [75, 85, 110, 218, 52];
   const colX = [
     margin,
     margin + colW[0],
@@ -6484,6 +6910,439 @@ function generateMkuNominalRollPdf(doc, data, groups) {
   doc.end();
 }
 
+// Helper to derive Examination Month and Year for Hall-wise Invigilator Report
+// Follows established MKU Exam-Session Rule:
+// Odd semester session (Aug - Feb) -> NOVEMBER [YEAR]
+// Even semester session (Mar - Jul) -> APRIL [YEAR]
+function getInvigilatorReportMonthYear(data) {
+  let examMonth = "NOVEMBER";
+  let examYear = new Date().getFullYear();
+
+  const targetDateVal = data?.targetDate || (data?.examsAtTime && data.examsAtTime[0] && data.examsAtTime[0].date);
+  
+  if (targetDateVal instanceof Date && !isNaN(targetDateVal.getTime())) {
+    examYear = targetDateVal.getFullYear();
+    const m = targetDateVal.getMonth();
+    examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+  } else if (targetDateVal) {
+    const rawDateStr = String(targetDateVal).trim();
+    const isoMatch = rawDateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    const dmyMatch = rawDateStr.match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
+    if (isoMatch) {
+      examYear = parseInt(isoMatch[1], 10);
+      const m = parseInt(isoMatch[2], 10) - 1; // 0-indexed: 0=Jan, 3=Apr, 10=Nov
+      examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+    } else if (dmyMatch) {
+      examYear = parseInt(dmyMatch[3], 10);
+      const m = parseInt(dmyMatch[2], 10) - 1;
+      examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+    } else {
+      const d = new Date(rawDateStr);
+      if (!isNaN(d.getTime())) {
+        examYear = d.getFullYear();
+        const m = d.getMonth();
+        examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+      }
+    }
+  }
+
+  // If no date was found, check if exam records explicitly specify an examination session / month
+  if (!targetDateVal && Array.isArray(data?.examsAtTime)) {
+    for (const ex of data.examsAtTime) {
+      const explicitVal = (ex.examMonth || ex.month || ex.examSession || "").toString().trim().toUpperCase();
+      if (explicitVal.includes("APRIL") || explicitVal === "APR") {
+        examMonth = "APRIL";
+        break;
+      } else if (explicitVal.includes("NOVEMBER") || explicitVal === "NOV") {
+        examMonth = "NOVEMBER";
+        break;
+      }
+    }
+  }
+
+  return { examMonth, examYear, headerLine3: `${examMonth} ${examYear}` };
+}
+
+// Shared PDF generator for Hall-wise Invigilator Report (Exact Box-by-Box College Form Layout, Legal Paper, 2 forms per sheet)
+function generateInvigilatorReportPdf(doc, data) {
+  const margin = 36;
+  const printableW = 540; // 612 - 72
+
+  // Exact relative column widths matching reference image (641px -> 196px, 207px, 238px)
+  const col1W = 165; // CLASS (30.6%)
+  const col2W = 175; // SUBJECT (32.4%)
+  const col3W = 200; // NO OF STUDENTS (37.0%)
+  const footerLeftW = 305; // 56.5% (divides at x=362 in 641px)
+  const footerRightW = 235; // 43.5%
+
+  const { examMonth, examYear, headerLine3 } = getInvigilatorReportMonthYear(data);
+
+  const headerLine1 = "RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM.";
+  const headerLine2 = "MADURAI KAMARAJ UNIVERSITY EXAMINATIONS";
+
+  const formattedDate = data.formattedDate || data.targetDate;
+  const timeText = data.timeOfExam 
+    ? `${data.session} (${data.timeOfExam})` 
+    : (data.session === 'FN' ? 'FN (10:00 AM - 01:00 PM)' : 'AN (02:00 PM - 05:00 PM)');
+
+  const renderSingleForm = (hall, startY) => {
+    let y = startY;
+
+    // 1. College Header (Full width box)
+    doc.rect(margin, y, printableW, 20).lineWidth(0.8).strokeColor('#000000').stroke();
+    doc.font('Helvetica-Bold').fontSize(10.5).fillColor('#000000')
+       .text(headerLine1, margin, y + 4.5, { width: printableW, align: 'center' });
+    y += 20;
+
+    // 2. University Header (Full width box)
+    doc.rect(margin, y, printableW, 18).lineWidth(0.8).strokeColor('#000000').stroke();
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#000000')
+       .text(headerLine2, margin, y + 4, { width: printableW, align: 'center' });
+    y += 18;
+
+    // 3. Examination Month & Year (Full width box)
+    doc.rect(margin, y, printableW, 18).lineWidth(0.8).strokeColor('#000000').stroke();
+    doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#000000')
+       .text(headerLine3, margin, y + 4, { width: printableW, align: 'center' });
+    y += 18;
+
+    // 4. Examination Details Row (Divided into 3 cells matching columns below)
+    doc.rect(margin, y, printableW, 20).lineWidth(0.8).strokeColor('#000000').stroke();
+    doc.moveTo(margin + col1W, y).lineTo(margin + col1W, y + 20).stroke();
+    doc.moveTo(margin + col1W + col2W, y).lineTo(margin + col1W + col2W, y + 20).stroke();
+
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#000000');
+    doc.text(`DATE : ${formattedDate}`, margin + 6, y + 5.5, { width: col1W - 12, align: 'left' });
+    doc.text(`TIME: ${timeText}`, margin + col1W + 4, y + 5.5, { width: col2W - 8, align: 'center' });
+    doc.text(`HALL NO : ${hall ? (hall.hallName || '') : ''}`, margin + col1W + col2W + 8, y + 5.5, { width: col3W - 16, align: 'left' });
+    y += 20;
+
+    // 5. Student Table Header (CLASS | SUBJECT | NO OF STUDENTS)
+    doc.rect(margin, y, printableW, 20).lineWidth(0.8).strokeColor('#000000').stroke();
+    doc.moveTo(margin + col1W, y).lineTo(margin + col1W, y + 20).stroke();
+    doc.moveTo(margin + col1W + col2W, y).lineTo(margin + col1W + col2W, y + 20).stroke();
+
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#000000');
+    doc.text('CLASS', margin, y + 5.5, { width: col1W, align: 'center' });
+    doc.text('SUBJECT', margin + col1W, y + 5.5, { width: col2W, align: 'center' });
+    doc.text('NO OF STUDENTS', margin + col1W + col2W, y + 5.5, { width: col3W, align: 'center' });
+    y += 20;
+
+    // 6. Student Rows (Only actual groups, no unnecessary empty rows)
+    const classes = (hall && hall.classes) || [];
+    const numRows = classes.length;
+    const rowH = 21;
+
+    for (let r = 0; r < numRows; r++) {
+      const cls = classes[r];
+      doc.rect(margin, y, printableW, rowH).lineWidth(0.8).strokeColor('#000000').stroke();
+      doc.moveTo(margin + col1W, y).lineTo(margin + col1W, y + rowH).stroke();
+      doc.moveTo(margin + col1W + col2W, y).lineTo(margin + col1W + col2W, y + rowH).stroke();
+
+      if (cls) {
+        doc.font('Helvetica').fontSize(8.5).fillColor('#000000');
+        doc.text(cls.degree || cls.classCode || '', margin + 8, y + 5.5, { width: col1W - 16, align: 'left' });
+        doc.text(cls.subjectCode || '', margin + col1W, y + 5.5, { width: col2W, align: 'center' });
+        doc.font('Helvetica-Bold').fontSize(8.5);
+        doc.text(String(cls.count || 0), margin + col1W + col2W, y + 5.5, { width: col3W, align: 'center' });
+      }
+      y += rowH;
+    }
+
+    // 7. Footer Box 1: NAME OF INVIGILATOR | M/s
+    doc.rect(margin, y, printableW, 24).lineWidth(0.8).strokeColor('#000000').stroke();
+    doc.moveTo(margin + footerLeftW, y).lineTo(margin + footerLeftW, y + 24).stroke();
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#000000');
+    doc.text('NAME OF INVIGILATER', margin + 8, y + 7, { width: footerLeftW - 16, align: 'left' });
+    doc.font('Helvetica').fontSize(8.5);
+    doc.text('M/s', margin + footerLeftW + 8, y + 7, { width: footerRightW - 16, align: 'left' });
+    y += 24;
+
+    // 8. Footer Box 2: TOTAL NO OF CANDIDATES | [total]
+    doc.rect(margin, y, printableW, 24).lineWidth(0.8).strokeColor('#000000').stroke();
+    doc.moveTo(margin + footerLeftW, y).lineTo(margin + footerLeftW, y + 24).stroke();
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#000000');
+    doc.text('TOTAL NO OF CANDIDATES', margin + 8, y + 7, { width: footerLeftW - 16, align: 'left' });
+    if (hall && hall.totalStudents) {
+      doc.text(String(hall.totalStudents), margin + footerLeftW, y + 7, { width: footerRightW, align: 'center' });
+    }
+    y += 24;
+
+    // 9. Footer Box 3: REGISTER NOS OF ABSENTEES (Tall writing area: 56 pt)
+    const absH = 56;
+    doc.rect(margin, y, printableW, absH).lineWidth(0.8).strokeColor('#000000').stroke();
+    doc.moveTo(margin + footerLeftW, y).lineTo(margin + footerLeftW, y + absH).stroke();
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#000000');
+    doc.text('REGISTER NOS OF ABSENTEES', margin + 8, y + 8, { width: footerLeftW - 16, align: 'left' });
+    y += absH;
+
+    // 10. Footer Box 4: TOTAL NO OF PAPERS COLLECTED | [blank]
+    doc.rect(margin, y, printableW, 24).lineWidth(0.8).strokeColor('#000000').stroke();
+    doc.moveTo(margin + footerLeftW, y).lineTo(margin + footerLeftW, y + 24).stroke();
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#000000');
+    doc.text('TOTAL NO OF PAPERS COLLECTED', margin + 8, y + 7, { width: footerLeftW - 16, align: 'left' });
+    y += 24;
+
+    // 11. Footer Box 5: SIGNATURE OF THE INVIGILATER | [blank]
+    doc.rect(margin, y, printableW, 24).lineWidth(0.8).strokeColor('#000000').stroke();
+    doc.moveTo(margin + footerLeftW, y).lineTo(margin + footerLeftW, y + 24).stroke();
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#000000');
+    doc.text('SIGNATURE OF THE INVIGILATER', margin + 8, y + 7, { width: footerLeftW - 16, align: 'left' });
+    y += 24;
+
+    return y;
+  };
+
+  const results = data.result || [];
+  for (let i = 0; i < results.length; i += 2) {
+    if (i > 0) {
+      doc.addPage({ size: [612, 1008], margin: 0 });
+    }
+
+    const hall1 = results[i];
+    const hall2 = results[i + 1] || null;
+
+    // Render Top Form (starts at Y = 20)
+    const endY1 = renderSingleForm(hall1, 20);
+
+    if (hall2) {
+      // Subtle dashed cutting line in middle gap
+      const cutY = Math.max(492, endY1 + 14);
+      doc.lineWidth(0.6).dash(4, { space: 3 }).strokeColor('#888888')
+         .moveTo(margin, cutY).lineTo(margin + printableW, cutY).stroke().undash();
+      doc.font('Helvetica').fontSize(7.5).fillColor('#888888')
+         .text('✂ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ✂', margin, cutY - 3, { width: printableW, align: 'center' });
+
+      // Render Bottom Form (starts at Y = 510 or below cut line)
+      const form2StartY = Math.max(510, cutY + 16);
+      renderSingleForm(hall2, form2StartY);
+    }
+  }
+
+  doc.end();
+}
+
+// Shared Excel generator for Hall-wise Invigilator Report (Exact Box-by-Box Layout, 2 forms per Legal worksheet)
+function generateInvigilatorReportExcel(data) {
+  let XLSXLib;
+  try {
+    XLSXLib = require('xlsx-js-style');
+  } catch (e) {
+    XLSXLib = require('xlsx');
+  }
+
+  const wb = XLSXLib.utils.book_new();
+
+  const { examMonth, examYear, headerLine3 } = getInvigilatorReportMonthYear(data);
+
+  const headerLine1 = "RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM.";
+  const headerLine2 = "MADURAI KAMARAJ UNIVERSITY EXAMINATIONS";
+
+  const formattedDate = data.formattedDate || data.targetDate;
+  const timeText = data.timeOfExam 
+    ? `${data.session} (${data.timeOfExam})` 
+    : (data.session === 'FN' ? 'FN (10:00 AM - 01:00 PM)' : 'AN (02:00 PM - 05:00 PM)');
+
+  const borderAll = {
+    top: { style: 'thin', color: { rgb: '000000' } },
+    bottom: { style: 'thin', color: { rgb: '000000' } },
+    left: { style: 'thin', color: { rgb: '000000' } },
+    right: { style: 'thin', color: { rgb: '000000' } }
+  };
+
+  const results = data.result || [];
+  const usedSheetNames = new Set();
+
+  for (let idx = 0; idx < results.length; idx += 2) {
+    const hall1 = results[idx];
+    const hall2 = results[idx + 1] || null;
+
+    const ws = {};
+    const merges = [];
+    const rowHeights = [];
+
+    const writeCell = (r, c, val, bold = false, align = 'left', fontSize = 9.5, vAlign = 'center') => {
+      const cellRef = XLSXLib.utils.encode_cell({ r, c });
+      ws[cellRef] = {
+        v: val !== undefined && val !== null ? val : '',
+        t: typeof val === 'number' ? 'n' : 's',
+        s: {
+          font: {
+            name: 'Times New Roman',
+            size: fontSize,
+            bold: bold
+          },
+          alignment: {
+            horizontal: align,
+            vertical: vAlign,
+            wrapText: true
+          },
+          border: borderAll
+        }
+      };
+    };
+
+    const renderFormOnSheet = (hall, baseR) => {
+      let r = baseR;
+
+      // 1. College Header (Merged A-C)
+      writeCell(r, 0, headerLine1, true, 'center', 11);
+      writeCell(r, 1, '');
+      writeCell(r, 2, '');
+      merges.push({ s: { r, c: 0 }, e: { r, c: 2 } });
+      rowHeights[r] = { hpt: 20 };
+      r++;
+
+      // 2. University Header (Merged A-C)
+      writeCell(r, 0, headerLine2, true, 'center', 10.5);
+      writeCell(r, 1, '');
+      writeCell(r, 2, '');
+      merges.push({ s: { r, c: 0 }, e: { r, c: 2 } });
+      rowHeights[r] = { hpt: 18 };
+      r++;
+
+      // 3. Month & Year (Merged A-C)
+      writeCell(r, 0, headerLine3, true, 'center', 10);
+      writeCell(r, 1, '');
+      writeCell(r, 2, '');
+      merges.push({ s: { r, c: 0 }, e: { r, c: 2 } });
+      rowHeights[r] = { hpt: 18 };
+      r++;
+
+      // 4. Details (Date | Time | Hall No)
+      writeCell(r, 0, `DATE : ${formattedDate}`, true, 'left', 9);
+      writeCell(r, 1, `TIME: ${timeText}`, true, 'center', 9);
+      writeCell(r, 2, `HALL NO : ${hall ? (hall.hallName || '') : ''}`, true, 'left', 9);
+      rowHeights[r] = { hpt: 20 };
+      r++;
+
+      // 5. Table Header (CLASS | SUBJECT | NO OF STUDENTS)
+      writeCell(r, 0, 'CLASS', true, 'center', 9.5);
+      writeCell(r, 1, 'SUBJECT', true, 'center', 9.5);
+      writeCell(r, 2, 'NO OF STUDENTS', true, 'center', 9.5);
+      rowHeights[r] = { hpt: 20 };
+      r++;
+
+      // 6. Student Rows (Only actual groups, no unnecessary empty rows)
+      const classes = (hall && hall.classes) || [];
+      const numRows = classes.length;
+      for (let i = 0; i < numRows; i++) {
+        const cls = classes[i];
+        writeCell(r, 0, cls ? (cls.degree || cls.classCode || 'GENERAL') : '', false, 'left', 9);
+        writeCell(r, 1, cls ? (cls.subjectCode || '') : '', false, 'center', 9);
+        writeCell(r, 2, cls ? (cls.count || 0) : '', cls ? true : false, 'center', 9);
+        rowHeights[r] = { hpt: 18 };
+        r++;
+      }
+
+      // 7. Footer Row 1: NAME OF INVIGILATOR | M/s
+      writeCell(r, 0, 'NAME OF INVIGILATER', true, 'left', 9);
+      writeCell(r, 1, '');
+      merges.push({ s: { r, c: 0 }, e: { r, c: 1 } });
+      writeCell(r, 2, 'M/s', false, 'left', 9);
+      rowHeights[r] = { hpt: 22 };
+      r++;
+
+      // 8. Footer Row 2: TOTAL NO OF CANDIDATES | [total]
+      writeCell(r, 0, 'TOTAL NO OF CANDIDATES', true, 'left', 9);
+      writeCell(r, 1, '');
+      merges.push({ s: { r, c: 0 }, e: { r, c: 1 } });
+      writeCell(r, 2, hall && hall.totalStudents ? hall.totalStudents : '', true, 'center', 9.5);
+      rowHeights[r] = { hpt: 22 };
+      r++;
+
+      // 9. Footer Row 3: REGISTER NOS OF ABSENTEES (Tall writing box: 48 pt)
+      writeCell(r, 0, 'REGISTER NOS OF ABSENTEES', true, 'left', 9, 'top');
+      writeCell(r, 1, '', false, 'left', 9, 'top');
+      merges.push({ s: { r, c: 0 }, e: { r, c: 1 } });
+      writeCell(r, 2, '', false, 'left', 9, 'top');
+      rowHeights[r] = { hpt: 48 };
+      r++;
+
+      // 10. Footer Row 4: TOTAL NO OF PAPERS COLLECTED | [blank]
+      writeCell(r, 0, 'TOTAL NO OF PAPERS COLLECTED', true, 'left', 9);
+      writeCell(r, 1, '');
+      merges.push({ s: { r, c: 0 }, e: { r, c: 1 } });
+      writeCell(r, 2, '', false, 'left', 9);
+      rowHeights[r] = { hpt: 22 };
+      r++;
+
+      // 11. Footer Row 5: SIGNATURE OF THE INVIGILATER | [blank]
+      writeCell(r, 0, 'SIGNATURE OF THE INVIGILATER', true, 'left', 9);
+      writeCell(r, 1, '');
+      merges.push({ s: { r, c: 0 }, e: { r, c: 1 } });
+      writeCell(r, 2, '', false, 'left', 9);
+      rowHeights[r] = { hpt: 24 };
+      r++;
+
+      return r;
+    };
+
+    // Render Form 1 (Top)
+    let endR1 = renderFormOnSheet(hall1, 0);
+    let finalRow = endR1;
+
+    if (hall2) {
+      // Gap / cut line between forms
+      const cellRefGap = XLSXLib.utils.encode_cell({ r: endR1, c: 0 });
+      ws[cellRefGap] = {
+        v: '✂ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ✂',
+        t: 's',
+        s: {
+          font: { name: 'Times New Roman', size: 8, color: { rgb: '888888' } },
+          alignment: { horizontal: 'center', vertical: 'center' }
+        }
+      };
+      merges.push({ s: { r: endR1, c: 0 }, e: { r: endR1, c: 2 } });
+      rowHeights[endR1] = { hpt: 16 };
+      endR1++;
+
+      rowHeights[endR1] = { hpt: 10 };
+      endR1++;
+
+      // Render Form 2 (Bottom)
+      let endR2 = renderFormOnSheet(hall2, endR1);
+      finalRow = endR2;
+    }
+
+    ws['!cols'] = [
+      { wch: 26 }, // CLASS
+      { wch: 28 }, // SUBJECT
+      { wch: 32 }  // NO OF STUDENTS
+    ];
+    ws['!rows'] = rowHeights;
+    ws['!merges'] = merges;
+    ws['!ref'] = XLSXLib.utils.encode_range({
+      s: { r: 0, c: 0 },
+      e: { r: finalRow, c: 2 }
+    });
+
+    ws['!pageSetup'] = {
+      paperSize: 5, // Legal / Long Bond
+      orientation: 'portrait'
+    };
+
+    let baseName;
+    if (hall2 && hall2.hallName) {
+      baseName = `Halls ${hall1.hallName} - ${hall2.hallName}`.trim().substring(0, 31);
+    } else {
+      baseName = `Hall ${hall1.hallName}`.trim().substring(0, 31);
+    }
+    if (!baseName) baseName = `Halls_${idx + 1}`;
+    let sheetName = baseName;
+    let sCounter = 1;
+    while (usedSheetNames.has(sheetName)) {
+      sheetName = `${baseName.substring(0, 27)}_${sCounter}`;
+      sCounter++;
+    }
+    usedSheetNames.add(sheetName);
+
+    XLSXLib.utils.book_append_sheet(wb, ws, sheetName);
+  }
+
+  return wb;
+}
+
 // GET seating summary (locations) for all halls on a date and session
 app.get(["/api/seating/locations-by-date-session", "/api/seating/locations-summary"], async (req, res) => {
   try {
@@ -6624,9 +7483,10 @@ app.get(["/api/seating/download-nominal-roll-pdf", "/api/seating/locations/downl
 
     const PDFDocument = require("pdfkit");
     const doc = new PDFDocument({
-      size: "A4",
-      margin: 35,
-      bufferPages: true
+      size: [612, 1008], // Legal / Long Bond: 8.5 x 14 in
+      margin: 36,
+      bufferPages: true,
+      autoFirstPage: true
     });
 
     const buffers = [];
@@ -6774,11 +7634,24 @@ app.get(["/api/seating/download-nominal-roll-excel", "/api/seating/locations/dow
     let examMonth = "NOVEMBER";
     let examYear = new Date().getFullYear();
     try {
-      const d = new Date(data.targetDate);
-      if (!isNaN(d.getTime())) {
-        const m = d.getMonth();
+      const rawDateStr = String(data.targetDate || (data.examsAtTime && data.examsAtTime[0] && data.examsAtTime[0].date) || "");
+      const isoMatch = rawDateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      const dmyMatch = rawDateStr.match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
+      if (isoMatch) {
+        examYear = parseInt(isoMatch[1], 10);
+        const m = parseInt(isoMatch[2], 10) - 1;
         examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
-        examYear = d.getFullYear();
+      } else if (dmyMatch) {
+        examYear = parseInt(dmyMatch[3], 10);
+        const m = parseInt(dmyMatch[2], 10) - 1;
+        examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+      } else {
+        const d = new Date(rawDateStr);
+        if (!isNaN(d.getTime())) {
+          examYear = d.getFullYear();
+          const m = d.getMonth();
+          examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+        }
       }
     } catch (e) {}
 
@@ -6861,10 +7734,17 @@ app.get(["/api/seating/download-nominal-roll-excel", "/api/seating/locations/dow
     ws['!rows'][1] = { hpt: 20 };
     ws['!rows'][3] = { hpt: 22 };
 
-    ws['!pageSetup'] = { paperSize: 9, orientation: 'portrait', fitToWidth: 1 };
+    ws['!pageSetup'] = {
+      paperSize: 5, // Legal / Long Bond (8.5 x 14 in)
+      orientation: 'portrait',
+      fitToWidth: 1,
+      fitToHeight: 0,
+      scale: 100
+    };
     XLSXLib.utils.book_append_sheet(wb, ws, 'MKU Nominal Roll');
 
-    const buf = XLSXLib.write(wb, { bookType: 'xlsx', type: 'buffer' });
+    let buf = XLSXLib.write(wb, { bookType: 'xlsx', type: 'buffer' });
+    buf = applyLegalPaperSizeToXlsxBuffer(buf);
 
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
     res.setHeader('Content-Disposition', `attachment; filename="Nominal_Roll_MKU_${data.formattedDate}_${session}.xlsx"`);
@@ -6976,7 +7856,7 @@ app.get("/api/seating/download-locations", async (req, res) => {
       const hallTitle = `HALL NO. ${hall.hallName}`;
 
       // Write Hall Title Row
-      writeCell(currentRow, 0, hallTitle, true, 'left', 11);
+      writeCell(currentRow, 0, hallTitle, true, 'center', 11);
       merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: 3 } });
       currentRow++;
 
@@ -7043,6 +7923,80 @@ app.get("/api/seating/download-locations", async (req, res) => {
 
   } catch (error) {
     console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET export Hall-wise Invigilator Report as styled PDF file (.pdf)
+app.get(["/api/seating/download-invigilator-report-pdf", "/api/seating/invigilator-report/download-pdf", "/api/seating/download-invigilator-pdf"], async (req, res) => {
+  try {
+    const { date, session } = req.query;
+    if (!date || !session) {
+      return res.status(400).json({ error: "date and session are required." });
+    }
+
+    const data = await getLocationsSummaryData(date, session);
+    if (!data.result || data.result.length === 0) {
+      return res.status(404).json({ error: "No seating plans generated for this date and session." });
+    }
+
+    const PDFDocument = require("pdfkit");
+    const doc = new PDFDocument({
+      size: [612, 1008], // Legal size: 8.5 x 14 in
+      margin: 0,
+      autoFirstPage: true,
+      bufferPages: true
+    });
+
+    const buffers = [];
+    doc.on("data", buffers.push.bind(buffers));
+    doc.on("end", () => {
+      const pdfData = Buffer.concat(buffers);
+      res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="Invigilator_Report_${data.formattedDate}_${data.session}.pdf"`);
+      res.send(pdfData);
+    });
+
+    generateInvigilatorReportPdf(doc, data);
+
+  } catch (error) {
+    console.error("Error generating Invigilator Report PDF:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET export Hall-wise Invigilator Report as styled Excel file (.xlsx)
+app.get(["/api/seating/download-invigilator-report-excel", "/api/seating/invigilator-report/download-excel", "/api/seating/download-invigilator-report-xlsx", "/api/seating/download-invigilator-excel"], async (req, res) => {
+  try {
+    const { date, session } = req.query;
+    if (!date || !session) {
+      return res.status(400).json({ error: "date and session are required." });
+    }
+
+    const data = await getLocationsSummaryData(date, session);
+    if (!data.result || data.result.length === 0) {
+      return res.status(404).json({ error: "No seating plans generated for this date and session." });
+    }
+
+    let XLSXLib;
+    try {
+      XLSXLib = require('xlsx-js-style');
+    } catch (e) {
+      XLSXLib = require('xlsx');
+    }
+
+    const wb = generateInvigilatorReportExcel(data);
+    let buf = XLSXLib.write(wb, { bookType: 'xlsx', type: 'buffer' });
+    buf = applyLegalPaperSizeToXlsxBuffer(buf);
+
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.setHeader('Content-Disposition', `attachment; filename="Invigilator_Report_${data.formattedDate}_${data.session}.xlsx"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buf);
+
+  } catch (error) {
+    console.error("Error generating Invigilator Report Excel:", error);
     res.status(500).json({ error: error.message });
   }
 });
