@@ -1,5 +1,12 @@
 [
   {
+    "id": "1792686077759_yswr2",
+    "type": "user",
+    "message": "User Logged In",
+    "detail": "admin logged into the system.",
+    "time": "2026-10-22T16:21:17.759Z"
+  },
+  {
     "id": "1792684084576_ef9km",
     "type": "exam",
     "message": "Exam Updated",
@@ -201,12 +208,5 @@
     "message": "Seating Generated",
     "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
     "time": "2026-10-22T15:47:35.841Z"
-  },
-  {
-    "id": "1792684055520_x2t56",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:35.520Z"
   }
 ]
