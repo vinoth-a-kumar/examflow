@@ -44,6 +44,16 @@ async function getBuffer(path) {
   return Buffer.from(arrayBuffer);
 }
 
+function getRowLetter(r) {
+  let letter = '';
+  let num = r;
+  while (num >= 0) {
+    letter = String.fromCharCode(65 + (num % 26)) + letter;
+    num = Math.floor(num / 26) - 1;
+  }
+  return letter;
+}
+
 // Helper: Calculate exact serpentine student sequence from a hall's seatingGrid
 function getSerpentineStudentSequenceFromGrid(grid, cols, colRows) {
   const benchMap = new Map();
@@ -54,7 +64,7 @@ function getSerpentineStudentSequenceFromGrid(grid, cols, colRows) {
     const rowsInCol = colRows && colRows[c - 1] !== undefined ? colRows[c - 1] : 6;
     if (c % 2 === 1) { // Odd column: top to bottom
       for (let r = 0; r < rowsInCol; r++) {
-        const code = `${String.fromCharCode(65 + r)}${c}`;
+        const code = `${getRowLetter(r)}${c}`;
         const bench = benchMap.get(code);
         if (bench && !bench.isPlaceholder) {
           if (bench.seat1?.registerNo) students.push(bench.seat1);
@@ -64,7 +74,7 @@ function getSerpentineStudentSequenceFromGrid(grid, cols, colRows) {
       }
     } else { // Even column: bottom to top
       for (let r = rowsInCol - 1; r >= 0; r--) {
-        const code = `${String.fromCharCode(65 + r)}${c}`;
+        const code = `${getRowLetter(r)}${c}`;
         const bench = benchMap.get(code);
         if (bench && !bench.isPlaceholder) {
           if (bench.seat1?.registerNo) students.push(bench.seat1);

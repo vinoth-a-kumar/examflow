@@ -130,7 +130,7 @@ async function runTests() {
     // TEST 4: Create an exam using an unused subject code; it should succeed
     // -------------------------------------------------------------------------
     console.log('\n--- TEST 4: Create exam using unused subject code succeeds ---');
-    const codeC = 'ABAPC11';
+    const codeC = 'ABAPC99';
     const exam2Payload = {
       name: 'Test Exam 2 (C)',
       subjectCodes: [codeC],

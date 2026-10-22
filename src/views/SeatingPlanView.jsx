@@ -1848,21 +1848,37 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
               const cols = seatingPlan.columns || 4;
               const colRows = seatingPlan.columnRows || [];
               const benchMap = new Map();
-              seatingPlan.seatingGrid.forEach(b => { if (b && b.benchCode) benchMap.set(b.benchCode, b); });
+              const colMaxRowMap = new Map();
+              seatingPlan.seatingGrid.forEach(b => {
+                if (b && b.benchCode) {
+                  benchMap.set(b.benchCode, b);
+                  const m = String(b.benchCode).match(/^([A-Za-z]+)(\d+)$/);
+                  if (m) {
+                    let rIdx = 0;
+                    const clean = m[1].toUpperCase();
+                    for (let i = 0; i < clean.length; i++) {
+                      rIdx = rIdx * 26 + (clean.charCodeAt(i) - 64);
+                    }
+                    const cNum = parseInt(m[2], 10);
+                    const cur = colMaxRowMap.get(cNum) || 0;
+                    if (rIdx > cur) colMaxRowMap.set(cNum, rIdx);
+                  }
+                }
+              });
               for (let c = 1; c <= cols; c++) {
-                const rCount = colRows[c - 1] !== undefined ? colRows[c - 1] : 6;
-                if (c % 2 === 1) {
+                const rCount = Math.max(colMaxRowMap.get(c) || 0, colRows[c - 1] !== undefined ? colRows[c - 1] : (seatingPlan.rows || 6));
+                if (c % 2 === 1) { // Odd column: top to bottom
                   for (let r = 0; r < rCount; r++) {
-                    const b = benchMap.get(`${String.fromCharCode(65 + r)}${c}`);
+                    const b = benchMap.get(`${getRowLetterHelper(r)}${c}`);
                     if (b && !b.isPlaceholder) {
                       if (b.seat1?.registerNo) studentRegNos.push(b.seat1.registerNo);
                       if (b.seat2?.registerNo) studentRegNos.push(b.seat2.registerNo);
                       if (b.seat3?.registerNo) studentRegNos.push(b.seat3.registerNo);
                     }
                   }
-                } else {
+                } else { // Even column: bottom to top
                   for (let r = rCount - 1; r >= 0; r--) {
-                    const b = benchMap.get(`${String.fromCharCode(65 + r)}${c}`);
+                    const b = benchMap.get(`${getRowLetterHelper(r)}${c}`);
                     if (b && !b.isPlaceholder) {
                       if (b.seat1?.registerNo) studentRegNos.push(b.seat1.registerNo);
                       if (b.seat2?.registerNo) studentRegNos.push(b.seat2.registerNo);

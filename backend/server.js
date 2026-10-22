@@ -2729,6 +2729,277 @@ function getRowLetter(r) {
   return letter;
 }
 
+// Robust helper to retrieve actual student Department / Course Code identity
+function getStudentCourseIdentity(student) {
+  if (!student) return 'GENERAL';
+  if (student.courseCode && typeof student.courseCode === 'string' && student.courseCode.trim()) {
+    const val = student.courseCode.trim().toUpperCase();
+    if (!['GENERAL', 'UNKNOWN', 'NULL', 'UNDEFINED'].includes(val)) return val;
+  }
+  if (student.csvData && typeof student.csvData === 'object') {
+    const keys = Object.keys(student.csvData);
+    const cKey = keys.find(k => /cours|cousr/i.test(k));
+    if (cKey && student.csvData[cKey]) {
+      const val = String(student.csvData[cKey]).trim().toUpperCase();
+      if (val && !['GENERAL', 'UNKNOWN', 'NULL', 'UNDEFINED'].includes(val)) {
+        return val;
+      }
+    }
+    const dKey = keys.find(k => /dept|depart|branch/i.test(k));
+    if (dKey && student.csvData[dKey]) {
+      const val = String(student.csvData[dKey]).trim().toUpperCase();
+      if (val && !['GENERAL', 'UNKNOWN', 'NULL', 'UNDEFINED'].includes(val)) {
+        return val;
+      }
+    }
+  }
+  const rawDept = student.department;
+  const resolved = resolveStudentDepartment(student, student.registerNo, rawDept);
+  return (canonicalizeDegree(resolved) || resolved || rawDept || 'GENERAL').toUpperCase();
+}
+
+// Unified Department-Wise Consecutive Seating Allocation by Seat Position (Tracks along W-order traversal)
+function allocateStudentsToBenchesBySeatPosition(benchesList, students, seatsPerBench, maxCap = 0, onAssign = null) {
+  if (!benchesList || benchesList.length === 0 || !students || students.length === 0) {
+    return { seatedCount: 0 };
+  }
+
+  const effectiveCap = maxCap > 0 ? Math.min(maxCap, students.length) : students.length;
+  const spb = parseInt(seatsPerBench) || 2;
+
+  const trackDefs = spb === 3
+    ? [
+        { key: 'seat1', pos: 'Left' },
+        { key: 'seat2', pos: 'Middle' },
+        { key: 'seat3', pos: 'Right' }
+      ]
+    : [
+        { key: 'seat1', pos: 'Left' },
+        { key: 'seat2', pos: 'Right' }
+      ];
+
+  const tracks = trackDefs.map(() => []);
+  for (const bench of benchesList) {
+    trackDefs.forEach((def, tIdx) => {
+      if (!bench[def.key]) {
+        tracks[tIdx].push({
+          bench,
+          seatKey: def.key,
+          pos: def.pos
+        });
+      }
+    });
+  }
+
+  // Group candidate students by Course/Department identity preserving order
+  const deptMap = new Map();
+  students.forEach(st => {
+    const dId = getStudentCourseIdentity(st);
+    if (!deptMap.has(dId)) {
+      deptMap.set(dId, []);
+    }
+    deptMap.get(dId).push(st);
+  });
+
+  const pools = Array.from(deptMap.entries()).map(([dId, stList]) => ({
+    dId,
+    dept: stList[0]?.department || dId,
+    students: [...stList]
+  }));
+
+  const trackQueues = trackDefs.map(() => []);
+  const totalBenchCount = benchesList.length;
+
+  // Helper to fill remaining capacity of tracks in specific track preference order
+  // taking contiguous chunks from remaining pools to guarantee consecutive sequence
+  function fillTracksContiguously(trackOrder, unallocatedPools) {
+    for (const t of trackOrder) {
+      let needed = tracks[t].length - trackQueues[t].length;
+      if (needed <= 0) continue;
+      for (const pool of unallocatedPools) {
+        if (needed <= 0) break;
+        if (pool.students.length > 0) {
+          const takeCount = Math.min(needed, pool.students.length);
+          const chunk = pool.students.splice(0, takeCount);
+          trackQueues[t].push(...chunk);
+          needed -= takeCount;
+        }
+      }
+    }
+  }
+
+  if (spb === 3) {
+    if (pools.length >= 3) {
+      // 3 or more departments: Track 0 (Left) -> Pool 0, Track 1 (Middle) -> Pool 1, Track 2 (Right) -> Pool 2
+      trackQueues[0] = pools[0].students.splice(0, totalBenchCount);
+      trackQueues[1] = pools[1].students.splice(0, totalBenchCount);
+      trackQueues[2] = pools[2].students.splice(0, totalBenchCount);
+
+      // Remaining distinct pools (pools 3, 4, etc.) first
+      const otherPools = pools.slice(3);
+      fillTracksContiguously([2, 1, 0], otherPools);
+
+      // Then fill overflow from primary pools (pools 0, 1, 2)
+      // Prefer Track 2 (Right) for Pool 0 (Left) overflow so Left & Right are separated by Middle
+      fillTracksContiguously([2, 1, 0], pools.slice(0, 3));
+    } else if (pools.length === 2) {
+      // 2 departments:
+      const p0 = pools[0];
+      const p1 = pools[1];
+      const pMaj = p0.students.length >= p1.students.length ? p0 : p1;
+      const pMin = p0.students.length >= p1.students.length ? p1 : p0;
+
+      if (pMaj.students.length > totalBenchCount) {
+        // Majority pool occupies Track 0 (Left) and overflows to Track 2 (Right).
+        // Minority pool occupies Track 1 (Middle) to separate Left & Right!
+        trackQueues[0] = pMaj.students.splice(0, totalBenchCount);
+        trackQueues[1] = pMin.students.splice(0, totalBenchCount);
+        trackQueues[2] = pMaj.students.splice(0, totalBenchCount);
+
+        fillTracksContiguously([2, 1, 0], [pMin, pMaj]);
+      } else {
+        // Neither department exceeds bench count: place on Left and Right with Middle empty!
+        trackQueues[0] = pMaj.students.splice(0, totalBenchCount);
+        trackQueues[2] = pMin.students.splice(0, totalBenchCount);
+        // Middle remains empty unless additional students need placement
+        fillTracksContiguously([1, 2, 0], [pMaj, pMin]);
+      }
+    } else if (pools.length === 1) {
+      // 1 department: Check if multiple subject codes exist
+      const singlePool = pools[0];
+      const subMap = new Map();
+      singlePool.students.forEach(st => {
+        const sub = (st.subjectCode || '').trim().toUpperCase() || 'GENERAL';
+        if (!subMap.has(sub)) subMap.set(sub, []);
+        subMap.get(sub).push(st);
+      });
+      const subPools = Array.from(subMap.values()).map((sts, idx) => ({
+        dId: `SUB_${idx}`,
+        dept: sts[0]?.department || singlePool.dept,
+        students: sts
+      }));
+
+      if (subPools.length >= 3) {
+        trackQueues[0] = subPools[0].students.splice(0, totalBenchCount);
+        trackQueues[1] = subPools[1].students.splice(0, totalBenchCount);
+        trackQueues[2] = subPools[2].students.splice(0, totalBenchCount);
+        fillTracksContiguously([2, 1, 0], subPools);
+      } else if (subPools.length === 2) {
+        const sMaj = subPools[0].students.length >= subPools[1].students.length ? subPools[0] : subPools[1];
+        const sMin = subPools[0].students.length >= subPools[1].students.length ? subPools[1] : subPools[0];
+        if (sMaj.students.length > totalBenchCount) {
+          trackQueues[0] = sMaj.students.splice(0, totalBenchCount);
+          trackQueues[1] = sMin.students.splice(0, totalBenchCount);
+          trackQueues[2] = sMaj.students.splice(0, totalBenchCount);
+          fillTracksContiguously([2, 1, 0], [sMin, sMaj]);
+        } else {
+          trackQueues[0] = sMaj.students.splice(0, totalBenchCount);
+          trackQueues[2] = sMin.students.splice(0, totalBenchCount);
+          fillTracksContiguously([1, 2, 0], [sMaj, sMin]);
+        }
+      } else {
+        // Single subject: Fill Left (Track 0) and Right (Track 2) first, Middle (Track 1) last
+        trackQueues[0] = singlePool.students.splice(0, totalBenchCount);
+        trackQueues[2] = singlePool.students.splice(0, totalBenchCount);
+        trackQueues[1] = singlePool.students.splice(0, totalBenchCount);
+      }
+    }
+  } else {
+    // 2 seats per bench
+    if (pools.length >= 2) {
+      trackQueues[0] = pools[0].students.splice(0, totalBenchCount);
+      trackQueues[1] = pools[1].students.splice(0, totalBenchCount);
+      fillTracksContiguously([0, 1], pools);
+    } else if (pools.length === 1) {
+      const singlePool = pools[0];
+      const subMap = new Map();
+      singlePool.students.forEach(st => {
+        const sub = (st.subjectCode || '').trim().toUpperCase() || 'GENERAL';
+        if (!subMap.has(sub)) subMap.set(sub, []);
+        subMap.get(sub).push(st);
+      });
+      const subPools = Array.from(subMap.values()).map((sts, idx) => ({
+        dId: `SUB_${idx}`,
+        dept: sts[0]?.department || singlePool.dept,
+        students: sts
+      }));
+
+      if (subPools.length >= 2) {
+        trackQueues[0] = subPools[0].students.splice(0, totalBenchCount);
+        trackQueues[1] = subPools[1].students.splice(0, totalBenchCount);
+        fillTracksContiguously([0, 1], subPools);
+      } else {
+        trackQueues[0] = singlePool.students.splice(0, totalBenchCount);
+        trackQueues[1] = singlePool.students.splice(0, totalBenchCount);
+      }
+    }
+  }
+
+  // Physically assign students along tracks in W-order traversal
+  let seatedCount = 0;
+  for (let t = 0; t < trackDefs.length; t++) {
+    const trackSlots = tracks[t];
+    const queue = trackQueues[t];
+    for (let i = 0; i < trackSlots.length; i++) {
+      if (i >= queue.length) break;
+      if (seatedCount >= effectiveCap) break;
+
+      const slot = trackSlots[i];
+      const student = queue[i];
+      slot.bench[slot.seatKey] = student;
+      seatedCount++;
+
+      if (typeof onAssign === 'function') {
+        onAssign(slot.bench, slot.seatKey, slot.pos, {
+          student,
+          dept: student.department,
+          code: student.subjectCode || '',
+          isSecondary: student.isSecondary
+        });
+      }
+    }
+  }
+
+  // Safety sweep: Guarantee ZERO empty seats up to effectiveCap without duplicates
+  if (seatedCount < effectiveCap) {
+    const unassigned = [];
+    pools.forEach(p => {
+      if (p.students.length > 0) unassigned.push(...p.students);
+    });
+    for (let t = 0; t < trackDefs.length; t++) {
+      const placed = tracks[t].length;
+      if (trackQueues[t].length > placed) {
+        unassigned.push(...trackQueues[t].slice(placed));
+      }
+    }
+
+    if (unassigned.length > 0) {
+      for (let t = 0; t < trackDefs.length && unassigned.length > 0; t++) {
+        const trackSlots = tracks[t];
+        for (let i = 0; i < trackSlots.length && unassigned.length > 0; i++) {
+          if (seatedCount >= effectiveCap) break;
+          const slot = trackSlots[i];
+          if (!slot.bench[slot.seatKey]) {
+            const student = unassigned.shift();
+            slot.bench[slot.seatKey] = student;
+            seatedCount++;
+            if (typeof onAssign === 'function') {
+              onAssign(slot.bench, slot.seatKey, slot.pos, {
+                student,
+                dept: student.department,
+                code: student.subjectCode || '',
+                isSecondary: student.isSecondary
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return { seatedCount };
+}
+
 // Helper to perform seating generation for a single exam and hall
 async function generateSeatingPlan(examId, hallId) {
   const exam = await Models.Exam.findById(examId);
@@ -3027,33 +3298,65 @@ async function generateSeatingPlan(examId, hallId) {
     // Target per group across B benches is B students (1 per bench)
     const targetPerGroup = totalBenchesInHall;
 
+    // Group active subject pools by Course/Department identity so multiple subject codes under the same department do not crowd out distinct departments
+    const courseMap = new Map();
+    subjectPools.forEach(p => {
+      const sampleStudent = p.students[0];
+      const dId = sampleStudent ? getStudentCourseIdentity(sampleStudent) : (p.dept || p.code);
+      if (!courseMap.has(dId)) {
+        courseMap.set(dId, []);
+      }
+      courseMap.get(dId).push(p);
+    });
+
+    const distinctCourseList = Array.from(courseMap.values());
+    distinctCourseList.sort((a, b) => {
+      const totA = a.reduce((sum, p) => sum + p.students.length, 0);
+      const totB = b.reduce((sum, p) => sum + p.students.length, 0);
+      return totB - totA;
+    });
+
     const allocations = new Map();
     subjectPools.forEach(p => allocations.set(p, 0));
 
-    // Step 1: Base target allocation across top active subject pools (up to seatsPerBench pools)
-    const activeSubjectPools = subjectPools.filter(p => p.students && p.students.length > 0);
-    const primaryPools = activeSubjectPools.slice(0, seatsPerBench);
-    for (const p of primaryPools) {
-      if (remainingNeeded <= 0) break;
-      const canTake = Math.min(targetPerGroup, p.students.length, remainingNeeded);
-      allocations.set(p, canTake);
-      remainingNeeded -= canTake;
-    }
+    // Step 1: Base target allocation across top active distinct courses (up to seatsPerBench courses)
+    const activeCourses = distinctCourseList.filter(cPools => cPools.some(p => p.students && p.students.length > 0));
+    const primaryCourses = activeCourses.slice(0, seatsPerBench);
+    const tracksPerCourse = Math.floor(seatsPerBench / Math.max(1, primaryCourses.length));
+    let extraTracks = seatsPerBench % Math.max(1, primaryCourses.length);
 
-    // Step 2: If capacity remains (e.g. some groups had < B students, or fewer than S groups existed),
-    // redistribute capacity among other eligible groups in selected priority order (target up to B)
-    if (remainingNeeded > 0) {
-      const otherPools = activeSubjectPools.slice(seatsPerBench);
-      for (const p of otherPools) {
-        if (remainingNeeded <= 0) break;
-        const canTake = Math.min(targetPerGroup, p.students.length, remainingNeeded);
+    for (const cPools of primaryCourses) {
+      if (remainingNeeded <= 0) break;
+      const courseTarget = targetPerGroup * (tracksPerCourse + (extraTracks > 0 ? 1 : 0));
+      if (extraTracks > 0) extraTracks--;
+
+      let courseNeeded = Math.min(courseTarget, remainingNeeded);
+      for (const p of cPools) {
+        if (courseNeeded <= 0) break;
+        const canTake = Math.min(courseNeeded, p.students.length);
         allocations.set(p, canTake);
+        courseNeeded -= canTake;
         remainingNeeded -= canTake;
       }
     }
 
-    // Step 3: If capacity STILL remains (all active groups reached target B or ran out,
-    // but hall still has empty seats), fill from any groups that still have students left in selection priority order
+    // Step 2: If capacity remains, distribute across other courses in selection priority order
+    if (remainingNeeded > 0) {
+      const otherCourses = activeCourses.slice(seatsPerBench);
+      for (const cPools of otherCourses) {
+        if (remainingNeeded <= 0) break;
+        let courseNeeded = Math.min(targetPerGroup, remainingNeeded);
+        for (const p of cPools) {
+          if (courseNeeded <= 0) break;
+          const canTake = Math.min(courseNeeded, p.students.length);
+          allocations.set(p, canTake);
+          courseNeeded -= canTake;
+          remainingNeeded -= canTake;
+        }
+      }
+    }
+
+    // Step 3: If capacity STILL remains, fill from any groups with students left in selection priority order
     if (remainingNeeded > 0) {
       for (const p of subjectPools) {
         if (remainingNeeded <= 0) break;
@@ -3094,7 +3397,7 @@ async function generateSeatingPlan(examId, hallId) {
           row: rowLetter,
           col: c,
           seat1: occupiedSeatsInThisHall[`${benchCode}_seat1`] || null,
-          seat2: occupiedSeatsInThisHall[`${benchCode}_seat2`] || null,
+          seat2: seatsPerBench >= 2 ? (occupiedSeatsInThisHall[`${benchCode}_seat2`] || null) : undefined,
           seat3: seatsPerBench === 3 ? (occupiedSeatsInThisHall[`${benchCode}_seat3`] || null) : undefined
         };
       }
@@ -3124,33 +3427,6 @@ async function generateSeatingPlan(examId, hallId) {
         }
       }
     }
-
-    // Stage 2: Group hall students strictly by department to achieve department diversity across benches
-    const hallDeptMap = new Map();
-    hallStudents.forEach(st => {
-      const d = st.department || 'GENERAL';
-      if (!hallDeptMap.has(d)) {
-        hallDeptMap.set(d, []);
-      }
-      hallDeptMap.get(d).push(st);
-    });
-
-    // Sort department pools strictly preserving selected subject-code sequence
-    const hallDeptNames = [];
-    orderedSubCodes.forEach(code => {
-      const p = subjectPools.find(pool => pool.code === code);
-      if (p && hallDeptMap.has(p.dept) && !hallDeptNames.includes(p.dept)) {
-        hallDeptNames.push(p.dept);
-      }
-    });
-    hallDeptMap.forEach((_, d) => {
-      if (!hallDeptNames.includes(d)) hallDeptNames.push(d);
-    });
-
-    const deptPools = hallDeptNames.map(deptName => ({
-      dept: deptName,
-      students: hallDeptMap.get(deptName)
-    }));
 
     function handleSecondaryStudent(res, bench, pos) {
       const student = res.student;
@@ -3191,207 +3467,16 @@ async function generateSeatingPlan(examId, hallId) {
       }
     }
 
-    // Fill benches in serpentine W-order, maximizing department diversity on each bench
-    for (let bIdx = 0; bIdx < benchesList.length; bIdx++) {
-      if (totalSeatedInThisHall >= hallStudents.length || (maxHallCap > 0 && totalSeatedInThisHall >= maxHallCap)) break;
-
-      const bench = benchesList[bIdx];
-      const freeSlots = [];
-      if (!bench.seat1) freeSlots.push({ key: 'seat1', pos: 'Left' });
-      if (!bench.seat2) freeSlots.push({ key: 'seat2', pos: seatsPerBench === 3 ? 'Middle' : 'Right' });
-      if (seatsPerBench === 3 && !bench.seat3) freeSlots.push({ key: 'seat3', pos: 'Right' });
-
-      if (freeSlots.length === 0) continue;
-
-      const remainingStudentsTotal = deptPools.reduce((sum, p) => sum + p.students.length, 0);
-      if (remainingStudentsTotal <= 0) break;
-
-      let seatsToFill = Math.min(freeSlots.length, remainingStudentsTotal);
-      if (maxHallCap > 0) {
-        seatsToFill = Math.min(seatsToFill, maxHallCap - totalSeatedInThisHall);
+    // Allocate students by seat position (Track-by-Track in W-order traversal)
+    allocateStudentsToBenchesBySeatPosition(
+      benchesList,
+      hallStudents,
+      seatsPerBench,
+      availableCap,
+      (bench, seatKey, pos, res) => {
+        assignStudentToSeat(bench, seatKey, pos, res);
       }
-      if (seatsToFill <= 0) break;
-
-      // Calculate effective remaining benches to balance department distribution
-      let remainingBenchesWithFreeSeats = 0;
-      for (let i = bIdx; i < benchesList.length; i++) {
-        const b = benchesList[i];
-        if (!b.seat1 || !b.seat2 || (seatsPerBench === 3 && !b.seat3)) {
-          remainingBenchesWithFreeSeats++;
-        }
-      }
-      const benchesNeeded = Math.ceil(remainingStudentsTotal / seatsPerBench);
-      const effectiveRemainingBenches = Math.max(1, Math.min(remainingBenchesWithFreeSeats, benchesNeeded));
-
-      const occupiedDeptsOnBench = [bench.seat1, bench.seat2, bench.seat3]
-        .filter(Boolean)
-        .map(s => (s.department || '').toUpperCase());
-
-      const activePools = deptPools.filter(p => p.students.length > 0);
-      const chosenPools = [];
-
-      // 1. Critical priority: If a department has more students than remaining benches,
-      // it MUST take 2 seats on this bench (Left & Right) so it never accumulates to 3 on later benches!
-      const criticalDouble = activePools.find(p => 
-        !occupiedDeptsOnBench.includes(p.dept.toUpperCase()) &&
-        p.students.length > effectiveRemainingBenches &&
-        seatsToFill >= 2 &&
-        seatsPerBench === 3
-      );
-      if (criticalDouble) {
-        chosenPools.push(criticalDouble);
-        chosenPools.push(criticalDouble);
-      } else {
-        const criticalPools = activePools.filter(p => 
-          !occupiedDeptsOnBench.includes(p.dept.toUpperCase()) &&
-          p.students.length >= effectiveRemainingBenches
-        );
-        criticalPools.sort((a, b) => {
-          if (b.students.length !== a.students.length) return b.students.length - a.students.length;
-          return deptPools.indexOf(a) - deptPools.indexOf(b);
-        });
-        for (const p of criticalPools) {
-          if (chosenPools.length < seatsToFill) {
-            chosenPools.push(p);
-          }
-        }
-      }
-
-      // 2. Select other distinct departments, prioritizing higher remaining count to prevent concentration
-      const otherDistinctPools = activePools.filter(p => 
-        !chosenPools.includes(p) && 
-        !occupiedDeptsOnBench.includes(p.dept.toUpperCase())
-      );
-      otherDistinctPools.sort((a, b) => {
-        if (b.students.length !== a.students.length) return b.students.length - a.students.length;
-        return deptPools.indexOf(a) - deptPools.indexOf(b);
-      });
-      for (const p of otherDistinctPools) {
-        if (chosenPools.length < seatsToFill) {
-          chosenPools.push(p);
-        }
-      }
-
-      // 3. If fewer distinct departments remain, fill remaining seats from department with highest count
-      while (chosenPools.length < seatsToFill) {
-        const candidatePools = deptPools.filter(p => {
-          const alreadyTakenCount = chosenPools.filter(cp => cp === p).length;
-          return p.students.length > alreadyTakenCount;
-        });
-        if (candidatePools.length === 0) break;
-        candidatePools.sort((a, b) => {
-          const remA = a.students.length - chosenPools.filter(cp => cp === a).length;
-          const remB = b.students.length - chosenPools.filter(cp => cp === b).length;
-          if (remB !== remA) return remB - remA;
-          return deptPools.indexOf(a) - deptPools.indexOf(b);
-        });
-        chosenPools.push(candidatePools[0]);
-      }
-
-      // Pull actual student objects preserving order
-      const benchAssignments = chosenPools.map(p => {
-        const student = p.students.shift();
-        return {
-          student,
-          dept: p.dept,
-          code: student.subjectCode || '',
-          isSecondary: student.isSecondary
-        };
-      });
-
-      // Physically assign students to bench seats
-      if (freeSlots.length === 3 && benchAssignments.length === 3) {
-        const uniqueDepts = new Set(benchAssignments.map(ba => ba.dept));
-        if (uniqueDepts.size === 3) {
-          // 3 distinct departments: sort in configured department order (Left -> Middle -> Right)
-          benchAssignments.sort((a, b) => {
-            const idxA = deptPools.findIndex(p => p.dept === a.dept);
-            const idxB = deptPools.findIndex(p => p.dept === b.dept);
-            return idxA - idxB;
-          });
-          assignStudentToSeat(bench, 'seat1', 'Left', benchAssignments[0]);
-          assignStudentToSeat(bench, 'seat2', 'Middle', benchAssignments[1]);
-          assignStudentToSeat(bench, 'seat3', 'Right', benchAssignments[2]);
-        } else if (uniqueDepts.size === 2) {
-          // 2 departments (2 majority, 1 minority): Place minority department in Middle!
-          const counts = {};
-          benchAssignments.forEach(ba => counts[ba.dept] = (counts[ba.dept] || 0) + 1);
-          const majDept = Object.keys(counts).find(d => counts[d] === 2);
-          const minDept = Object.keys(counts).find(d => counts[d] === 1);
-          const majStudents = benchAssignments.filter(ba => ba.dept === majDept);
-          const minStudent = benchAssignments.find(ba => ba.dept === minDept);
-          assignStudentToSeat(bench, 'seat1', 'Left', majStudents[0]);
-          assignStudentToSeat(bench, 'seat2', 'Middle', minStudent);
-          assignStudentToSeat(bench, 'seat3', 'Right', majStudents[1]);
-        } else {
-          // 1 department: alternate subject codes if multiple exist
-          const subCodes = benchAssignments.map(ba => ba.code);
-          const uniqueSubs = new Set(subCodes);
-          if (uniqueSubs.size === 2) {
-            const subCounts = {};
-            subCodes.forEach(sc => subCounts[sc] = (subCounts[sc] || 0) + 1);
-            const majSub = Object.keys(subCounts).find(sc => subCounts[sc] === 2);
-            const minSub = Object.keys(subCounts).find(sc => subCounts[sc] === 1);
-            const majStudents = benchAssignments.filter(ba => ba.code === majSub);
-            const minStudent = benchAssignments.find(ba => ba.code === minSub);
-            assignStudentToSeat(bench, 'seat1', 'Left', majStudents[0]);
-            assignStudentToSeat(bench, 'seat2', 'Middle', minStudent);
-            assignStudentToSeat(bench, 'seat3', 'Right', majStudents[1]);
-          } else {
-            assignStudentToSeat(bench, 'seat1', 'Left', benchAssignments[0]);
-            assignStudentToSeat(bench, 'seat2', 'Middle', benchAssignments[1]);
-            assignStudentToSeat(bench, 'seat3', 'Right', benchAssignments[2]);
-          }
-        }
-      } else if (freeSlots.length === 2 && seatsPerBench === 2 && benchAssignments.length === 2) {
-        const uniqueDepts = new Set(benchAssignments.map(ba => ba.dept));
-        if (uniqueDepts.size === 2) {
-          // 2 distinct departments: sort in configured department order (Left -> Right)
-          benchAssignments.sort((a, b) => {
-            const idxA = deptPools.findIndex(p => p.dept === a.dept);
-            const idxB = deptPools.findIndex(p => p.dept === b.dept);
-            return idxA - idxB;
-          });
-          assignStudentToSeat(bench, 'seat1', 'Left', benchAssignments[0]);
-          assignStudentToSeat(bench, 'seat2', 'Right', benchAssignments[1]);
-        } else {
-          assignStudentToSeat(bench, 'seat1', 'Left', benchAssignments[0]);
-          assignStudentToSeat(bench, 'seat2', 'Right', benchAssignments[1]);
-        }
-      } else {
-        // Arbitrary / partially filled bench: place students sequentially in free slots
-        for (let sIdx = 0; sIdx < benchAssignments.length; sIdx++) {
-          const slot = freeSlots[sIdx];
-          assignStudentToSeat(bench, slot.key, slot.pos, benchAssignments[sIdx]);
-        }
-      }
-    }
-
-    // Safety sweep: Guarantee ZERO empty seats up to hallStudents.length
-    if (totalSeatedInThisHall < hallStudents.length && (maxHallCap <= 0 || totalSeatedInThisHall < maxHallCap)) {
-      for (const bench of benchesList) {
-        if (totalSeatedInThisHall >= hallStudents.length || (maxHallCap > 0 && totalSeatedInThisHall >= maxHallCap)) break;
-        const sweepSlots = [
-          { key: 'seat1', label: 'Left' },
-          { key: 'seat2', label: seatsPerBench === 3 ? 'Middle' : 'Right' },
-          ...(seatsPerBench === 3 ? [{ key: 'seat3', label: 'Right' }] : [])
-        ];
-        for (const sInfo of sweepSlots) {
-          if (!bench[sInfo.key] && totalSeatedInThisHall < hallStudents.length && (maxHallCap <= 0 || totalSeatedInThisHall < maxHallCap)) {
-            const nextPool = deptPools.find(p => p.students.length > 0);
-            if (nextPool) {
-              const student = nextPool.students.shift();
-              assignStudentToSeat(bench, sInfo.key, sInfo.label, {
-                student,
-                dept: nextPool.dept,
-                code: student.subjectCode || '',
-                isSecondary: student.isSecondary
-              });
-            }
-          }
-        }
-      }
-    }
+    );
 
     // Construct grid in row-major order (with placeholders for uneven column rows)
     const localGrid = [];
@@ -3673,8 +3758,24 @@ app.post('/api/seating/update-layout', async (req, res) => {
     const seatedStudents = [];
     const collectedRegNos = new Set();
 
-    for (let c = 1; c <= oldCols; c++) {
-      const rowsForCol = oldColRows[c - 1] !== undefined ? oldColRows[c - 1] : Math.max(1, Math.ceil(baseGrid.length / oldCols));
+    let maxColFound = oldCols;
+    const colMaxRowMapOld = new Map();
+    for (const [code] of benchMap.entries()) {
+      const m = code.match(/^([A-Za-z]+)(\d+)$/);
+      if (m) {
+        const rIdx = getRowIndex(m[1]);
+        const cNum = parseInt(m[2], 10);
+        if (cNum > maxColFound) maxColFound = cNum;
+        const cur = colMaxRowMapOld.get(cNum) || 0;
+        if (rIdx + 1 > cur) colMaxRowMapOld.set(cNum, rIdx + 1);
+      }
+    }
+
+    for (let c = 1; c <= maxColFound; c++) {
+      const rowsForCol = Math.max(
+        colMaxRowMapOld.get(c) || 0,
+        oldColRows[c - 1] !== undefined ? oldColRows[c - 1] : Math.max(1, Math.ceil(baseGrid.length / oldCols))
+      );
       if (c % 2 === 1) { // Odd col: top to bottom
         for (let r = 0; r < rowsForCol; r++) {
           const code = `${getRowLetter(r)}${c}`;
@@ -3737,6 +3838,14 @@ app.post('/api/seating/update-layout', async (req, res) => {
       });
     }
 
+    // Sort seatedStudents deterministically by course identity and register number to preserve department consecutive order
+    seatedStudents.sort((a, b) => {
+      const idA = getStudentCourseIdentity(a);
+      const idB = getStudentCourseIdentity(b);
+      if (idA !== idB) return idA.localeCompare(idB);
+      return (a.registerNo || '').localeCompare(b.registerNo || '');
+    });
+
     // 3. Build new gridMap and newBenchesList in serpentine W-order
     const newGridMap = {};
     for (let c = 1; c <= newCols; c++) {
@@ -3749,7 +3858,7 @@ app.post('/api/seating/update-layout', async (req, res) => {
           row: rowLetter,
           col: c,
           seat1: null,
-          seat2: null,
+          seat2: effectiveSpb >= 2 ? null : undefined,
           seat3: effectiveSpb === 3 ? null : undefined
         };
       }
@@ -3771,40 +3880,17 @@ app.post('/api/seating/update-layout', async (req, res) => {
       }
     }
 
-    // 4. Deterministically place students into newBenchesList preserving exact allocation order
-    let stIdx = 0;
+    // 4. Deterministically place students into newBenchesList using seat-position consecutive allocation
     const studentNewCoords = new Map(); // regNo -> { bench, seat }
-
-    for (const bench of newBenchesList) {
-      if (stIdx >= totalAssignedStudents) break;
-
-      // Seat 1 (Left)
-      bench.seat1 = seatedStudents[stIdx];
-      studentNewCoords.set(seatedStudents[stIdx].registerNo, { bench: bench.benchCode, seat: 'Left' });
-      stIdx++;
-
-      if (effectiveSpb === 3) {
-        // Seat 2 (Middle)
-        if (stIdx < totalAssignedStudents) {
-          bench.seat2 = seatedStudents[stIdx];
-          studentNewCoords.set(seatedStudents[stIdx].registerNo, { bench: bench.benchCode, seat: 'Middle' });
-          stIdx++;
-        }
-        // Seat 3 (Right)
-        if (stIdx < totalAssignedStudents) {
-          bench.seat3 = seatedStudents[stIdx];
-          studentNewCoords.set(seatedStudents[stIdx].registerNo, { bench: bench.benchCode, seat: 'Right' });
-          stIdx++;
-        }
-      } else {
-        // 2-seat: Seat 2 (Right)
-        if (stIdx < totalAssignedStudents) {
-          bench.seat2 = seatedStudents[stIdx];
-          studentNewCoords.set(seatedStudents[stIdx].registerNo, { bench: bench.benchCode, seat: 'Right' });
-          stIdx++;
-        }
+    allocateStudentsToBenchesBySeatPosition(
+      newBenchesList,
+      seatedStudents,
+      effectiveSpb,
+      totalAssignedStudents,
+      (bench, seatKey, pos, res) => {
+        studentNewCoords.set(res.student.registerNo, { bench: bench.benchCode, seat: pos });
       }
-    }
+    );
 
     // 5. Construct newSeatingGrid in row-major order with placeholders
     const newSeatingGrid = [];
@@ -4963,7 +5049,7 @@ function extractHallSavedSeatingSequence(plansForHall, hallSnapshot = null) {
   const seenRegs = new Set();
 
   for (let c = 1; c <= effectiveCols; c++) {
-    const rowsInCol = effectiveColRows[c - 1] !== undefined ? effectiveColRows[c - 1] : 6;
+    const rowsInCol = Math.max(colMaxRowMap.get(c) || 0, effectiveColRows[c - 1] !== undefined ? effectiveColRows[c - 1] : 6);
     if (c % 2 === 1) { // Odd column: Top to Bottom
       for (let r = 0; r < rowsInCol; r++) {
         const code = `${getRowLetter(r)}${c}`;
@@ -5478,7 +5564,7 @@ app.get('/api/seating/layout/download-pdf', async (req, res) => {
     seatingGrid.forEach((bench, bIdx) => {
       if (bench.isPlaceholder) return;
       const colIdx = (bench.col ? bench.col - 1 : (bIdx % colsCount));
-      const rowIdx = Math.floor(bIdx / colsCount);
+      const rowIdx = bench.row ? getRowIndex(bench.row) : Math.floor(bIdx / colsCount);
 
       const bx = margin + colIdx * (benchW + benchGap);
       const by = y + rowIdx * (benchH + benchGap);
@@ -6147,6 +6233,257 @@ function generateExamLocationsPdf(doc, data) {
   doc.end();
 }
 
+// Helper to build compact register number ranges (e.g. C4S24620 to C4S24640) for MKU Nominal Roll
+function buildNominalRollRanges(regNos) {
+  if (!regNos || regNos.length === 0) return [];
+  const prefixGroups = {};
+
+  regNos.forEach(reg => {
+    const clean = String(reg).trim();
+    const m = clean.match(/^(.*?)(\d+)$/);
+    if (m) {
+      const pfx = m[1];
+      const numStr = m[2];
+      const numVal = parseInt(numStr, 10);
+      if (!prefixGroups[pfx]) prefixGroups[pfx] = [];
+      prefixGroups[pfx].push({ original: clean, prefix: pfx, numStr, numVal, len: numStr.length });
+    } else {
+      if (!prefixGroups['__RAW__']) prefixGroups['__RAW__'] = [];
+      prefixGroups['__RAW__'].push({ original: clean, prefix: clean, numVal: NaN, len: 0 });
+    }
+  });
+
+  const ranges = [];
+  const sortedPfx = Object.keys(prefixGroups).sort();
+
+  sortedPfx.forEach(pfx => {
+    const items = prefixGroups[pfx];
+    if (pfx === '__RAW__') {
+      items.sort((a, b) => a.original.localeCompare(b.original)).forEach(it => {
+        ranges.push({ text: it.original, count: 1 });
+      });
+      return;
+    }
+
+    // Sort strictly numerically, with length tie-breaker
+    items.sort((a, b) => a.numVal - b.numVal || a.len - b.len);
+
+    let rStart = items[0];
+    let rEnd = items[0];
+
+    for (let i = 1; i < items.length; i++) {
+      const curr = items[i];
+      if (curr.numVal === rEnd.numVal + 1 && curr.len === rEnd.len) {
+        rEnd = curr;
+      } else if (curr.numVal === rEnd.numVal && curr.original === rEnd.original) {
+        // Skip identical duplicate if any
+      } else {
+        if (rStart.numVal === rEnd.numVal) {
+          ranges.push({ text: rStart.original, count: 1 });
+        } else {
+          ranges.push({
+            text: `${rStart.original} to ${rEnd.original}`,
+            count: rEnd.numVal - rStart.numVal + 1
+          });
+        }
+        rStart = curr;
+        rEnd = curr;
+      }
+    }
+
+    if (rStart.numVal === rEnd.numVal) {
+      ranges.push({ text: rStart.original, count: 1 });
+    } else {
+      ranges.push({
+        text: `${rStart.original} to ${rEnd.original}`,
+        count: rEnd.numVal - rStart.numVal + 1
+      });
+    }
+  });
+
+  return ranges;
+}
+
+// Helper to generate print-ready MKU Nominal Roll PDF document matching official University format
+function generateMkuNominalRollPdf(doc, data, groups) {
+  const pageW = 595.28;
+  const pageH = 841.89;
+  const margin = 35;
+  const printableW = pageW - (2 * margin); // 525.28 pt
+  const safeBottom = pageH - 45; // 796.89 pt
+
+  // Format header month, year and session
+  // In MKU, university semester examinations are officially titled:
+  // "NOVEMBER - [YEAR] - F.N." (odd semester) or "APRIL - [YEAR] - F.N." (even semester)
+  let examMonth = "NOVEMBER";
+  let examYear = new Date().getFullYear();
+  try {
+    const d = new Date(data.targetDate);
+    if (!isNaN(d.getTime())) {
+      const m = d.getMonth();
+      examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+      examYear = d.getFullYear();
+    }
+  } catch (e) {}
+
+  const sessionText = (data.session || "").toUpperCase().includes("AN") ? "A.N." : "F.N.";
+  const examSubTitle = `${examMonth} - ${examYear} - ${sessionText}`;
+
+  // Column widths: Total = 525.28 pt
+  // Col 0: FOIL NO = 75 pt
+  // Col 1: ABSENTS = 85 pt
+  // Col 2: [BLANK HEADER] (Department / Subject Code) = 100 pt
+  // Col 3: NOMINAL ROLL (Register Numbers) = 215.28 pt
+  // Col 4: TOTAL = 50 pt
+  const colW = [75, 85, 100, 215.28, 50];
+  const colX = [
+    margin,
+    margin + colW[0],
+    margin + colW[0] + colW[1],
+    margin + colW[0] + colW[1] + colW[2],
+    margin + colW[0] + colW[1] + colW[2] + colW[3]
+  ];
+
+  const headerH = 24;
+  const lineH = 17; // Line height for each compact register number range
+  const pad = 10;
+  const grandTotalH = 24;
+
+  const drawHeader = () => {
+    let y = margin;
+    doc.font("Helvetica-Bold").fontSize(13).fillColor("#000000")
+       .text("MADURAI KAMARAJ UNIVERSITY EXAMINATIONS", margin, y, { align: "center", width: printableW });
+    y += 18;
+
+    doc.font("Helvetica-Bold").fontSize(11).fillColor("#000000")
+       .text(examSubTitle, margin, y, { align: "center", width: printableW });
+    y += 16;
+
+    // Table Header Row: exactly 5 columns
+    // | FOIL NO | ABSENTS | [BLANK HEADER] | NOMINAL ROLL | TOTAL |
+    // Critical: Col 2 header MUST remain completely blank on every page!
+    doc.rect(margin, y, printableW, headerH).lineWidth(0.8).stroke("#000000");
+    for (let c = 1; c < colX.length; c++) {
+      doc.moveTo(colX[c], y).lineTo(colX[c], y + headerH).stroke("#000000");
+    }
+
+    doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#000000");
+    doc.text("FOIL NO", colX[0], y + 7, { width: colW[0], align: "center" });
+    doc.text("ABSENTS", colX[1], y + 7, { width: colW[1], align: "center" });
+    // Third column heading is left completely empty!
+    doc.text("NOMINAL ROLL", colX[3], y + 7, { width: colW[3], align: "center" });
+    doc.text("TOTAL", colX[4], y + 7, { width: colW[4], align: "center" });
+
+    return y + headerH;
+  };
+
+  let currentY = drawHeader();
+
+  const grandTotal = groups.reduce((sum, g) => sum + g.count, 0);
+
+  // Render each department/subject-code group with compact register number ranges
+  groups.forEach((group) => {
+    const ranges = buildNominalRollRanges(group.regNos);
+    let remainingRanges = [...ranges];
+    let isContinuation = false;
+
+    // Determine whole group height
+    const wholeGroupH = Math.max(30, ranges.length * lineH + pad);
+    const maxPageBodyH = safeBottom - (margin + 18 + 18 + 16 + headerH);
+
+    // If whole group fits on a fresh page, but doesn't fit in remaining space on current page, move to fresh page
+    if (wholeGroupH <= maxPageBodyH && (currentY + wholeGroupH > safeBottom)) {
+      doc.addPage();
+      currentY = drawHeader();
+    }
+
+    while (remainingRanges.length > 0) {
+      let spaceLeft = safeBottom - currentY;
+      let maxFit = Math.floor((spaceLeft - pad) / lineH);
+
+      // If cannot fit even 1 range and we have ranges left, start a new page
+      if (maxFit < 1) {
+        doc.addPage();
+        currentY = drawHeader();
+        spaceLeft = safeBottom - currentY;
+        maxFit = Math.floor((spaceLeft - pad) / lineH);
+      }
+
+      const takeCount = Math.min(remainingRanges.length, Math.max(1, maxFit));
+      const chunkRanges = remainingRanges.slice(0, takeCount);
+      remainingRanges = remainingRanges.slice(takeCount);
+
+      const chunkH = Math.max(30, takeCount * lineH + pad);
+      // Fifth column TOTAL must show the actual number of students in this group/chunk!
+      const chunkStudents = chunkRanges.reduce((sum, r) => sum + r.count, 0);
+
+      // Draw Group Cell Outline & Divider Lines
+      doc.rect(margin, currentY, printableW, chunkH).lineWidth(0.8).stroke("#000000");
+      for (let c = 1; c < colX.length; c++) {
+        doc.moveTo(colX[c], currentY).lineTo(colX[c], currentY + chunkH).stroke("#000000");
+      }
+
+      // Col 2: Department and Subject Code inside body
+      // e.g. "B.A. / AENPC31" or "B.A. / AENPC31 (Contd.)"
+      const degText = group.degree || "";
+      const subText = group.subjectCode || "";
+      let deptSubLabel = (degText && subText) ? `${degText} / ${subText}` : (degText || subText || "GENERAL");
+      if (isContinuation) {
+        deptSubLabel += " (Contd.)";
+      }
+
+      doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#000000");
+      const labelH = doc.heightOfString(deptSubLabel, { width: colW[2] - 8 });
+      const labelY = currentY + Math.max(6, (chunkH - labelH) / 2);
+      doc.text(deptSubLabel, colX[2] + 4, labelY, { width: colW[2] - 8, align: "center" });
+
+      // Col 3: NOMINAL ROLL (Compact register-number ranges)
+      const rangesStartY = currentY + (chunkH - (chunkRanges.length * lineH)) / 2;
+      chunkRanges.forEach((r, idx) => {
+        const rY = rangesStartY + (idx * lineH);
+        doc.font("Helvetica").fontSize(9.5).fillColor("#000000");
+        doc.text(r.text, colX[3] + 4, rY, { width: colW[3] - 8, align: "center" });
+      });
+
+      // Col 4: TOTAL (actual student count, not range count!)
+      doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
+      doc.text(String(chunkStudents), colX[4], currentY + (chunkH - 10) / 2, { width: colW[4], align: "center" });
+
+      currentY += chunkH;
+      isContinuation = true;
+    }
+  });
+
+  // Grand Total Row
+  if (currentY + grandTotalH > safeBottom) {
+    doc.addPage();
+    currentY = drawHeader();
+  }
+
+  doc.rect(margin, currentY, printableW, grandTotalH).lineWidth(0.8).stroke("#000000");
+  for (let c = 1; c < colX.length; c++) {
+    doc.moveTo(colX[c], currentY).lineTo(colX[c], currentY + grandTotalH).stroke("#000000");
+  }
+
+  doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#000000");
+  doc.text("TOTAL", colX[3], currentY + 7, { width: colW[3] - 12, align: "right" });
+  doc.text(String(grandTotal), colX[4], currentY + 7, { width: colW[4], align: "center" });
+
+  // Footer: Page Numbers on all pages
+  const pages = doc.bufferedPageRange();
+  for (let i = pages.start; i < pages.start + pages.count; i++) {
+    doc.switchToPage(i);
+    doc.lineWidth(0.5).strokeColor("#9CA3AF")
+       .moveTo(margin, pageH - 32).lineTo(margin + printableW, pageH - 32).stroke();
+
+    doc.font("Helvetica").fontSize(8).fillColor("#6B7280");
+    doc.text("ExamFlow | MKU Nominal Roll", margin, pageH - 24, { width: 250, align: "left" });
+    doc.text(`Page ${i + 1} of ${pages.count}`, margin + printableW - 150, pageH - 24, { width: 150, align: "right" });
+  }
+
+  doc.end();
+}
+
 // GET seating summary (locations) for all halls on a date and session
 app.get(["/api/seating/locations-by-date-session", "/api/seating/locations-summary"], async (req, res) => {
   try {
@@ -6206,6 +6543,336 @@ app.get(["/api/seating/download-locations-pdf", "/api/seating/locations/download
 
   } catch (error) {
     console.error("Error generating locations PDF:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET export MKU Nominal Roll PDF file (.pdf)
+app.get(["/api/seating/download-nominal-roll-pdf", "/api/seating/locations/download-nominal-roll-pdf"], async (req, res) => {
+  try {
+    const { date, session } = req.query;
+    if (!date || !session) {
+      return res.status(400).json({ error: "date and session are required." });
+    }
+
+    const data = await getLocationsSummaryData(date, session);
+    if (!data.result || data.result.length === 0) {
+      return res.status(404).json({ error: "No seating plans generated for this date and session." });
+    }
+
+    // Aggregate students across all halls into Department / Subject Code groups
+    const groupMap = {};
+    data.result.forEach(hall => {
+      (hall.classes || []).forEach(c => {
+        const key = `${(c.degree || '').trim().toUpperCase()}|||${(c.subjectCode || '').trim().toUpperCase()}`;
+        if (!groupMap[key]) {
+          groupMap[key] = {
+            degree: c.degree,
+            subjectCode: c.subjectCode,
+            regNos: []
+          };
+        }
+        (c.regNos || []).forEach(r => {
+          const upperReg = String(r).trim().toUpperCase();
+          if (upperReg && !groupMap[key].regNos.includes(upperReg)) {
+            groupMap[key].regNos.push(upperReg);
+          }
+        });
+      });
+    });
+
+    const configuredDeptsForSummary = (data.examsAtTime.flatMap(e => e.departments || [])).map(d => canonicalizeDegree(d).toUpperCase());
+    const allExamSubsForSummary = (data.examsAtTime.flatMap(e => e.subjectCodes || [])).map(c => String(c).trim().toUpperCase());
+
+    const groups = Object.values(groupMap).map(g => {
+      const sortedRegNos = g.regNos.sort((a, b) => a.localeCompare(b));
+      return {
+        degree: g.degree,
+        subjectCode: g.subjectCode,
+        regNos: sortedRegNos,
+        count: sortedRegNos.length
+      };
+    });
+
+    groups.sort((a, b) => {
+      const degA = (a.degree || '').toUpperCase();
+      const degB = (b.degree || '').toUpperCase();
+      const idxDeptA = configuredDeptsForSummary.indexOf(degA);
+      const idxDeptB = configuredDeptsForSummary.indexOf(degB);
+      if (idxDeptA !== -1 && idxDeptB !== -1 && idxDeptA !== idxDeptB) return idxDeptA - idxDeptB;
+      if (idxDeptA !== -1 && idxDeptB === -1) return -1;
+      if (idxDeptA === -1 && idxDeptB !== -1) return 1;
+
+      // Academic level: UG before PG
+      const lvlA = (degA.startsWith('M.') || degA.startsWith('M')) ? 'PG' : 'UG';
+      const lvlB = (degB.startsWith('M.') || degB.startsWith('M')) ? 'PG' : 'UG';
+      if (lvlA !== lvlB) return lvlA === 'UG' ? -1 : 1;
+
+      const dComp = degA.localeCompare(degB);
+      if (dComp !== 0) return dComp;
+
+      const subA = String(a.subjectCode || '').trim().toUpperCase();
+      const subB = String(b.subjectCode || '').trim().toUpperCase();
+      const idxSubA = allExamSubsForSummary.indexOf(subA);
+      const idxSubB = allExamSubsForSummary.indexOf(subB);
+      if (idxSubA !== -1 && idxSubB !== -1 && idxSubA !== idxSubB) return idxSubA - idxSubB;
+      if (idxSubA !== -1 && idxSubB === -1) return -1;
+      if (idxSubA === -1 && idxSubB !== -1) return 1;
+
+      return subA.localeCompare(subB);
+    });
+
+    const PDFDocument = require("pdfkit");
+    const doc = new PDFDocument({
+      size: "A4",
+      margin: 35,
+      bufferPages: true
+    });
+
+    const buffers = [];
+    doc.on("data", buffers.push.bind(buffers));
+    doc.on("end", () => {
+      const pdfData = Buffer.concat(buffers);
+      res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="Nominal_Roll_MKU_${data.formattedDate}_${session}.pdf"`);
+      res.send(pdfData);
+    });
+
+    generateMkuNominalRollPdf(doc, data, groups);
+
+  } catch (error) {
+    console.error("Error generating MKU Nominal Roll PDF:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET export MKU Nominal Roll as styled Excel file (.xlsx)
+app.get(["/api/seating/download-nominal-roll-excel", "/api/seating/locations/download-nominal-roll-excel", "/api/seating/download-nominal-roll-xlsx"], async (req, res) => {
+  try {
+    const { date, session } = req.query;
+    if (!date || !session) {
+      return res.status(400).json({ error: "date and session are required." });
+    }
+
+    const data = await getLocationsSummaryData(date, session);
+    if (!data.result || data.result.length === 0) {
+      return res.status(404).json({ error: "No seating plans generated for this date and session." });
+    }
+
+    // Aggregate students across all halls into Department / Subject Code groups
+    const groupMap = {};
+    data.result.forEach(hall => {
+      (hall.classes || []).forEach(c => {
+        const key = `${(c.degree || '').trim().toUpperCase()}|||${(c.subjectCode || '').trim().toUpperCase()}`;
+        if (!groupMap[key]) {
+          groupMap[key] = {
+            degree: c.degree,
+            subjectCode: c.subjectCode,
+            regNos: []
+          };
+        }
+        (c.regNos || []).forEach(r => {
+          const upperReg = String(r).trim().toUpperCase();
+          if (upperReg && !groupMap[key].regNos.includes(upperReg)) {
+            groupMap[key].regNos.push(upperReg);
+          }
+        });
+      });
+    });
+
+    const configuredDeptsForSummary = (data.examsAtTime.flatMap(e => e.departments || [])).map(d => canonicalizeDegree(d).toUpperCase());
+    const allExamSubsForSummary = (data.examsAtTime.flatMap(e => e.subjectCodes || [])).map(c => String(c).trim().toUpperCase());
+
+    const groups = Object.values(groupMap).map(g => {
+      const sortedRegNos = g.regNos.sort((a, b) => a.localeCompare(b));
+      return {
+        degree: g.degree,
+        subjectCode: g.subjectCode,
+        regNos: sortedRegNos,
+        count: sortedRegNos.length
+      };
+    });
+
+    groups.sort((a, b) => {
+      const degA = (a.degree || '').toUpperCase();
+      const degB = (b.degree || '').toUpperCase();
+      const idxDeptA = configuredDeptsForSummary.indexOf(degA);
+      const idxDeptB = configuredDeptsForSummary.indexOf(degB);
+      if (idxDeptA !== -1 && idxDeptB !== -1 && idxDeptA !== idxDeptB) return idxDeptA - idxDeptB;
+      if (idxDeptA !== -1 && idxDeptB === -1) return -1;
+      if (idxDeptA === -1 && idxDeptB !== -1) return 1;
+
+      // Academic level: UG before PG
+      const lvlA = (degA.startsWith('M.') || degA.startsWith('M')) ? 'PG' : 'UG';
+      const lvlB = (degB.startsWith('M.') || degB.startsWith('M')) ? 'PG' : 'UG';
+      if (lvlA !== lvlB) return lvlA === 'UG' ? -1 : 1;
+
+      const dComp = degA.localeCompare(degB);
+      if (dComp !== 0) return dComp;
+
+      const subA = String(a.subjectCode || '').trim().toUpperCase();
+      const subB = String(b.subjectCode || '').trim().toUpperCase();
+      const idxSubA = allExamSubsForSummary.indexOf(subA);
+      const idxSubB = allExamSubsForSummary.indexOf(subB);
+      if (idxSubA !== -1 && idxSubB !== -1 && idxSubA !== idxSubB) return idxSubA - idxSubB;
+      if (idxSubA !== -1 && idxSubB === -1) return -1;
+      if (idxSubA === -1 && idxSubB !== -1) return 1;
+
+      return subA.localeCompare(subB);
+    });
+
+    let XLSXLib;
+    try {
+      XLSXLib = require('xlsx-js-style');
+    } catch (e) {
+      XLSXLib = require('xlsx');
+    }
+
+    const wb = XLSXLib.utils.book_new();
+    const ws = {};
+
+    const borderStyle = {
+      top: { style: 'thin', color: { rgb: '000000' } },
+      bottom: { style: 'thin', color: { rgb: '000000' } },
+      left: { style: 'thin', color: { rgb: '000000' } },
+      right: { style: 'thin', color: { rgb: '000000' } }
+    };
+
+    const writeCell = (r, c, val, bold = false, align = 'left', fontSize = 11, border = false, isHeader = false) => {
+      const cellRef = XLSXLib.utils.encode_cell({ r, c });
+      ws[cellRef] = {
+        v: val,
+        t: typeof val === 'number' ? 'n' : 's',
+        s: {
+          font: {
+            name: 'Times New Roman',
+            size: fontSize,
+            bold: bold
+          },
+          alignment: {
+            horizontal: align,
+            vertical: 'center',
+            wrapText: true
+          }
+        }
+      };
+
+      if (border) {
+        ws[cellRef].s.border = borderStyle;
+      }
+
+      if (isHeader) {
+        ws[cellRef].s.fill = {
+          patternType: 'solid',
+          fgColor: { rgb: 'EAEAEA' }
+        };
+      }
+    };
+
+    // Header info
+    let examMonth = "NOVEMBER";
+    let examYear = new Date().getFullYear();
+    try {
+      const d = new Date(data.targetDate);
+      if (!isNaN(d.getTime())) {
+        const m = d.getMonth();
+        examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+        examYear = d.getFullYear();
+      }
+    } catch (e) {}
+
+    const sessionText = (session || "").toUpperCase().includes("AN") ? "A.N." : "F.N.";
+    const examSubTitle = `${examMonth} - ${examYear} - ${sessionText}`;
+
+    // Header Rows
+    writeCell(0, 0, 'MADURAI KAMARAJ UNIVERSITY EXAMINATIONS', true, 'center', 14);
+    writeCell(1, 0, examSubTitle, true, 'center', 12);
+
+    const merges = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } }
+    ];
+
+    // Table Header Row at Row 3
+    // Critical: Col 2 header MUST remain completely blank!
+    writeCell(3, 0, 'FOIL NO', true, 'center', 10, true, true);
+    writeCell(3, 1, 'ABSENTS', true, 'center', 10, true, true);
+    writeCell(3, 2, '', true, 'center', 10, true, true);
+    writeCell(3, 3, 'NOMINAL ROLL', true, 'center', 10, true, true);
+    writeCell(3, 4, 'TOTAL', true, 'center', 10, true, true);
+
+    let currentRow = 4;
+
+    groups.forEach(group => {
+      const ranges = buildNominalRollRanges(group.regNos);
+      const groupStartRow = currentRow;
+      const degText = group.degree || "";
+      const subText = group.subjectCode || "";
+      const deptSubLabel = (degText && subText) ? `${degText} / ${subText}` : (degText || subText || "GENERAL");
+
+      ranges.forEach(r => {
+        writeCell(currentRow, 0, '', false, 'center', 10, true);
+        writeCell(currentRow, 1, '', false, 'center', 10, true);
+        writeCell(currentRow, 2, '', false, 'center', 10, true);
+        writeCell(currentRow, 3, r.text, false, 'center', 10, true);
+        writeCell(currentRow, 4, '', false, 'center', 10, true);
+        currentRow++;
+      });
+
+      const groupEndRow = currentRow - 1;
+
+      // Col 2: Department and Subject Code, bold, centered
+      writeCell(groupStartRow, 2, deptSubLabel, true, 'center', 10, true);
+      // Col 4: Actual student count in this group, bold, centered
+      writeCell(groupStartRow, 4, group.count, true, 'center', 11, true);
+
+      // If group has multiple ranges, vertically merge Col 0, Col 1, Col 2, Col 4
+      if (groupEndRow > groupStartRow) {
+        merges.push({ s: { r: groupStartRow, c: 0 }, e: { r: groupEndRow, c: 0 } });
+        merges.push({ s: { r: groupStartRow, c: 1 }, e: { r: groupEndRow, c: 1 } });
+        merges.push({ s: { r: groupStartRow, c: 2 }, e: { r: groupEndRow, c: 2 } });
+        merges.push({ s: { r: groupStartRow, c: 4 }, e: { r: groupEndRow, c: 4 } });
+      }
+    });
+
+    // Grand Total Row
+    const grandTotal = groups.reduce((sum, g) => sum + g.count, 0);
+    writeCell(currentRow, 0, '', false, 'center', 10, true);
+    writeCell(currentRow, 1, '', false, 'center', 10, true);
+    writeCell(currentRow, 2, '', false, 'center', 10, true);
+    writeCell(currentRow, 3, 'TOTAL', true, 'right', 10, true);
+    writeCell(currentRow, 4, grandTotal, true, 'center', 11, true);
+    currentRow++;
+
+    finalizeWorksheet(XLSXLib, ws, merges);
+
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 16 }, // FOIL NO
+      { wch: 18 }, // ABSENTS
+      { wch: 24 }, // [BLANK HEADER] (Dept / Subject Code)
+      { wch: 45 }, // NOMINAL ROLL
+      { wch: 14 }  // TOTAL
+    ];
+
+    ws['!rows'] = [];
+    ws['!rows'][0] = { hpt: 26 };
+    ws['!rows'][1] = { hpt: 20 };
+    ws['!rows'][3] = { hpt: 22 };
+
+    ws['!pageSetup'] = { paperSize: 9, orientation: 'portrait', fitToWidth: 1 };
+    XLSXLib.utils.book_append_sheet(wb, ws, 'MKU Nominal Roll');
+
+    const buf = XLSXLib.write(wb, { bookType: 'xlsx', type: 'buffer' });
+
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.setHeader('Content-Disposition', `attachment; filename="Nominal_Roll_MKU_${data.formattedDate}_${session}.xlsx"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buf);
+
+  } catch (error) {
+    console.error("Error generating MKU Nominal Roll Excel:", error);
     res.status(500).json({ error: error.message });
   }
 });

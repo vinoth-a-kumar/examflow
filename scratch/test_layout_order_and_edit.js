@@ -18,6 +18,16 @@ async function request(path, options = {}) {
   return { status: res.status, ok: res.ok, data };
 }
 
+function getRowLetter(r) {
+  let letter = '';
+  let num = r;
+  while (num >= 0) {
+    letter = String.fromCharCode(65 + (num % 26)) + letter;
+    num = Math.floor(num / 26) - 1;
+  }
+  return letter;
+}
+
 function getSerpentineStudentOrder(grid, cols, colRows) {
   const benchMap = new Map();
   grid.forEach(b => { if (b && b.benchCode) benchMap.set(b.benchCode, b); });
@@ -26,7 +36,7 @@ function getSerpentineStudentOrder(grid, cols, colRows) {
     const rowsForCol = colRows && colRows[c - 1] !== undefined ? colRows[c - 1] : 6;
     if (c % 2 === 1) { // Odd col: top to bottom
       for (let r = 0; r < rowsForCol; r++) {
-        const b = benchMap.get(`${String.fromCharCode(65 + r)}${c}`);
+        const b = benchMap.get(`${getRowLetter(r)}${c}`);
         if (b) {
           if (b.seat1) students.push(b.seat1);
           if (b.seat2) students.push(b.seat2);
@@ -35,7 +45,7 @@ function getSerpentineStudentOrder(grid, cols, colRows) {
       }
     } else { // Even col: bottom to top
       for (let r = rowsForCol - 1; r >= 0; r--) {
-        const b = benchMap.get(`${String.fromCharCode(65 + r)}${c}`);
+        const b = benchMap.get(`${getRowLetter(r)}${c}`);
         if (b) {
           if (b.seat1) students.push(b.seat1);
           if (b.seat2) students.push(b.seat2);
@@ -358,7 +368,7 @@ async function runTests() {
       const rowsForCol = colRows[c - 1] !== undefined ? colRows[c - 1] : 6;
       if (c % 2 === 1) { // Odd col: top to bottom
         for (let r = 0; r < rowsForCol; r++) {
-          const b = benchMap.get(`${String.fromCharCode(65 + r)}${c}`);
+          const b = benchMap.get(`${getRowLetter(r)}${c}`);
           if (b) {
             if (b.seat1) students.push(b.seat1.registerNo);
             if (b.seat2) students.push(b.seat2.registerNo);
@@ -367,7 +377,7 @@ async function runTests() {
         }
       } else { // Even col: bottom to top
         for (let r = rowsForCol - 1; r >= 0; r--) {
-          const b = benchMap.get(`${String.fromCharCode(65 + r)}${c}`);
+          const b = benchMap.get(`${getRowLetter(r)}${c}`);
           if (b) {
             if (b.seat1) students.push(b.seat1.registerNo);
             if (b.seat2) students.push(b.seat2.registerNo);

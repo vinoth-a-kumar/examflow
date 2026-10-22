@@ -12,7 +12,10 @@ import {
   Download,
   Users,
   BookOpen,
-  Armchair
+  Armchair,
+  ChevronDown,
+  FileText,
+  FileSpreadsheet
 } from 'lucide-react';
 
 // Helper to get local date string YYYY-MM-DD avoiding timezone off-by-one errors
@@ -53,6 +56,21 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
   const [locations, setLocations] = useState(null);
   const [locLoading, setLocLoading] = useState(false);
   const [locError, setLocError] = useState('');
+
+  // Dropdown states for Location and Nominal Roll download menus
+  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
+  const [nominalDropdownOpen, setNominalDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest('.download-dropdown-wrapper')) {
+        setLocationDropdownOpen(false);
+        setNominalDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   // Extract unique dates from scheduled exams
   const uniqueExamDates = useMemo(() => {
@@ -169,6 +187,69 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
       alert('Failed to download PDF file: ' + err.message);
     }
   };
+
+  const handleDownloadNominalRollPdf = async () => {
+    if (!locDate || !locSession) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/seating/download-nominal-roll-pdf?date=${locDate}&session=${locSession}`);
+      
+      const contentType = response.headers.get('content-type') || '';
+      
+      if (!response.ok || contentType.includes('application/json')) {
+        let errorMsg = 'Failed to download Nominal Roll PDF file.';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errData.message || errorMsg;
+        } catch (_) {
+          const text = await response.text();
+          if (text) errorMsg = text;
+        }
+        setLocError(errorMsg);
+        alert(errorMsg);
+        return;
+      }
+
+      const rawBlob = await response.blob();
+      const pdfBlob = new Blob([rawBlob], { type: 'application/pdf' });
+
+      let filename = '';
+      const disposition = response.headers.get('content-disposition');
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (match && match[1]) {
+          filename = match[1].replace(/['"]/g, '').trim();
+        }
+      }
+
+      if (!filename || !filename.toLowerCase().endsWith('.pdf')) {
+        let formattedDate = locDate;
+        try {
+          const d = new Date(locDate);
+          if (!isNaN(d.getTime())) {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            formattedDate = `${dd}-${mm}-${yyyy}`;
+          }
+        } catch (_) {}
+        filename = `Nominal_Roll_MKU_${formattedDate}_${locSession}.pdf`;
+      }
+
+      const objectUrl = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      console.error('Error downloading MKU Nominal Roll PDF:', err);
+      setLocError('Failed to download Nominal Roll PDF: ' + err.message);
+      alert('Failed to download Nominal Roll PDF: ' + err.message);
+    }
+  };
+
   const handleDownloadLocationsExcel = async () => {
     if (!locDate || !locSession) return;
     try {
@@ -235,6 +316,70 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
       console.error('Error downloading locations Excel:', err);
       setLocError('Failed to download Excel file: ' + err.message);
       alert('Failed to download Excel file: ' + err.message);
+    }
+  };
+
+  const handleDownloadNominalRollExcel = async () => {
+    if (!locDate || !locSession) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/seating/download-nominal-roll-excel?date=${locDate}&session=${locSession}`);
+      
+      const contentType = response.headers.get('content-type') || '';
+      
+      if (!response.ok || contentType.includes('application/json')) {
+        let errorMsg = 'Failed to download Nominal Roll Excel file.';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errData.message || errorMsg;
+        } catch (_) {
+          const text = await response.text();
+          if (text) errorMsg = text;
+        }
+        setLocError(errorMsg);
+        alert(errorMsg);
+        return;
+      }
+
+      const rawBlob = await response.blob();
+      const excelBlob = new Blob([rawBlob], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+
+      let filename = '';
+      const disposition = response.headers.get('content-disposition');
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (match && match[1]) {
+          filename = match[1].replace(/['"]/g, '').trim();
+        }
+      }
+
+      if (!filename || !filename.toLowerCase().endsWith('.xlsx')) {
+        let formattedDate = locDate;
+        try {
+          const d = new Date(locDate);
+          if (!isNaN(d.getTime())) {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            formattedDate = `${dd}-${mm}-${yyyy}`;
+          }
+        } catch (_) {}
+        filename = `Nominal_Roll_MKU_${formattedDate}_${locSession}.xlsx`;
+      }
+
+      const objectUrl = window.URL.createObjectURL(excelBlob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      console.error('Error downloading MKU Nominal Roll Excel:', err);
+      setLocError('Failed to download Nominal Roll Excel: ' + err.message);
+      alert('Failed to download Nominal Roll Excel: ' + err.message);
     }
   };
 
@@ -2129,24 +2274,191 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
           </button>
 
           {locations && locations.length > 0 && (
-            <>
-              <button 
-                className="btn-secondary" 
-                onClick={handleDownloadLocationsPdf}
-                style={{ height: '42px', display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <Download size={16} />
-                <span>Download PDF (.pdf)</span>
-              </button>
-              <button 
-                className="btn-secondary" 
-                onClick={handleDownloadLocationsExcel}
-                style={{ height: '42px', display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <Download size={16} />
-                <span>Download Location Sheet (.xlsx)</span>
-              </button>
-            </>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              {/* Location Download Dropdown */}
+              <div className="download-dropdown-wrapper" style={{ position: 'relative', display: 'inline-block' }}>
+                <button 
+                  type="button"
+                  className="btn-secondary" 
+                  onClick={() => {
+                    setLocationDropdownOpen(prev => !prev);
+                    setNominalDropdownOpen(false);
+                  }}
+                  style={{ height: '42px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Download size={16} />
+                  <span>Location</span>
+                  <ChevronDown size={14} style={{ marginLeft: '2px', transition: 'transform 0.2s', transform: locationDropdownOpen ? 'rotate(180deg)' : 'none' }} />
+                </button>
+
+                {locationDropdownOpen && (
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      left: 0,
+                      zIndex: 100,
+                      minWidth: '200px',
+                      backgroundColor: 'var(--surface-card, #ffffff)',
+                      border: '1px solid var(--border-color, #e5e7eb)',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      padding: '4px',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDownloadLocationsPdf();
+                        setLocationDropdownOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '9px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: 'var(--text-primary, #111827)',
+                        cursor: 'pointer',
+                        borderRadius: '6px',
+                        transition: 'background-color 0.15s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover, #f3f4f6)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <FileText size={15} style={{ color: '#ef4444' }} />
+                      <span>Download PDF</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDownloadLocationsExcel();
+                        setLocationDropdownOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '9px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: 'var(--text-primary, #111827)',
+                        cursor: 'pointer',
+                        borderRadius: '6px',
+                        transition: 'background-color 0.15s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover, #f3f4f6)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
+                      <span>Download Excel (.xlsx)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Nominal Roll Download Dropdown */}
+              <div className="download-dropdown-wrapper" style={{ position: 'relative', display: 'inline-block' }}>
+                <button 
+                  type="button"
+                  className="btn-secondary" 
+                  onClick={() => {
+                    setNominalDropdownOpen(prev => !prev);
+                    setLocationDropdownOpen(false);
+                  }}
+                  style={{ height: '42px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Download size={16} />
+                  <span>Nominal Roll</span>
+                  <ChevronDown size={14} style={{ marginLeft: '2px', transition: 'transform 0.2s', transform: nominalDropdownOpen ? 'rotate(180deg)' : 'none' }} />
+                </button>
+
+                {nominalDropdownOpen && (
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      left: 0,
+                      zIndex: 100,
+                      minWidth: '200px',
+                      backgroundColor: 'var(--surface-card, #ffffff)',
+                      border: '1px solid var(--border-color, #e5e7eb)',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      padding: '4px',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDownloadNominalRollPdf();
+                        setNominalDropdownOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '9px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: 'var(--text-primary, #111827)',
+                        cursor: 'pointer',
+                        borderRadius: '6px',
+                        transition: 'background-color 0.15s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover, #f3f4f6)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <FileText size={15} style={{ color: '#ef4444' }} />
+                      <span>Download PDF</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDownloadNominalRollExcel();
+                        setNominalDropdownOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '9px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: 'var(--text-primary, #111827)',
+                        cursor: 'pointer',
+                        borderRadius: '6px',
+                        transition: 'background-color 0.15s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover, #f3f4f6)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
+                      <span>Download Excel (.xlsx)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
 
