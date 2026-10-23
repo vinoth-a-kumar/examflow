@@ -1,0 +1,212 @@
+[
+  {
+    "id": "1792750266868_4h9gz",
+    "type": "exam",
+    "message": "Exam Updated",
+    "detail": "ABAPC32, ABAPC11, AENPC53 configuration was updated. 7 student(s) could not be seated due to hall capacity constraints (103 eligible, 96 seated in 2 halls).",
+    "time": "2026-10-23T10:11:06.868Z"
+  },
+  {
+    "id": "1792750266856_5tqs2",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for ABAPC32, ABAPC11, AENPC53. Seated 96 students across 2 halls.",
+    "time": "2026-10-23T10:11:06.857Z"
+  },
+  {
+    "id": "1792750266499_ylbwi",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for ABAPC32, ABAPC11, AENPC53. Seated 96 students across 2 halls.",
+    "time": "2026-10-23T10:11:06.499Z"
+  },
+  {
+    "id": "1792750253372_7i9r6",
+    "type": "exam",
+    "message": "Exam Updated",
+    "detail": "ABAPC32, ABAPC11, AENPC53 configuration was updated. 1 student(s) could not be seated due to hall capacity constraints (103 eligible, 102 seated in 2 halls).",
+    "time": "2026-10-23T10:10:53.373Z"
+  },
+  {
+    "id": "1792750253365_jskbh",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for ABAPC32, ABAPC11, AENPC53. Seated 102 students across 2 halls.",
+    "time": "2026-10-23T10:10:53.365Z"
+  },
+  {
+    "id": "1792750252915_b7mh9",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for ABAPC32, ABAPC11, AENPC53. Seated 102 students across 2 halls.",
+    "time": "2026-10-23T10:10:52.915Z"
+  },
+  {
+    "id": "1792750219584_hi1t5",
+    "type": "hall",
+    "message": "Hall Layout Updated",
+    "detail": "Updated layout for A06: 3 Cols, 17 Benches (51 Seats) for 2026-10-31 FN.",
+    "time": "2026-10-23T10:10:19.584Z"
+  },
+  {
+    "id": "1792750150075_715gv",
+    "type": "exam",
+    "message": "Exam Updated",
+    "detail": "ABAPC32, ABAPC11, AENPC53 configuration was updated. 7 student(s) could not be seated due to hall capacity constraints (103 eligible, 96 seated in 2 halls).",
+    "time": "2026-10-23T10:09:10.075Z"
+  },
+  {
+    "id": "1792750150067_syiwk",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for ABAPC32, ABAPC11, AENPC53. Seated 96 students across 2 halls.",
+    "time": "2026-10-23T10:09:10.067Z"
+  },
+  {
+    "id": "1792750149515_hn4vg",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for ABAPC32, ABAPC11, AENPC53. Seated 96 students across 2 halls.",
+    "time": "2026-10-23T10:09:09.515Z"
+  },
+  {
+    "id": "1792749980450_dynhc",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for ABAPC32, ABAPC11, AENPC53. Seated 102 students across 2 halls.",
+    "time": "2026-10-23T10:06:20.450Z"
+  },
+  {
+    "id": "1792749980063_p593z",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for ABAPC32, ABAPC11, AENPC53. Seated 102 students across 2 halls.",
+    "time": "2026-10-23T10:06:20.063Z"
+  },
+  {
+    "id": "1792749979712_01m8m",
+    "type": "exam",
+    "message": "Exam Scheduled",
+    "detail": "ABAPC32, ABAPC11, AENPC53 scheduled for 2026-10-31 (FN). Assigned to 2 halls.",
+    "time": "2026-10-23T10:06:19.712Z"
+  },
+  {
+    "id": "1792749931983_2fmc1",
+    "type": "exam",
+    "message": "Exam Cancelled",
+    "detail": "Layout Test Exam 3-Seat was deleted.",
+    "time": "2026-10-23T10:05:31.983Z"
+  },
+  {
+    "id": "1792749928942_02jgf",
+    "type": "exam",
+    "message": "Exam Cancelled",
+    "detail": "ABAPC51, AENPC51, AHSPC51 was deleted.",
+    "time": "2026-10-23T10:05:28.942Z"
+  },
+  {
+    "id": "1792749925182_4hz0a",
+    "type": "exam",
+    "message": "Exam Cancelled",
+    "detail": "Layout Test Exam 2-Seat was deleted.",
+    "time": "2026-10-23T10:05:25.182Z"
+  },
+  {
+    "id": "1792749921595_tmvwc",
+    "type": "exam",
+    "message": "Exam Cancelled",
+    "detail": "Unrelated Exam Different Date was deleted.",
+    "time": "2026-10-23T10:05:21.595Z"
+  },
+  {
+    "id": "1792749874895_dmv4k",
+    "type": "hall",
+    "message": "Hall Layout Updated",
+    "detail": "Updated layout for M10: 3 Cols, 17 Benches (51 Seats) for 2026-11-22 FN.",
+    "time": "2026-10-23T10:04:34.895Z"
+  },
+  {
+    "id": "1792749874789_zu8qb",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Layout Test Exam 3-Seat. Seated 51 students across 1 halls.",
+    "time": "2026-10-23T10:04:34.789Z"
+  },
+  {
+    "id": "1792749874356_nv5vq",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Layout Test Exam 3-Seat. Seated 51 students across 1 halls.",
+    "time": "2026-10-23T10:04:34.356Z"
+  },
+  {
+    "id": "1792749873993_47omf",
+    "type": "exam",
+    "message": "Exam Scheduled",
+    "detail": "Layout Test Exam 3-Seat scheduled for 2026-11-22 (FN). Assigned to 1 halls.",
+    "time": "2026-10-23T10:04:33.993Z"
+  },
+  {
+    "id": "1792749873813_ahqk7",
+    "type": "hall",
+    "message": "Hall Layout Updated",
+    "detail": "Updated layout for M02: 4 Cols, 13 Benches (26 Seats) for 2026-11-20 FN.",
+    "time": "2026-10-23T10:04:33.813Z"
+  },
+  {
+    "id": "1792749873681_jy4o6",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Unrelated Exam Different Date. Seated 26 students across 1 halls.",
+    "time": "2026-10-23T10:04:33.681Z"
+  },
+  {
+    "id": "1792749873416_8qoof",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Unrelated Exam Different Date. Seated 26 students across 1 halls.",
+    "time": "2026-10-23T10:04:33.416Z"
+  },
+  {
+    "id": "1792749873183_412wc",
+    "type": "exam",
+    "message": "Exam Scheduled",
+    "detail": "Unrelated Exam Different Date scheduled for 2026-11-25 (AN). Assigned to 1 halls.",
+    "time": "2026-10-23T10:04:33.183Z"
+  },
+  {
+    "id": "1792749872868_cpvw3",
+    "type": "hall",
+    "message": "Hall Layout Updated",
+    "detail": "Updated layout for M02: 3 Cols, 13 Benches (26 Seats) for 2026-11-20 FN.",
+    "time": "2026-10-23T10:04:32.868Z"
+  },
+  {
+    "id": "1792749872756_ozl8n",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Layout Test Exam 2-Seat. Seated 26 students across 1 halls.",
+    "time": "2026-10-23T10:04:32.756Z"
+  },
+  {
+    "id": "1792749872423_vqr44",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for Layout Test Exam 2-Seat. Seated 26 students across 1 halls.",
+    "time": "2026-10-23T10:04:32.424Z"
+  },
+  {
+    "id": "1792749872043_49osi",
+    "type": "exam",
+    "message": "Exam Scheduled",
+    "detail": "Layout Test Exam 2-Seat scheduled for 2026-11-20 (FN). Assigned to 1 halls.",
+    "time": "2026-10-23T10:04:32.043Z"
+  },
+  {
+    "id": "1792749871983_w523h",
+    "type": "exam",
+    "message": "Exam Cancelled",
+    "detail": "Layout Test Exam 2-Seat was deleted.",
+    "time": "2026-10-23T10:04:31.983Z"
+  }
+]

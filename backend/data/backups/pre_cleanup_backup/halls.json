@@ -1,0 +1,1008 @@
+[
+  {
+    "_id": "fhkjij0mvklabth",
+    "name": "M02",
+    "block": "MAIN BLOCK",
+    "rows": 5,
+    "columns": 3,
+    "benches": 13,
+    "capacity": 26,
+    "columnRows": [
+      5,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "1",
+      "BLOCK": "MAIN BLOCK",
+      "HALL NO": "M02",
+      "SETS": "13",
+      "seatsPerBench": 13
+    },
+    "idx": 1,
+    "columnGaps": null
+  },
+  {
+    "_id": "jmg4xwjmvklabu4",
+    "name": "M03",
+    "block": "MAIN BLOCK",
+    "rows": 5,
+    "columns": 3,
+    "benches": 13,
+    "capacity": 26,
+    "columnRows": [
+      5,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "2",
+      "BLOCK": "",
+      "HALL NO": "M03",
+      "SETS": "13",
+      "seatsPerBench": 2
+    },
+    "idx": 2
+  },
+  {
+    "_id": "5ev8n56mvklabuv",
+    "name": "M04",
+    "block": "MAIN BLOCK",
+    "rows": 5,
+    "columns": 3,
+    "benches": 13,
+    "capacity": 26,
+    "columnRows": [
+      5,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "3",
+      "BLOCK": "",
+      "HALL NO": "M04",
+      "SETS": "13",
+      "seatsPerBench": 2
+    },
+    "idx": 3
+  },
+  {
+    "_id": "fkffteemvklabvf",
+    "name": "M05",
+    "block": "MAIN BLOCK",
+    "rows": 5,
+    "columns": 3,
+    "benches": 13,
+    "capacity": 26,
+    "columnRows": [
+      5,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "4",
+      "BLOCK": "",
+      "HALL NO": "M05",
+      "SETS": "13",
+      "seatsPerBench": 2
+    },
+    "idx": 4
+  },
+  {
+    "_id": "6yo110bmvklabvy",
+    "name": "M06",
+    "block": "MAIN BLOCK",
+    "rows": 5,
+    "columns": 3,
+    "benches": 13,
+    "capacity": 26,
+    "columnRows": [
+      5,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "5",
+      "BLOCK": "",
+      "HALL NO": "M06",
+      "SETS": "13",
+      "seatsPerBench": 2
+    },
+    "idx": 5
+  },
+  {
+    "_id": "kqcqj4smvklabwg",
+    "name": "M07",
+    "block": "MAIN BLOCK",
+    "rows": 5,
+    "columns": 3,
+    "benches": 13,
+    "capacity": 26,
+    "columnRows": [
+      5,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "6",
+      "BLOCK": "",
+      "HALL NO": "M07",
+      "SETS": "13",
+      "seatsPerBench": 2
+    },
+    "idx": 6
+  },
+  {
+    "_id": "c7wyo5bmvklabx1",
+    "name": "M10",
+    "block": "MAIN BLOCK",
+    "rows": 6,
+    "columns": 3,
+    "benches": 17,
+    "capacity": 51,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "seatsPerBench": 3,
+    "csvData": {
+      "S.NO": "7",
+      "BLOCK": "",
+      "HALL NO": "M10",
+      "SETS": "17",
+      "seatsPerBench": 17
+    },
+    "idx": 7,
+    "columnGaps": null
+  },
+  {
+    "_id": "4waith1mvklabxo",
+    "name": "M11",
+    "block": "MAIN BLOCK",
+    "rows": 6,
+    "columns": 3,
+    "benches": 17,
+    "capacity": 51,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "seatsPerBench": 3,
+    "csvData": {
+      "S.NO": "8",
+      "BLOCK": "",
+      "HALL NO": "M11",
+      "SETS": "17",
+      "seatsPerBench": 17
+    },
+    "idx": 8,
+    "columnGaps": null
+  },
+  {
+    "_id": "6ofz53cmvklabyb",
+    "name": "M12",
+    "block": "MAIN BLOCK",
+    "rows": 6,
+    "columns": 3,
+    "benches": 17,
+    "capacity": 51,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "seatsPerBench": 3,
+    "csvData": {
+      "S.NO": "9",
+      "BLOCK": "",
+      "HALL NO": "M12",
+      "SETS": "17",
+      "seatsPerBench": 17
+    },
+    "idx": 9,
+    "columnGaps": null
+  },
+  {
+    "_id": "2bgddu8mvklabyu",
+    "name": "M14",
+    "block": "MAIN BLOCK",
+    "rows": 6,
+    "columns": 3,
+    "benches": 17,
+    "capacity": 51,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "seatsPerBench": 3,
+    "csvData": {
+      "S.NO": "10",
+      "BLOCK": "",
+      "HALL NO": "M14",
+      "SETS": "17",
+      "seatsPerBench": 17
+    },
+    "idx": 10,
+    "columnGaps": null
+  },
+  {
+    "_id": "f3mp21tmvklabzc",
+    "name": "M16",
+    "block": "MAIN BLOCK",
+    "rows": 6,
+    "columns": 3,
+    "benches": 17,
+    "capacity": 51,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "seatsPerBench": 3,
+    "csvData": {
+      "S.NO": "11",
+      "BLOCK": "",
+      "HALL NO": "M16",
+      "SETS": "17",
+      "seatsPerBench": 17
+    },
+    "idx": 11,
+    "columnGaps": null
+  },
+  {
+    "_id": "cjnp7azmvklabzu",
+    "name": "M19",
+    "block": "MAIN BLOCK",
+    "rows": 6,
+    "columns": 3,
+    "benches": 17,
+    "capacity": 51,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "seatsPerBench": 3,
+    "csvData": {
+      "S.NO": "12",
+      "BLOCK": "",
+      "HALL NO": "M19",
+      "SETS": "17",
+      "seatsPerBench": 17
+    },
+    "idx": 12,
+    "columnGaps": null
+  },
+  {
+    "_id": "q4wjmp6mvklac0c",
+    "name": "M23",
+    "block": "MAIN BLOCK",
+    "rows": 6,
+    "columns": 3,
+    "benches": 17,
+    "capacity": 34,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "13",
+      "BLOCK": "",
+      "HALL NO": "M23",
+      "SETS": "17",
+      "seatsPerBench": 2
+    },
+    "idx": 13
+  },
+  {
+    "_id": "8pvg7zvmvklac0u",
+    "name": "M24",
+    "block": "MAIN BLOCK",
+    "rows": 6,
+    "columns": 3,
+    "benches": 17,
+    "capacity": 34,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "14",
+      "BLOCK": "",
+      "HALL NO": "M24",
+      "SETS": "17",
+      "seatsPerBench": 2
+    },
+    "idx": 14
+  },
+  {
+    "_id": "tucxnpzmvklac1f",
+    "name": "M25",
+    "block": "MAIN BLOCK",
+    "rows": 6,
+    "columns": 3,
+    "benches": 17,
+    "capacity": 34,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "15",
+      "BLOCK": "",
+      "HALL NO": "M25",
+      "SETS": "17",
+      "seatsPerBench": 2
+    },
+    "idx": 15
+  },
+  {
+    "_id": "y5xcft0mvklac1y",
+    "name": "A01",
+    "block": "A' BLOCK",
+    "rows": 6,
+    "columns": 3,
+    "benches": 17,
+    "capacity": 51,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "seatsPerBench": 3,
+    "csvData": {
+      "S.NO": "16",
+      "BLOCK": "A' BLOCK",
+      "HALL NO": "A01",
+      "SETS": "17",
+      "seatsPerBench": 17
+    },
+    "idx": 16,
+    "columnGaps": null
+  },
+  {
+    "_id": "9rkmbjbmvklac2h",
+    "name": "A02",
+    "block": "A' BLOCK",
+    "rows": 6,
+    "columns": 3,
+    "benches": 17,
+    "capacity": 51,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "seatsPerBench": 3,
+    "csvData": {
+      "S.NO": "17",
+      "BLOCK": "",
+      "HALL NO": "A02",
+      "SETS": "17",
+      "seatsPerBench": 17
+    },
+    "idx": 17,
+    "columnGaps": null
+  },
+  {
+    "_id": "acvaqy2mvklac35",
+    "name": "A03",
+    "block": "A' BLOCK",
+    "rows": 6,
+    "columns": 3,
+    "benches": 17,
+    "capacity": 51,
+    "columnRows": [
+      6,
+      6,
+      5
+    ],
+    "seatsPerBench": 3,
+    "csvData": {
+      "S.NO": "18",
+      "BLOCK": "",
+      "HALL NO": "A03",
+      "SETS": "17",
+      "seatsPerBench": 17
+    },
+    "idx": 18,
+    "columnGaps": null
+  },
+  {
+    "_id": "dk96q3bmvklac3o",
+    "name": "A06",
+    "block": "A' BLOCK",
+    "rows": 5,
+    "columns": 3,
+    "benches": 17,
+    "capacity": 51,
+    "columnRows": [
+      5,
+      5,
+      5
+    ],
+    "seatsPerBench": 3,
+    "csvData": {
+      "S.NO": "19",
+      "BLOCK": "",
+      "HALL NO": "A06",
+      "SETS": "15",
+      "seatsPerBench": 17
+    },
+    "idx": 19,
+    "columnGaps": null
+  },
+  {
+    "_id": "ma191uwmvklac47",
+    "name": "A07",
+    "block": "A' BLOCK",
+    "rows": 5,
+    "columns": 3,
+    "benches": 15,
+    "capacity": 30,
+    "columnRows": [
+      5,
+      5,
+      5
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "20",
+      "BLOCK": "",
+      "HALL NO": "A07",
+      "SETS": "15",
+      "seatsPerBench": 2
+    },
+    "idx": 20
+  },
+  {
+    "_id": "1pvbogamvklac4r",
+    "name": "A08",
+    "block": "A' BLOCK",
+    "rows": 5,
+    "columns": 3,
+    "benches": 15,
+    "capacity": 30,
+    "columnRows": [
+      5,
+      5,
+      5
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "21",
+      "BLOCK": "",
+      "HALL NO": "A08",
+      "SETS": "15",
+      "seatsPerBench": 2
+    },
+    "idx": 21
+  },
+  {
+    "_id": "o0lj5rbmvklac5e",
+    "name": "B01",
+    "block": "B' BLOCK",
+    "rows": 4,
+    "columns": 4,
+    "benches": 16,
+    "capacity": 32,
+    "columnRows": [
+      4,
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "22",
+      "BLOCK": "B' BLOCK",
+      "HALL NO": "B01",
+      "SETS": "16",
+      "seatsPerBench": 2
+    },
+    "idx": 22
+  },
+  {
+    "_id": "vrke8m6mvklac60",
+    "name": "B02",
+    "block": "B' BLOCK",
+    "rows": 4,
+    "columns": 4,
+    "benches": 16,
+    "capacity": 32,
+    "columnRows": [
+      4,
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "23",
+      "BLOCK": "",
+      "HALL NO": "B02",
+      "SETS": "16",
+      "seatsPerBench": 2
+    },
+    "idx": 23
+  },
+  {
+    "_id": "91n2e78mvklac6l",
+    "name": "B03",
+    "block": "B' BLOCK",
+    "rows": 4,
+    "columns": 4,
+    "benches": 16,
+    "capacity": 32,
+    "columnRows": [
+      4,
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "24",
+      "BLOCK": "",
+      "HALL NO": "B03",
+      "SETS": "16",
+      "seatsPerBench": 2
+    },
+    "idx": 24
+  },
+  {
+    "_id": "hsjtl3bmvklac79",
+    "name": "B04",
+    "block": "B' BLOCK",
+    "rows": 4,
+    "columns": 4,
+    "benches": 16,
+    "capacity": 32,
+    "columnRows": [
+      4,
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "25",
+      "BLOCK": "",
+      "HALL NO": "B04",
+      "SETS": "16",
+      "seatsPerBench": 2
+    },
+    "idx": 25
+  },
+  {
+    "_id": "qkocp4xmvklac80",
+    "name": "B05",
+    "block": "B' BLOCK",
+    "rows": 4,
+    "columns": 4,
+    "benches": 16,
+    "capacity": 32,
+    "columnRows": [
+      4,
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "26",
+      "BLOCK": "",
+      "HALL NO": "B05",
+      "SETS": "16",
+      "seatsPerBench": 2
+    },
+    "idx": 26
+  },
+  {
+    "_id": "9qsocvsmvklac8g",
+    "name": "B06",
+    "block": "B' BLOCK",
+    "rows": 4,
+    "columns": 4,
+    "benches": 16,
+    "capacity": 32,
+    "columnRows": [
+      4,
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "27",
+      "BLOCK": "",
+      "HALL NO": "B06",
+      "SETS": "16",
+      "seatsPerBench": 2
+    },
+    "idx": 27
+  },
+  {
+    "_id": "5hjwqmumvklac8w",
+    "name": "C02",
+    "block": "C' BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "28",
+      "BLOCK": "C' BLOCK",
+      "HALL NO": "C02",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 28
+  },
+  {
+    "_id": "3hmducbmvklac9e",
+    "name": "C03",
+    "block": "C' BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "29",
+      "BLOCK": "",
+      "HALL NO": "C03",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 29
+  },
+  {
+    "_id": "ow7fnv8mvklaca7",
+    "name": "C04",
+    "block": "C' BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "30",
+      "BLOCK": "",
+      "HALL NO": "C04",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 30
+  },
+  {
+    "_id": "v4b3xl1mvklacas",
+    "name": "C05",
+    "block": "C' BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "31",
+      "BLOCK": "",
+      "HALL NO": "C05",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 31
+  },
+  {
+    "_id": "cr7ugofmvklacbd",
+    "name": "C06",
+    "block": "C' BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "32",
+      "BLOCK": "",
+      "HALL NO": "C06",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 32
+  },
+  {
+    "_id": "izl90kimvklacc1",
+    "name": "S01",
+    "block": "SCIENCE BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "33",
+      "BLOCK": "SCIENCE BLOCK",
+      "HALL NO": "S01",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 33
+  },
+  {
+    "_id": "s586qoomvklaccn",
+    "name": "S02",
+    "block": "SCIENCE BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "34",
+      "BLOCK": "",
+      "HALL NO": "S02",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 34
+  },
+  {
+    "_id": "z97z7n1mvklacde",
+    "name": "S03",
+    "block": "SCIENCE BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "35",
+      "BLOCK": "",
+      "HALL NO": "S03",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 35
+  },
+  {
+    "_id": "vy11w7lmvklace8",
+    "name": "S05",
+    "block": "SCIENCE BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "36",
+      "BLOCK": "",
+      "HALL NO": "S05",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 36
+  },
+  {
+    "_id": "ct9mxttmvklacf7",
+    "name": "S06",
+    "block": "SCIENCE BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "37",
+      "BLOCK": "",
+      "HALL NO": "S06",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 37
+  },
+  {
+    "_id": "rh20m4omvklacfu",
+    "name": "S10",
+    "block": "SCIENCE BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "38",
+      "BLOCK": "",
+      "HALL NO": "S10",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 38
+  },
+  {
+    "_id": "928hxqrmvklacgl",
+    "name": "S11",
+    "block": "SCIENCE BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "39",
+      "BLOCK": "",
+      "HALL NO": "S11",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 39
+  },
+  {
+    "_id": "vue8n1umvklach2",
+    "name": "S12",
+    "block": "SCIENCE BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "40",
+      "BLOCK": "",
+      "HALL NO": "S12",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 40
+  },
+  {
+    "_id": "7jcjd6dmvklachj",
+    "name": "S15",
+    "block": "SCIENCE BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "41",
+      "BLOCK": "",
+      "HALL NO": "S15",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 41
+  },
+  {
+    "_id": "851b2hwmvklachy",
+    "name": "S16",
+    "block": "SCIENCE BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "42",
+      "BLOCK": "",
+      "HALL NO": "S16",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 42
+  },
+  {
+    "_id": "kwuzd55mvklacid",
+    "name": "S17",
+    "block": "SCIENCE BLOCK",
+    "rows": 4,
+    "columns": 3,
+    "benches": 12,
+    "capacity": 24,
+    "columnRows": [
+      4,
+      4,
+      4
+    ],
+    "seatsPerBench": 2,
+    "csvData": {
+      "S.NO": "43",
+      "BLOCK": "",
+      "HALL NO": "S17",
+      "SETS": "12",
+      "seatsPerBench": 2
+    },
+    "idx": 43
+  }
+]

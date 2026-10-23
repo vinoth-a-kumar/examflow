@@ -1,0 +1,125 @@
+[
+  {
+    "_id": "n09m5rvmvkt1tew",
+    "name": "ABAPC32, ABAPC11, AENPC53",
+    "departments": [],
+    "subjectCodes": [
+      "ABAPC32",
+      "ABAPC11",
+      "AENPC53",
+      "SCHPC3P"
+    ],
+    "date": "2026-10-31",
+    "session": "FN",
+    "time": "10:00 AM - 01:00 PM",
+    "studentsCount": 103,
+    "assignedHalls": [
+      "A06",
+      "M10"
+    ],
+    "seatsPerBench": 2,
+    "hallSnapshots": {
+      "A06": {
+        "_id": "dk96q3bmvklac3o",
+        "name": "A06",
+        "block": "A' BLOCK",
+        "idx": 19,
+        "rows": 5,
+        "columns": 3,
+        "benches": 17,
+        "capacity": 51,
+        "columnRows": [
+          5,
+          5,
+          5
+        ],
+        "seatsPerBench": 3,
+        "csvData": {
+          "S.NO": "19",
+          "BLOCK": "",
+          "HALL NO": "A06",
+          "SETS": "15",
+          "seatsPerBench": 17
+        },
+        "columnGaps": null,
+        "updatedAt": "2026-10-23T10:11:06.029Z"
+      },
+      "dk96q3bmvklac3o": {
+        "_id": "dk96q3bmvklac3o",
+        "name": "A06",
+        "block": "A' BLOCK",
+        "idx": 19,
+        "rows": 5,
+        "columns": 3,
+        "benches": 17,
+        "capacity": 51,
+        "columnRows": [
+          5,
+          5,
+          5
+        ],
+        "seatsPerBench": 3,
+        "csvData": {
+          "S.NO": "19",
+          "BLOCK": "",
+          "HALL NO": "A06",
+          "SETS": "15",
+          "seatsPerBench": 17
+        },
+        "columnGaps": null,
+        "updatedAt": "2026-10-23T10:11:06.029Z"
+      },
+      "M10": {
+        "_id": "c7wyo5bmvklabx1",
+        "name": "M10",
+        "block": "MAIN BLOCK",
+        "idx": 7,
+        "rows": 6,
+        "columns": 3,
+        "benches": 17,
+        "capacity": 51,
+        "columnRows": [
+          6,
+          6,
+          5
+        ],
+        "seatsPerBench": 3,
+        "csvData": {
+          "S.NO": "7",
+          "BLOCK": "",
+          "HALL NO": "M10",
+          "SETS": "17",
+          "seatsPerBench": 17
+        },
+        "columnGaps": null,
+        "updatedAt": "2026-10-23T10:11:06.029Z"
+      },
+      "c7wyo5bmvklabx1": {
+        "_id": "c7wyo5bmvklabx1",
+        "name": "M10",
+        "block": "MAIN BLOCK",
+        "idx": 7,
+        "rows": 6,
+        "columns": 3,
+        "benches": 17,
+        "capacity": 51,
+        "columnRows": [
+          6,
+          6,
+          5
+        ],
+        "seatsPerBench": 3,
+        "csvData": {
+          "S.NO": "7",
+          "BLOCK": "",
+          "HALL NO": "M10",
+          "SETS": "17",
+          "seatsPerBench": 17
+        },
+        "columnGaps": null,
+        "updatedAt": "2026-10-23T10:11:06.029Z"
+      }
+    },
+    "status": "Scheduled"
+  }
+]

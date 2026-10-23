@@ -1,212 +1,212 @@
 [
   {
-    "id": "1792686077759_yswr2",
-    "type": "user",
-    "message": "User Logged In",
-    "detail": "admin logged into the system.",
-    "time": "2026-10-22T16:21:17.759Z"
-  },
-  {
-    "id": "1792684084576_ef9km",
+    "id": "1792769763504_g74sc",
     "type": "exam",
-    "message": "Exam Updated",
-    "detail": "ABAPC51, AENPC51, AHSPC51 configuration was updated.",
-    "time": "2026-10-22T15:48:04.576Z"
+    "message": "Exam Cancelled",
+    "detail": "UENPE11 was deleted.",
+    "time": "2026-10-23T15:36:03.504Z"
   },
   {
-    "id": "1792684084569_1s8fp",
+    "id": "1792769743165_jq5vl",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for UENPE11. Seated 420 students across 10 halls.",
+    "time": "2026-10-23T15:35:43.165Z"
+  },
+  {
+    "id": "1792769737099_kgypr",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for UENPE11. Seated 420 students across 10 halls.",
+    "time": "2026-10-23T15:35:37.099Z"
+  },
+  {
+    "id": "1792769731341_am1g7",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for UENPE11. Seated 420 students across 10 halls.",
+    "time": "2026-10-23T15:35:31.341Z"
+  },
+  {
+    "id": "1792769726124_jya8u",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for UENPE11. Seated 420 students across 10 halls.",
+    "time": "2026-10-23T15:35:26.124Z"
+  },
+  {
+    "id": "1792769721021_z9vxh",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for UENPE11. Seated 420 students across 10 halls.",
+    "time": "2026-10-23T15:35:21.021Z"
+  },
+  {
+    "id": "1792769714583_0izdx",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for UENPE11. Seated 420 students across 10 halls.",
+    "time": "2026-10-23T15:35:14.583Z"
+  },
+  {
+    "id": "1792769708123_yc05s",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for UENPE11. Seated 420 students across 10 halls.",
+    "time": "2026-10-23T15:35:08.123Z"
+  },
+  {
+    "id": "1792769702763_fxac0",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for UENPE11. Seated 420 students across 10 halls.",
+    "time": "2026-10-23T15:35:02.763Z"
+  },
+  {
+    "id": "1792769697592_zlv5x",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for UENPE11. Seated 420 students across 10 halls.",
+    "time": "2026-10-23T15:34:57.592Z"
+  },
+  {
+    "id": "1792769691818_5z4hv",
+    "type": "exam",
+    "message": "Seating Generated",
+    "detail": "Generated seating plan for UENPE11. Seated 420 students across 10 halls.",
+    "time": "2026-10-23T15:34:51.818Z"
+  },
+  {
+    "id": "1792769686573_f0ty5",
+    "type": "exam",
+    "message": "Exam Scheduled",
+    "detail": "UENPE11 scheduled for 2026-11-12 (FN). Assigned to 10 halls.",
+    "time": "2026-10-23T15:34:46.573Z"
+  },
+  {
+    "id": "1792769598138_cgksb",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "B06 (B' BLOCK) updated: 48 seats (16 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:33:18.138Z"
+  },
+  {
+    "id": "1792769596020_6qde4",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "B05 (B' BLOCK) updated: 48 seats (16 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:33:16.020Z"
+  },
+  {
+    "id": "1792769593820_wgv5d",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "B04 (B' BLOCK) updated: 48 seats (16 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:33:13.820Z"
+  },
+  {
+    "id": "1792769592504_ym7p4",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "B03 (B' BLOCK) updated: 48 seats (16 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:33:12.504Z"
+  },
+  {
+    "id": "1792769590306_59lqz",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "B02 (B' BLOCK) updated: 48 seats (16 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:33:10.306Z"
+  },
+  {
+    "id": "1792769588956_jzee6",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "B01 (B' BLOCK) updated: 48 seats (16 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:33:08.956Z"
+  },
+  {
+    "id": "1792769587573_3vh4h",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "A08 (A' BLOCK) updated: 45 seats (15 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:33:07.573Z"
+  },
+  {
+    "id": "1792769585153_889s3",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "A07 (A' BLOCK) updated: 45 seats (15 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:33:05.153Z"
+  },
+  {
+    "id": "1792769582576_hbv7e",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "M25 (MAIN BLOCK) updated: 51 seats (17 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:33:02.576Z"
+  },
+  {
+    "id": "1792769581225_4f3gi",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "M24 (MAIN BLOCK) updated: 51 seats (17 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:33:01.225Z"
+  },
+  {
+    "id": "1792769577436_7vm9w",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "M07 (MAIN BLOCK) updated: 39 seats (13 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:32:57.436Z"
+  },
+  {
+    "id": "1792769576044_fo7mj",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "M06 (MAIN BLOCK) updated: 39 seats (13 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:32:56.044Z"
+  },
+  {
+    "id": "1792769573274_rm2ra",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "M05 (MAIN BLOCK) updated: 39 seats (13 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:32:53.274Z"
+  },
+  {
+    "id": "1792769571063_pjtu7",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "M04 (MAIN BLOCK) updated: 39 seats (13 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:32:51.063Z"
+  },
+  {
+    "id": "1792769568174_adhb1",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "M03 (MAIN BLOCK) updated: 39 seats (13 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:32:48.174Z"
+  },
+  {
+    "id": "1792769564033_udeh5",
+    "type": "hall",
+    "message": "Hall Updated",
+    "detail": "M02 (MAIN BLOCK) updated: 60 seats (20 benches, 3 seats/bench).",
+    "time": "2026-10-23T15:32:44.033Z"
+  },
+  {
+    "id": "1792769528318_4tk8o",
+    "type": "hall",
+    "message": "Hall Layout Updated",
+    "detail": "Updated layout for A01: 4 Cols, 17 Benches (51 Seats) for 2026-11-12 FN.",
+    "time": "2026-10-23T15:32:08.318Z"
+  },
+  {
+    "id": "1792769443763_s46c2",
     "type": "exam",
     "message": "Seating Generated",
     "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:48:04.569Z"
-  },
-  {
-    "id": "1792684082954_2qfsh",
-    "type": "exam",
-    "message": "Exam Updated",
-    "detail": "ABAPC51, AENPC51, AHSPC51 configuration was updated.",
-    "time": "2026-10-22T15:48:02.954Z"
-  },
-  {
-    "id": "1792684082940_lgoxw",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:48:02.940Z"
-  },
-  {
-    "id": "1792684082848_iusol",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:48:02.848Z"
-  },
-  {
-    "id": "1792684079523_xdass",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:59.523Z"
-  },
-  {
-    "id": "1792684079467_tdu6y",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:59.467Z"
-  },
-  {
-    "id": "1792684076546_82yla",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:56.547Z"
-  },
-  {
-    "id": "1792684076452_zz699",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:56.452Z"
-  },
-  {
-    "id": "1792684074080_sn2mm",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:54.080Z"
-  },
-  {
-    "id": "1792684073977_dyz6z",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:53.977Z"
-  },
-  {
-    "id": "1792684071582_wpuql",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:51.582Z"
-  },
-  {
-    "id": "1792684071544_23ixt",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:51.544Z"
-  },
-  {
-    "id": "1792684070278_g9gef",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:50.278Z"
-  },
-  {
-    "id": "1792684068719_u9fuu",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:48.719Z"
-  },
-  {
-    "id": "1792684068102_w2vk6",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:48.102Z"
-  },
-  {
-    "id": "1792684065996_6fk27",
-    "type": "exam",
-    "message": "Exam Updated",
-    "detail": "ABAPC51, AENPC51, AHSPC51 configuration was updated.",
-    "time": "2026-10-22T15:47:45.996Z"
-  },
-  {
-    "id": "1792684065872_rfuev",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:45.873Z"
-  },
-  {
-    "id": "1792684065519_phrkf",
-    "type": "exam",
-    "message": "Exam Updated",
-    "detail": "ABAPC51, AENPC51, AHSPC51 configuration was updated. 102 student(s) could not be seated due to hall capacity constraints (435 eligible, 333 seated in 9 halls).",
-    "time": "2026-10-22T15:47:45.519Z"
-  },
-  {
-    "id": "1792684065421_s18vx",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:45.421Z"
-  },
-  {
-    "id": "1792684064703_7r3vj",
-    "type": "exam",
-    "message": "Exam Updated",
-    "detail": "ABAPC51, AENPC51, AHSPC51 configuration was updated. 51 student(s) could not be seated due to hall capacity constraints (435 eligible, 384 seated in 9 halls).",
-    "time": "2026-10-22T15:47:44.703Z"
-  },
-  {
-    "id": "1792684064565_ttmyu",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:44.565Z"
-  },
-  {
-    "id": "1792684064171_4w67w",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:44.171Z"
-  },
-  {
-    "id": "1792684063351_lf8gj",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:43.351Z"
-  },
-  {
-    "id": "1792684063243_kmju5",
-    "type": "exam",
-    "message": "Exam Updated",
-    "detail": "ABAPC51, AENPC51, AHSPC51 configuration was updated. 78 student(s) could not be seated due to hall capacity constraints (435 eligible, 357 seated in 9 halls).",
-    "time": "2026-10-22T15:47:43.243Z"
-  },
-  {
-    "id": "1792684063078_opnj4",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:43.078Z"
-  },
-  {
-    "id": "1792684058384_6zssr",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:38.384Z"
-  },
-  {
-    "id": "1792684057055_5n72w",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:37.056Z"
-  },
-  {
-    "id": "1792684055841_bmr8t",
-    "type": "exam",
-    "message": "Seating Generated",
-    "detail": "Generated seating plan for ABAPC51, AENPC51, AHSPC51. Seated 435 students across 9 halls.",
-    "time": "2026-10-22T15:47:35.841Z"
+    "time": "2026-10-23T15:30:43.763Z"
   }
 ]
