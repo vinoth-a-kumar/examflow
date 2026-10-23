@@ -15,8 +15,10 @@ import {
   Armchair,
   ChevronDown,
   FileText,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Loader2
 } from 'lucide-react';
+import InteractiveLoadingOverlay from '../components/InteractiveLoadingOverlay';
 
 // Helper to get local date string YYYY-MM-DD avoiding timezone off-by-one errors
 const getLocalDateString = (d = new Date()) => {
@@ -33,6 +35,17 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
   const [session, setSession] = useState('FN');
   const [time, setTime] = useState('10:00 AM - 01:00 PM');
   const [selectedSubjectCodes, setSelectedSubjectCodes] = useState([]);
+
+  // Interactive loading states
+  const [isSubmittingExam, setIsSubmittingExam] = useState(false);
+  const [examSuccess, setExamSuccess] = useState(false);
+  const [examError, setExamError] = useState(null);
+
+  const [isUpdatingExam, setIsUpdatingExam] = useState(false);
+  const [editSuccess, setEditSuccess] = useState(false);
+  const [editError, setEditError] = useState(null);
+
+  const [isDeletingExamId, setIsDeletingExamId] = useState(null);
 
   const handleSessionChange = (s) => {
     setSession(s);
@@ -723,11 +736,16 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
   const totalAssignedCapacity = useMemo(() => {
     return selectedHalls.reduce((sum, hallName) => {
       const h = (halls || []).find(x => x.name === hallName);
+      if (!h) return sum;
+      const spb = h.seatsPerBench || 2;
+      const cap = (h.capacity && parseInt(h.capacity) > 0)
+        ? parseInt(h.capacity)
+        : (h.benches ? parseInt(h.benches) * spb : getHallCapacityForBenchConfig(h, spb));
       const avail = (examDate && hallAvailability) ? hallAvailability[hallName] : null;
       if (avail && typeof avail.vacantSeats === 'number') {
         return sum + avail.vacantSeats;
       }
-      return sum + (h ? getHallCapacityForBenchConfig(h, h.seatsPerBench || 2) : 0);
+      return sum + cap;
     }, 0);
   }, [selectedHalls, halls, examDate, hallAvailability]);
 
@@ -746,13 +764,16 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
   const editTotalAssignedCapacity = useMemo(() => {
     return editSelectedHalls.reduce((sum, hallName) => {
       const h = (halls || []).find(x => x.name === hallName);
+      if (!h) return sum;
+      const spb = h.seatsPerBench || 2;
+      const cap = (h.capacity && parseInt(h.capacity) > 0)
+        ? parseInt(h.capacity)
+        : (h.benches ? parseInt(h.benches) * spb : getHallCapacityForBenchConfig(h, spb));
       const avail = (editExamDate && editHallAvailability) ? editHallAvailability[hallName] : null;
       if (avail && typeof avail.vacantSeats === 'number') {
         return sum + avail.vacantSeats;
       }
-      const savedSnap = editingExam && editingExam.hallSnapshots && (editingExam.hallSnapshots[hallName] || editingExam.hallSnapshots[String(h?._id)]);
-      const effectiveSpb = savedSnap ? savedSnap.seatsPerBench : (h?.seatsPerBench || 2);
-      return sum + (h ? getHallCapacityForBenchConfig(h, effectiveSpb) : 0);
+      return sum + cap;
     }, 0);
   }, [editSelectedHalls, halls, editExamDate, editHallAvailability, editingExam]);
 
@@ -981,30 +1002,47 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
       ? selectedSubjectCodes.slice(0, 3).join(', ') 
       : 'Exam';
 
-    const success = await onAddExam({
-      name: generatedExamName,
-      subjectCodes: selectedSubjectCodes,
-      departments: [],
-      date: examDate,
-      session: session,
-      assignedHalls: selectedHalls,
-      seatsPerBench: seatsPerBench,
-      time: time
-    });
+    setIsSubmittingExam(true);
+    setExamSuccess(false);
+    setExamError(null);
 
-    if (success !== false) {
-      // Reset and close
-      setExamDate('');
-      setDateError('');
-      setSession('FN');
-      setTime('10:00 AM - 01:00 PM');
-      setSelectedSubjectCodes([]);
-      setSelectedHalls([]);
-      setSeatsPerBench(2);
-      setSubjectCodeSearch('');
-      setActiveYearFilter('ALL');
-      setModalOpen(false);
-      fetchServerAssignedCodes();
+    try {
+      const success = await onAddExam({
+        name: generatedExamName,
+        subjectCodes: selectedSubjectCodes,
+        departments: [],
+        date: examDate,
+        session: session,
+        assignedHalls: selectedHalls,
+        seatsPerBench: seatsPerBench,
+        time: time
+      });
+
+      if (success !== false) {
+        setExamSuccess(true);
+        if (refreshData) await refreshData(true);
+        setTimeout(() => {
+          // Reset and close
+          setExamDate('');
+          setDateError('');
+          setSession('FN');
+          setTime('10:00 AM - 01:00 PM');
+          setSelectedSubjectCodes([]);
+          setSelectedHalls([]);
+          setSeatsPerBench(2);
+          setSubjectCodeSearch('');
+          setActiveYearFilter('ALL');
+          setModalOpen(false);
+          fetchServerAssignedCodes();
+          setIsSubmittingExam(false);
+          setExamSuccess(false);
+        }, 700);
+      } else {
+        setIsSubmittingExam(false);
+      }
+    } catch (err) {
+      console.error("Exam creation error:", err);
+      setExamError("An error occurred while scheduling exam and allocating seating.");
     }
   };
 
@@ -1075,31 +1113,48 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
       ? editSelectedSubjectCodes.slice(0, 3).join(', ') 
       : 'Exam';
 
-    const success = await onUpdateExam(editingExam._id, {
-      name: generatedEditExamName,
-      subjectCodes: editSelectedSubjectCodes,
-      departments: [],
-      date: editExamDate,
-      session: editSession,
-      assignedHalls: editSelectedHalls,
-      seatsPerBench: editSeatsPerBench,
-      time: editTime
-    });
+    setIsUpdatingExam(true);
+    setEditSuccess(false);
+    setEditError(null);
 
-    if (success !== false) {
-      // Reset and close
-      setEditingExam(null);
-      setEditExamDate('');
-      setEditDateError('');
-      setEditSession('FN');
-      setEditTime('');
-      setEditSelectedSubjectCodes([]);
-      setEditSelectedHalls([]);
-      setEditSeatsPerBench(2);
-      setEditSubjectCodeSearch('');
-      setEditActiveYearFilter('ALL');
-      setEditModalOpen(false);
-      fetchServerAssignedCodes();
+    try {
+      const success = await onUpdateExam(editingExam._id, {
+        name: generatedEditExamName,
+        subjectCodes: editSelectedSubjectCodes,
+        departments: [],
+        date: editExamDate,
+        session: editSession,
+        assignedHalls: editSelectedHalls,
+        seatsPerBench: editSeatsPerBench,
+        time: editTime
+      });
+
+      if (success !== false) {
+        setEditSuccess(true);
+        if (refreshData) await refreshData(true);
+        setTimeout(() => {
+          // Reset and close
+          setEditingExam(null);
+          setEditExamDate('');
+          setEditDateError('');
+          setEditSession('FN');
+          setEditTime('');
+          setEditSelectedSubjectCodes([]);
+          setEditSelectedHalls([]);
+          setEditSeatsPerBench(2);
+          setEditSubjectCodeSearch('');
+          setEditActiveYearFilter('ALL');
+          setEditModalOpen(false);
+          fetchServerAssignedCodes();
+          setIsUpdatingExam(false);
+          setEditSuccess(false);
+        }, 700);
+      } else {
+        setIsUpdatingExam(false);
+      }
+    } catch (err) {
+      console.error("Exam update error:", err);
+      setEditError("An error occurred while updating exam details.");
     }
   };
 
@@ -1114,6 +1169,48 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Create Exam Interactive Loading Overlay */}
+      <InteractiveLoadingOverlay
+        isOpen={isSubmittingExam}
+        title="Scheduling Exam & Generating Seating Plan"
+        subtitle={`Exam Date: ${examDate} (${session}) · ${selectedSubjectCodes.length} Subjects · ${selectedHalls.length} Halls`}
+        steps={[
+          "Validating exam timetable parameters & assigned halls...",
+          "Matching student enrollments for selected subject codes...",
+          "Executing dynamic bench allocation algorithm...",
+          "Finalizing seating records & saving examination schedule..."
+        ]}
+        icon={CalendarDays}
+        isSuccess={examSuccess}
+        successMessage="Exam scheduled & seating plan generated successfully!"
+        errorMessage={examError}
+        onDismissError={() => {
+          setExamError(null);
+          setIsSubmittingExam(false);
+        }}
+      />
+
+      {/* Edit Exam Interactive Loading Overlay */}
+      <InteractiveLoadingOverlay
+        isOpen={isUpdatingExam}
+        title="Updating Exam & Recalculating Seating Plan"
+        subtitle={`Exam Date: ${editExamDate} (${editSession}) · Updating student allocations`}
+        steps={[
+          "Validating updated examination schedule & assigned halls...",
+          "Checking student roster enrollments & available capacity...",
+          "Re-executing dynamic seating allocation algorithm...",
+          "Synchronizing updated seating records with database..."
+        ]}
+        icon={CalendarDays}
+        isSuccess={editSuccess}
+        successMessage="Examination details & seating updated successfully!"
+        errorMessage={editError}
+        onDismissError={() => {
+          setEditError(null);
+          setIsUpdatingExam(false);
+        }}
+      />
+
       <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="page-intro">
           <h2>Exam Management</h2>
@@ -1263,15 +1360,26 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                         </button>
                         <button 
                           className="btn-danger" 
-                          onClick={() => {
+                          disabled={isDeletingExamId === (e._id || e.id)}
+                          onClick={async () => {
                             if (window.confirm(`Are you sure you want to cancel and delete ${e.name}?`)) {
-                              onDeleteExam(e._id);
+                              const examId = e._id || e.id;
+                              setIsDeletingExamId(examId);
+                              try {
+                                if (onDeleteExam) await onDeleteExam(examId);
+                              } finally {
+                                setIsDeletingExamId(null);
+                              }
                             }
                           }}
                           style={{ padding: '6px', borderRadius: '50%', boxShadow: 'none' }}
                           title="Cancel Exam"
                         >
-                          <Trash2 size={14} />
+                          {isDeletingExamId === (e._id || e.id) ? (
+                            <Loader2 size={14} className="btn-spinner" />
+                          ) : (
+                            <Trash2 size={14} />
+                          )}
                         </button>
                       </div>
                     </td>
@@ -1510,7 +1618,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                             <input
                               type="text"
-                              placeholder="Search codes… (e.g. CS101, TAM111)"
+                              placeholder="Search subject codes…"
                               value={subjectCodeSearch}
                               onChange={(e) => setSubjectCodeSearch(e.target.value)}
                               style={{ paddingLeft: '32px', fontSize: '12px', height: '34px', borderRadius: '8px', border: '1px solid var(--border-color)', width: '100%' }}
@@ -1737,7 +1845,10 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                               {blockHalls.map((h) => {
                                 const status = examDate ? hallAvailability[h.name] : null;
                                 const isOccupied = status ? status.occupied : false;
-                                const effectiveCap = getHallCapacityForBenchConfig(h, h.seatsPerBench || 2);
+                                const spb = h.seatsPerBench || 2;
+                                const effectiveCap = (h.capacity && parseInt(h.capacity) > 0)
+                                  ? parseInt(h.capacity)
+                                  : (h.benches ? parseInt(h.benches) * spb : getHallCapacityForBenchConfig(h, spb));
                                 const vacantText = status ? status.msg : `${effectiveCap} Seats`;
                                 const isSelected = selectedHalls.includes(h.name);
                                 const benchCount = h.benches || (h.rows && h.columns ? h.rows * h.columns : 0);
@@ -1801,10 +1912,14 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                   <button 
                     type="submit" 
                     className="btn-primary"
-                    disabled={halls.length === 0 || selectedSubjectCodes.length === 0 || selectedHalls.length === 0}
+                    disabled={isSubmittingExam || halls.length === 0 || selectedSubjectCodes.length === 0 || selectedHalls.length === 0}
                     style={{ padding: '8px 22px', fontSize: '13px', boxShadow: '0 4px 14px rgba(79,70,229,0.35)' }}
                   >
-                    Schedule Exam
+                    {isSubmittingExam ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <Loader2 size={14} className="btn-spinner" /> Generating Plan...
+                      </span>
+                    ) : 'Schedule Exam'}
                   </button>
                 </div>
               </div>
@@ -2036,7 +2151,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                             <input
                               type="text"
-                              placeholder="Search codes… (e.g. CS101, TAM111)"
+                              placeholder="Search subject codes…"
                               value={editSubjectCodeSearch}
                               onChange={(e) => setEditSubjectCodeSearch(e.target.value)}
                               style={{ paddingLeft: '32px', fontSize: '12px', height: '34px', borderRadius: '8px', border: '1px solid var(--border-color)', width: '100%' }}
@@ -2266,8 +2381,9 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                                 const savedSnap = editingExam && editingExam.hallSnapshots && 
                                   (editingExam.hallSnapshots[h.name] || editingExam.hallSnapshots[String(h._id)]);
                                 const currentHallSpb = h.seatsPerBench || 2;
-                                const examSpb = savedSnap ? savedSnap.seatsPerBench : currentHallSpb;
-                                const editEffectiveCap = getHallCapacityForBenchConfig(h, examSpb);
+                                const editEffectiveCap = (h.capacity && parseInt(h.capacity) > 0)
+                                  ? parseInt(h.capacity)
+                                  : (h.benches ? parseInt(h.benches) * currentHallSpb : getHallCapacityForBenchConfig(h, currentHallSpb));
                                 const vacantText = status ? status.msg : `${editEffectiveCap} Seats`;
                                 const isSelected = editSelectedHalls.includes(h.name);
                                 const benchCount = h.benches || (h.rows && h.columns ? h.rows * h.columns : 0);
@@ -2303,11 +2419,8 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                                       <span style={{ fontWeight: 700, color: isOccupied ? 'var(--color-error)' : 'var(--color-primary)' }}>{vacantText}</span>
                                     </div>
                                     {savedSnap && (
-                                      <div style={{ fontSize: '9.5px', color: savedSnap.seatsPerBench !== currentHallSpb ? '#d97706' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
-                                        <span>📋 Saved Snapshot: {savedSnap.seatsPerBench} seats/bench ({savedSnap.capacity} cap)</span>
-                                        {savedSnap.seatsPerBench !== currentHallSpb && (
-                                          <span style={{ fontSize: '8.5px', padding: '1px 4px', borderRadius: '3px', background: 'rgba(245,158,11,0.15)', color: '#d97706', fontWeight: 700 }}>Modified Default</span>
-                                        )}
+                                      <div style={{ fontSize: '9.5px', color: (savedSnap.seatsPerBench !== currentHallSpb || savedSnap.capacity !== editEffectiveCap) ? '#059669' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
+                                        <span>{(savedSnap.seatsPerBench !== currentHallSpb || savedSnap.capacity !== editEffectiveCap) ? `✨ Hall Updated: ${currentHallSpb} spb (${editEffectiveCap} cap)` : `📋 Saved: ${savedSnap.seatsPerBench} spb (${savedSnap.capacity} cap)`}</span>
                                       </div>
                                     )}
                                   </button>
@@ -2339,10 +2452,14 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                   <button 
                     type="submit" 
                     className="btn-primary"
-                    disabled={halls.length === 0 || editSelectedSubjectCodes.length === 0 || editSelectedHalls.length === 0}
+                    disabled={isUpdatingExam || halls.length === 0 || editSelectedSubjectCodes.length === 0 || editSelectedHalls.length === 0}
                     style={{ padding: '8px 22px', fontSize: '13px', boxShadow: '0 4px 14px rgba(16,185,129,0.35)', background: 'linear-gradient(135deg, #059669, #10b981)' }}
                   >
-                    Save Changes
+                    {isUpdatingExam ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <Loader2 size={14} className="btn-spinner" /> Recalculating Plan...
+                      </span>
+                    ) : 'Save Changes'}
                   </button>
                 </div>
               </div>

@@ -12,8 +12,9 @@ import {
   Check,
   Plus,
   Minus,
-  Layers
+  Loader2
 } from 'lucide-react';
+import InteractiveLoadingOverlay from '../components/InteractiveLoadingOverlay';
 
 function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
   const [selectedDate, setSelectedDate] = useState('');
@@ -23,6 +24,8 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
   const [showAllSeating, setShowAllSeating] = useState(true);
   const [seatingPlan, setSeatingPlan] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateSuccess, setGenerateSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [viewFormat, setViewFormat] = useState('university');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState('ALL');
@@ -36,8 +39,8 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
   // Hall Grid Layout (Rows & Columns) Customization State
   const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
   const [customCols, setCustomCols] = useState(4);
+  const [customRowsCount, setCustomRowsCount] = useState(6);
   const [columnRows, setColumnRows] = useState([6, 6, 6, 6]);
-  const [bulkRowVal, setBulkRowVal] = useState(6);
   const [customSeatsPerBench, setCustomSeatsPerBench] = useState(2);
   const [isSavingLayout, setIsSavingLayout] = useState(false);
   const [layoutSuccessMsg, setLayoutSuccessMsg] = useState('');
@@ -47,11 +50,17 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
     if (!selectedDate || !selectedSession) return;
     try {
       const base = window.API_BASE || 'http://localhost:5000';
-      const response = await fetch(`${base}/api/seating/labels/download-csv?date=${selectedDate}&session=${selectedSession}`);
+      const response = await fetch(`${base}/api/seating/labels/sequence?date=${selectedDate}&session=${selectedSession}`);
       if (response.ok) {
-        const text = await response.text();
-        const regNos = text.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
-        setAllHallsLabelSequence(regNos);
+        const data = await response.json();
+        setAllHallsLabelSequence(data.studentRegNos || []);
+      } else {
+        const csvRes = await fetch(`${base}/api/seating/labels/download-csv?date=${selectedDate}&session=${selectedSession}`);
+        if (csvRes.ok) {
+          const text = await csvRes.text();
+          const regNos = text.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+          setAllHallsLabelSequence(regNos);
+        }
       }
     } catch (err) {
       console.error('Error fetching all halls label sequence:', err);
@@ -293,8 +302,22 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
   }, [selectedDate, selectedSession, fetchRosterData]);
 
   const selectedHall = useMemo(() => {
-    return (halls || []).find(h => h && (h._id === selectedHallId || h.name === selectedHallId));
-  }, [halls, selectedHallId]);
+    const fromExam = (examHalls || []).find(h => h && (h._id === selectedHallId || h.name === selectedHallId));
+    const fromHallsById = (halls || []).find(h => h && h._id === selectedHallId);
+    const targetName = fromExam?.name || selectedHallId;
+    const fromHallsByName = (halls || []).find(h => h && h.name && String(h.name).toLowerCase() === String(targetName).toLowerCase());
+    const fromSnapshot = seatingPlan?.hallSnapshot && (
+      seatingPlan.hallSnapshot._id === selectedHallId ||
+      seatingPlan.hallSnapshot.name === selectedHallId ||
+      (targetName && seatingPlan.hallSnapshot.name === targetName)
+    ) ? seatingPlan.hallSnapshot : null;
+
+    const baseHall = fromExam || fromHallsById || fromHallsByName || fromSnapshot;
+    if (baseHall) return baseHall;
+    if (seatingPlan?.hallSnapshot) return seatingPlan.hallSnapshot;
+    if (seatingPlan?.hallName) return { name: seatingPlan.hallName, _id: selectedHallId };
+    return null;
+  }, [examHalls, halls, selectedHallId, seatingPlan]);
 
   const colsCount = useMemo(() => {
     if (seatingPlan && seatingPlan.hallSnapshot && seatingPlan.hallSnapshot.columns) {
@@ -321,127 +344,102 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
     return s;
   };
 
-  // Helper to compute hall maximum benches based on hall records
-  const getHallMaxBenches = (hall, spb = 2) => {
-    if (!hall) return 17;
-    if (hall.benches && hall.benches > 0) return hall.benches;
-    if (hall.rows && hall.columns && hall.rows > 0 && hall.columns > 0) {
-      if (Array.isArray(hall.columnRows) && hall.columnRows.length > 0) {
-        return hall.columnRows.reduce((a, b) => a + (parseInt(b) || 0), 0);
-      }
-      return hall.rows * hall.columns;
-    }
-    if (hall.capacity && hall.capacity > 0) {
-      return Math.round(hall.capacity / (spb || 2));
-    }
-    return 17;
-  };
+  // Helper to compute hall maximum benches based on hall records (fallback helper)
+  // const getHallMaxBenches = ...
 
   // Open Layout Modal and prefill with current Hall values (prioritizing exam's saved hallSnapshot)
   const openLayoutModal = () => {
     const activeSnapshot = seatingPlan?.hallSnapshot || null;
-    if (selectedHall || activeSnapshot) {
+    const hallToUse = selectedHall || activeSnapshot || (seatingPlan ? { name: seatingPlan.hallName, _id: selectedHallId } : null);
+    if (hallToUse) {
       const examMatch = examsOnSelectedDate[0];
-      const spb = activeSnapshot?.seatsPerBench || selectedHall?.seatsPerBench || examMatch?.seatsPerBench || 2;
-      const maxBenches = getHallMaxBenches(selectedHall || activeSnapshot, spb);
-      const cols = activeSnapshot?.columns || selectedHall?.columns || 1;
+      const spb = activeSnapshot?.seatsPerBench || hallToUse?.seatsPerBench || examMatch?.seatsPerBench || 2;
+      const cols = activeSnapshot?.columns || hallToUse?.columns || seatingPlan?.columns || 4;
 
       let cRows = [];
       if (activeSnapshot && Array.isArray(activeSnapshot.columnRows) && activeSnapshot.columnRows.length >= cols) {
         cRows = activeSnapshot.columnRows.slice(0, cols).map(n => Math.max(1, parseInt(n) || 1));
-      } else if (selectedHall && Array.isArray(selectedHall.columnRows) && selectedHall.columnRows.length >= cols) {
-        cRows = selectedHall.columnRows.slice(0, cols).map(n => Math.max(1, parseInt(n) || 1));
-      } else if (selectedHall?.csvData && Array.isArray(selectedHall.csvData.columnRows) && selectedHall.csvData.columnRows.length >= cols) {
-        cRows = selectedHall.csvData.columnRows.slice(0, cols).map(n => Math.max(1, parseInt(n) || 1));
+      } else if (hallToUse && Array.isArray(hallToUse.columnRows) && hallToUse.columnRows.length >= cols) {
+        cRows = hallToUse.columnRows.slice(0, cols).map(n => Math.max(1, parseInt(n) || 1));
+      } else if (hallToUse?.csvData && Array.isArray(hallToUse.csvData.columnRows) && hallToUse.csvData.columnRows.length >= cols) {
+        cRows = hallToUse.csvData.columnRows.slice(0, cols).map(n => Math.max(1, parseInt(n) || 1));
       } else {
-        const baseR = Math.floor(maxBenches / cols);
-        const rem = maxBenches % cols;
-        cRows = Array.from({ length: cols }, (_, i) => baseR + (i >= (cols - rem) ? 1 : 0));
+        const defaultR = activeSnapshot?.rows || hallToUse?.rows || seatingPlan?.rows || 6;
+        cRows = Array(cols).fill(defaultR);
       }
 
+      const initialMaxR = Math.max(...cRows, 1);
       setCustomCols(cols);
+      setCustomRowsCount(initialMaxR);
       setColumnRows(cRows);
-      setBulkRowVal(cRows[0] || Math.floor(maxBenches / cols) || 1);
       setCustomSeatsPerBench(spb);
     }
     setIsLayoutModalOpen(true);
     setLayoutSuccessMsg('');
   };
 
-  // Change total column count (and automatically distribute hall's bench capacity across columns)
-  const handleColCountChange = (newCount) => {
-    const n = Math.max(1, Math.min(20, parseInt(newCount) || 1));
-    const spb = customSeatsPerBench || 2;
-    const maxBenches = getHallMaxBenches(selectedHall, spb);
-
-    // Automatically distribute maxBenches evenly across n columns (e.g. 17 benches into 4 cols -> [4, 4, 4, 5])
-    const baseR = Math.floor(maxBenches / n);
-    const rem = maxBenches % n;
-    const newRows = Array.from({ length: n }, (_, i) => {
-      return baseR + (i >= (n - rem) ? 1 : 0);
-    });
-
-    setCustomCols(n);
-    setColumnRows(newRows);
-    setBulkRowVal(baseR || 1);
+  // Change total row count (applies to all columns)
+  const handleRowCountChange = (newRowCount) => {
+    const r = Math.max(1, Math.min(50, parseInt(newRowCount) || 1));
+    setCustomRowsCount(r);
+    const n = parseInt(customCols) || 1;
+    setColumnRows(Array(n).fill(r));
   };
 
-  // Change rows for a specific column, strictly capped by total hall capacity
-  const handleSpecificColumnRowChange = (colIdx, val) => {
-    const spb = customSeatsPerBench || 2;
-    const maxBenches = getHallMaxBenches(selectedHall, spb);
+  const handleRowCountStep = (delta) => {
+    const cur = parseInt(customRowsCount) || 1;
+    const nextVal = Math.max(1, Math.min(50, cur + delta));
+    handleRowCountChange(nextVal);
+  };
 
+  // Change total column count
+  const handleColCountChange = (newCount) => {
+    const n = Math.max(1, Math.min(20, parseInt(newCount) || 1));
+    setCustomCols(n);
+    const defaultR = parseInt(customRowsCount) || 6;
+    setColumnRows(prev => {
+      const updated = [...prev];
+      if (n > updated.length) {
+        while (updated.length < n) {
+          updated.push(defaultR);
+        }
+        return updated;
+      } else {
+        return updated.slice(0, n);
+      }
+    });
+  };
+
+  const handleColCountStep = (delta) => {
+    const cur = parseInt(customCols) || 1;
+    const nextVal = Math.max(1, Math.min(20, cur + delta));
+    handleColCountChange(nextVal);
+  };
+
+  // Change rows for a specific column
+  const handleSpecificColumnRowChange = (colIdx, val) => {
     setColumnRows(prev => {
       const updated = [...prev];
       if (val === '') {
         updated[colIdx] = '';
         return updated;
       }
-      const num = parseInt(val) || 1;
-      const otherTotal = updated.reduce((sum, r, idx) => idx === colIdx ? sum : sum + (parseInt(r) || 0), 0);
-      const maxAllowed = Math.max(1, maxBenches - otherTotal);
-      updated[colIdx] = Math.max(1, Math.min(num, maxAllowed));
+      const num = Math.max(1, Math.min(50, parseInt(val) || 1));
+      updated[colIdx] = num;
       return updated;
     });
   };
 
   const handleSpecificColumnRowStep = (colIdx, delta) => {
-    const spb = customSeatsPerBench || 2;
-    const maxBenches = getHallMaxBenches(selectedHall, spb);
-
     setColumnRows(prev => {
       const updated = [...prev];
       const current = parseInt(updated[colIdx]) || 1;
-      const otherTotal = updated.reduce((sum, r, idx) => idx === colIdx ? sum : sum + (parseInt(r) || 0), 0);
-      
-      if (delta > 0) {
-        const maxAllowed = Math.max(1, maxBenches - otherTotal);
-        updated[colIdx] = Math.min(current + delta, maxAllowed);
-      } else {
-        updated[colIdx] = Math.max(1, current + delta);
-      }
+      updated[colIdx] = Math.max(1, Math.min(50, current + delta));
       return updated;
     });
   };
 
-  // Apply same row count to all columns at once (capped at max benches)
-  const handleApplyAllRows = (targetRow) => {
-    const r = Math.max(1, parseInt(targetRow) || 1);
-    const n = parseInt(customCols) || 1;
-    const spb = customSeatsPerBench || 2;
-    const maxBenches = getHallMaxBenches(selectedHall, spb);
 
-    if (r * n > maxBenches) {
-      const baseR = Math.floor(maxBenches / n);
-      const rem = maxBenches % n;
-      const newRows = Array.from({ length: n }, (_, i) => baseR + (i >= (n - rem) ? 1 : 0));
-      setColumnRows(newRows);
-      setBulkRowVal(baseR || 1);
-    } else {
-      setColumnRows(Array(n).fill(r));
-      setBulkRowVal(r);
-    }
-  };
 
   // Save Hall Layout (Rows & Columns) & Persist Seating Arrangement
   const handleSaveLayout = async () => {
@@ -565,7 +563,8 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
       alert("Please select Date, Session and Hall.");
       return;
     }
-    setLoading(true);
+    setIsGenerating(true);
+    setGenerateSuccess(false);
     setErrorMsg('');
 
     try {
@@ -583,16 +582,22 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
 
       if (response.ok) {
         const data = await response.json();
+        setGenerateSuccess(true);
+        if (refreshData) await refreshData();
         setSeatingPlan(data);
+        setTimeout(() => {
+          setIsGenerating(false);
+          setGenerateSuccess(false);
+        }, 650);
       } else {
         const data = await response.json();
         setErrorMsg(data.error || 'Failed to generate seating plan.');
+        setIsGenerating(false);
       }
     } catch (err) {
       console.error(err);
       setErrorMsg('Network error occurred during generation.');
-    } finally {
-      setLoading(false);
+      setIsGenerating(false);
     }
   };
 
@@ -1008,25 +1013,54 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
         )}
       </div>
 
-      {/* Loading Indicator */}
-      {loading && (
-        <div className="card-container" style={{ textAlign: 'center', padding: '48px' }}>
-          <div style={{ 
-            width: '40px', 
-            height: '40px', 
-            border: '4px solid var(--border-color)', 
-            borderTopColor: 'var(--color-primary)', 
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 16px auto'
-          }} />
-          <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-          <p style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Processing seating allocation...</p>
+      {/* Interactive Seating Plan Loading Overlay */}
+      <InteractiveLoadingOverlay
+        isOpen={isGenerating}
+        title="Generating Seating Arrangement"
+        subtitle={`Allocating students for ${selectedHall?.name || 'hall'} (${selectedDate} ${selectedSession})`}
+        steps={[
+          "Fetching registered students for examination subject codes...",
+          "Validating hall dimensions, columns & bench layout...",
+          "Computing dynamic seat allocations & preventing department clashes...",
+          "Saving seating records & updating interactive hall plan..."
+        ]}
+        icon={Armchair}
+        isSuccess={generateSuccess}
+        successMessage="Seating arrangement generated successfully!"
+        onDismissError={() => setIsGenerating(false)}
+      />
+
+      {/* In-view Loading State */}
+      {loading && !isGenerating && (
+        <div className="card-container" style={{
+          textAlign: 'center',
+          padding: '60px 24px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.6))',
+          borderRadius: '16px',
+          border: '1px solid rgba(255, 255, 255, 0.08)'
+        }}>
+          <div className="interactive-spinner-wrapper" style={{ margin: '0 auto 16px auto', width: '70px', height: '70px' }}>
+            <div className="interactive-glow-ring" />
+            <div className="interactive-spinner-circle" style={{ width: '64px', height: '64px' }} />
+            <div className="interactive-spinner-icon">
+              <Armchair size={24} />
+            </div>
+          </div>
+          <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#f1f5f9', marginBottom: '6px' }}>
+            Loading Seating Plan
+          </h4>
+          <p style={{ color: 'rgba(148, 163, 184, 0.8)', fontSize: '13px', margin: 0 }}>
+            Retrieving student bench allocations, hall grid layout, and attendance rosters...
+          </p>
         </div>
       )}
 
       {/* Error state / Prompt to generate */}
-      {!loading && errorMsg && (
+      {!loading && !isGenerating && errorMsg && (
         <div className="card-container" style={{ textAlign: 'center', padding: '40px 24px', alignItems: 'center' }}>
           <div style={{ 
             width: '56px', 
@@ -1046,8 +1080,14 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
             {errorMsg}
           </p>
           {selectedDate && selectedHallId && (
-            <button className="btn-primary" onClick={handleGenerate}>
-              <span>Generate Seating Plan</span>
+            <button className="btn-primary" onClick={handleGenerate} disabled={isGenerating}>
+              {isGenerating ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <Loader2 size={14} className="btn-spinner" /> Generating Plan...
+                </span>
+              ) : (
+                <span>Generate Seating Plan</span>
+              )}
             </button>
           )}
         </div>
@@ -1279,35 +1319,6 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                 <div className="card-title-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                     <h3 style={{ margin: 0 }}>{seatingPlan.hallName} - Seating Arrangement</h3>
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      background: 'var(--bg-app)',
-                      border: '1px solid var(--border-color)',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: 'var(--text-secondary)'
-                    }}>
-                      <Layers size={13} color="var(--color-primary)" />
-                      <span>{selectedHall?.rows || Math.ceil((seatingPlan.seatingGrid?.length || 24) / (colsCount || 1))} Rows × {colsCount} Columns ({seatingPlan.totalBenches || ((selectedHall?.rows || 6) * colsCount)} Benches)</span>
-                    </div>
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      background: 'rgba(79, 70, 229, 0.08)',
-                      border: '1px solid rgba(79, 70, 229, 0.25)',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      color: 'var(--color-primary)'
-                    }}>
-                      <span>W-Order Serpentine</span>
-                    </div>
                   </div>
                   <div className="no-print" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button
@@ -1841,97 +1852,77 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
           let studentRegNos = allHallsLabelSequence;
           if (!studentRegNos || studentRegNos.length === 0) {
             studentRegNos = [];
-            if (seatingPlan && Array.isArray(seatingPlan.seatingGrid)) {
-              const cols = seatingPlan.columns || 4;
-              const colRows = seatingPlan.columnRows || [];
-              const benchMap = new Map();
-              const colMaxRowMap = new Map();
-              seatingPlan.seatingGrid.forEach(b => {
-                if (b && b.benchCode) {
-                  benchMap.set(b.benchCode, b);
-                  const m = String(b.benchCode).match(/^([A-Za-z]+)(\d+)$/);
-                  if (m) {
-                    let rIdx = 0;
-                    const clean = m[1].toUpperCase();
-                    for (let i = 0; i < clean.length; i++) {
-                      rIdx = rIdx * 26 + (clean.charCodeAt(i) - 64);
-                    }
-                    const cNum = parseInt(m[2], 10);
-                    const cur = colMaxRowMap.get(cNum) || 0;
-                    if (rIdx > cur) colMaxRowMap.set(cNum, rIdx);
-                  }
-                }
-              });
-
-              const distinctSubs = new Set();
-              let hasSeat3 = false;
-              benchMap.forEach(b => {
-                if (b && !b.isPlaceholder) {
-                  if (b.seat3) hasSeat3 = true;
-                  ['seat1', 'seat2', 'seat3'].forEach(k => {
-                    const st = b[k];
-                    if (st) {
-                      const sc = (st.subjectCode || st.code || '').trim().toUpperCase();
-                      if (sc && sc !== 'GENERAL' && sc !== 'UNKNOWN') distinctSubs.add(sc);
-                    }
-                  });
-                }
-              });
-              const isSingleSub = distinctSubs.size <= 1;
-              const is2SeatHall = (parseInt(seatingPlan.seatsPerBench) === 2) || (!hasSeat3 && benchMap.size > 0);
-
-              if (is2SeatHall && isSingleSub) {
-                for (let c = 1; c <= cols; c++) {
-                  const rCount = Math.max(colMaxRowMap.get(c) || 0, colRows[c - 1] !== undefined ? colRows[c - 1] : (seatingPlan.rows || 6));
-                  const colBenchCodes = [];
-                  if (c % 2 === 1) { // Odd column: top to bottom
-                    for (let r = 0; r < rCount; r++) {
-                      colBenchCodes.push(`${getRowLetterHelper(r)}${c}`);
-                    }
-                  } else { // Even column: bottom to top
-                    for (let r = rCount - 1; r >= 0; r--) {
-                      colBenchCodes.push(`${getRowLetterHelper(r)}${c}`);
-                    }
-                  }
-                  // 1. First extract Left seat (seat1) along column traversal
-                  colBenchCodes.forEach(code => {
-                    const b = benchMap.get(code);
-                    if (b && !b.isPlaceholder && b.seat1?.registerNo) {
-                      studentRegNos.push(b.seat1.registerNo);
-                    }
-                  });
-                  // 2. Next extract Right seat (seat2) along column traversal
-                  colBenchCodes.forEach(code => {
-                    const b = benchMap.get(code);
-                    if (b && !b.isPlaceholder && b.seat2?.registerNo) {
-                      studentRegNos.push(b.seat2.registerNo);
-                    }
-                  });
-                }
-              } else {
-                for (let c = 1; c <= cols; c++) {
-                  const rCount = Math.max(colMaxRowMap.get(c) || 0, colRows[c - 1] !== undefined ? colRows[c - 1] : (seatingPlan.rows || 6));
-                  if (c % 2 === 1) { // Odd column: top to bottom
-                    for (let r = 0; r < rCount; r++) {
-                      const b = benchMap.get(`${getRowLetterHelper(r)}${c}`);
-                      if (b && !b.isPlaceholder) {
-                        if (b.seat1?.registerNo) studentRegNos.push(b.seat1.registerNo);
-                        if (b.seat2?.registerNo) studentRegNos.push(b.seat2.registerNo);
-                        if (b.seat3?.registerNo) studentRegNos.push(b.seat3.registerNo);
+            if (seatingPlan) {
+              const studentMap = new Map();
+              if (Array.isArray(seatingPlan.seatingGrid)) {
+                seatingPlan.seatingGrid.forEach(b => {
+                  if (b && !b.isPlaceholder) {
+                    ['seat1', 'seat2', 'seat3'].forEach(k => {
+                      const st = b[k];
+                      if (st && st.registerNo) {
+                        const reg = String(st.registerNo).trim().toUpperCase();
+                        if (reg && !studentMap.has(reg)) {
+                          studentMap.set(reg, {
+                            ...st,
+                            registerNo: reg,
+                            subjectCode: (st.subjectCode || st.code || '').trim().toUpperCase() || 'GENERAL'
+                          });
+                        }
                       }
-                    }
-                  } else { // Even column: bottom to top
-                    for (let r = rCount - 1; r >= 0; r--) {
-                      const b = benchMap.get(`${getRowLetterHelper(r)}${c}`);
-                      if (b && !b.isPlaceholder) {
-                        if (b.seat1?.registerNo) studentRegNos.push(b.seat1.registerNo);
-                        if (b.seat2?.registerNo) studentRegNos.push(b.seat2.registerNo);
-                        if (b.seat3?.registerNo) studentRegNos.push(b.seat3.registerNo);
-                      }
-                    }
+                    });
                   }
-                }
+                });
               }
+              if (Array.isArray(seatingPlan.attendanceRoster)) {
+                seatingPlan.attendanceRoster.forEach(s => {
+                  if (s && s.registerNo) {
+                    const reg = String(s.registerNo).trim().toUpperCase();
+                    if (reg && !studentMap.has(reg)) {
+                      studentMap.set(reg, {
+                        ...s,
+                        registerNo: reg,
+                        subjectCode: (s.subjectCode || s.code || '').trim().toUpperCase() || 'GENERAL'
+                      });
+                    }
+                  }
+                });
+              }
+
+              // Group by subject code
+              const subCodeGroups = new Map();
+              studentMap.forEach(st => {
+                const sc = st.subjectCode || 'GENERAL';
+                if (!subCodeGroups.has(sc)) subCodeGroups.set(sc, []);
+                subCodeGroups.get(sc).push(st);
+              });
+
+              // Order subject codes: exams matching selectedDate & session
+              const targetDate = (selectedDate || '').split('T')[0];
+              const matchingExams = (exams || []).filter(e => (e.date || '').split('T')[0] === targetDate && e.session === selectedSession);
+              const configuredSubjectCodes = [];
+              const seenSc = new Set();
+              matchingExams.forEach(e => {
+                (e.subjectCodes || []).forEach(sc => {
+                  const clean = String(sc).trim().toUpperCase();
+                  if (clean && !seenSc.has(clean)) {
+                    seenSc.add(clean);
+                    if (subCodeGroups.has(clean)) configuredSubjectCodes.push(clean);
+                  }
+                });
+              });
+
+              const remainingSc = [];
+              subCodeGroups.forEach((_, sc) => {
+                if (!seenSc.has(sc)) remainingSc.push(sc);
+              });
+              remainingSc.sort((a, b) => a.localeCompare(b));
+              const allOrderedSc = [...configuredSubjectCodes, ...remainingSc];
+
+              allOrderedSc.forEach(sc => {
+                const grp = subCodeGroups.get(sc) || [];
+                grp.sort((a, b) => a.registerNo.localeCompare(b.registerNo, undefined, { numeric: true, sensitivity: 'base' }));
+                grp.forEach(st => studentRegNos.push(st.registerNo));
+              });
             }
           }
 
@@ -1948,7 +1939,10 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
             <div key={`label-page-${pIdx}`} className="seat-labels-page">
               <div className="seat-labels-grid">
                 {Array.from({ length: 84 }).map((_, lIdx) => {
-                  const regNo = pageStudents[lIdx] || '';
+                  const r = Math.floor(lIdx / 4);
+                  const c = lIdx % 4;
+                  const studentIdx = c * 21 + r;
+                  const regNo = pageStudents[studentIdx] || '';
                   return (
                     <div key={`label-${pIdx}-${lIdx}`} className="seat-label-box">
                       {regNo ? <span className="label-regno">{regNo}</span> : null}
@@ -1962,7 +1956,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
       </div>
 
       {/* Grid Layout (Rows & Columns) Editor Modal */}
-      {isLayoutModalOpen && selectedHall && (
+      {isLayoutModalOpen && (selectedHall || seatingPlan?.hallSnapshot || seatingPlan) && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -1985,7 +1979,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
               border: '1px solid var(--border-color)',
               borderRadius: 'var(--radius-xl)',
               padding: '28px',
-              maxWidth: '640px',
+              maxWidth: '680px',
               width: '100%',
               boxShadow: 'var(--shadow-xl)',
               display: 'flex',
@@ -2015,15 +2009,15 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                   </div>
                   <div>
                     <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)' }}>
-                      Edit Grid Layout
+                      Edit Rows & Columns
                     </h3>
                     <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-primary)' }}>
-                      Hall: {selectedHall.name}
+                      Hall: {selectedHall?.name || seatingPlan?.hallName || 'Hall'}
                     </span>
                   </div>
                 </div>
                 <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  Choose the number of columns, and configure how many rows each column contains.
+                  Customize the number of rows and columns to adjust the hall layout.
                 </p>
               </div>
               <button
@@ -2042,29 +2036,107 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
               </button>
             </div>
 
-            {/* Total Columns Selector & Bulk Row Setter */}
+            {/* Primary Rows & Columns Controls (Side by Side) */}
             <div style={{
               background: 'var(--bg-app)',
               border: '1px solid var(--border-color)',
               borderRadius: '12px',
-              padding: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px'
+              padding: '16px 20px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: '16px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+              {/* Rows Control */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                 <div>
                   <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'block' }}>
-                    Number of Columns (Vertical Lanes)
+                    Number of Rows
                   </label>
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Total vertical sections in this hall
+                    Benches per column (depth)
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <button
                     type="button"
-                    onClick={() => handleColCountChange(Math.max(1, (parseInt(customCols) || 1) - 1))}
+                    onClick={() => handleRowCountStep(-1)}
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-card)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    <Minus size={16} />
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={customRowsCount}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') setCustomRowsCount('');
+                      else handleRowCountChange(val);
+                    }}
+                    onBlur={() => {
+                      if (!customRowsCount || parseInt(customRowsCount) < 1) handleRowCountChange(1);
+                    }}
+                    style={{
+                      width: '60px',
+                      textAlign: 'center',
+                      fontSize: '16px',
+                      fontWeight: 800,
+                      height: '36px',
+                      borderRadius: '8px',
+                      border: '1.5px solid var(--color-primary)',
+                      background: 'var(--bg-card)',
+                      color: 'var(--text-primary)'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRowCountStep(1)}
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-card)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Columns Control */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'block' }}>
+                    Number of Columns
+                  </label>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Vertical lanes across hall
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleColCountStep(-1)}
                     style={{
                       width: '36px',
                       height: '36px',
@@ -2086,7 +2158,14 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                     min="1"
                     max="20"
                     value={customCols}
-                    onChange={(e) => handleColCountChange(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') setCustomCols('');
+                      else handleColCountChange(val);
+                    }}
+                    onBlur={() => {
+                      if (!customCols || parseInt(customCols) < 1) handleColCountChange(1);
+                    }}
                     style={{
                       width: '60px',
                       textAlign: 'center',
@@ -2101,7 +2180,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                   />
                   <button
                     type="button"
-                    onClick={() => handleColCountChange((parseInt(customCols) || 1) + 1)}
+                    onClick={() => handleColCountStep(1)}
                     style={{
                       width: '36px',
                       height: '36px',
@@ -2120,56 +2199,13 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                   </button>
                 </div>
               </div>
-
-              {/* Quick Action: Set All Columns to Same Row Count */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingTop: '10px',
-                borderTop: '1px dashed var(--border-color)',
-                flexWrap: 'wrap',
-                gap: '8px'
-              }}>
-                <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  Quick Apply (Same Rows for All Columns):
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={bulkRowVal}
-                    onChange={(e) => setBulkRowVal(e.target.value)}
-                    style={{
-                      width: '54px',
-                      textAlign: 'center',
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      height: '30px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border-color)',
-                      background: 'var(--bg-card)',
-                      color: 'var(--text-primary)'
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleApplyAllRows(bulkRowVal)}
-                    className="btn-secondary"
-                    style={{ padding: '6px 12px', fontSize: '11.5px', fontWeight: 600 }}
-                  >
-                    Set All Columns to {bulkRowVal}
-                  </button>
-                </div>
-              </div>
             </div>
 
             {/* Per-Column Rows Configuration */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                  Configure Rows for Each Column
+                  Customize Rows per Column (Optional)
                 </label>
                 <span style={{ fontSize: '11.5px', color: 'var(--color-primary)', fontWeight: 600 }}>
                   {customCols} {customCols === 1 ? 'Column' : 'Columns'}
@@ -2178,25 +2214,19 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
 
               {(() => {
                 const c = parseInt(customCols) || 1;
-                const spb = customSeatsPerBench || 2;
-                const maxBenches = getHallMaxBenches(selectedHall, spb);
-                const activeRows = columnRows.slice(0, c).map(n => Math.max(1, parseInt(n) || 1));
-                const totalBenchesCount = activeRows.reduce((a, b) => a + b, 0);
-
                 return (
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
                     gap: '10px',
-                    maxHeight: '260px',
+                    maxHeight: '220px',
                     overflowY: 'auto',
                     padding: '4px 2px'
                   }}>
                     {Array.from({ length: c }).map((_, colIdx) => {
-                      const currentR = columnRows[colIdx] !== undefined ? columnRows[colIdx] : (parseInt(bulkRowVal) || 6);
+                      const currentR = columnRows[colIdx] !== undefined ? columnRows[colIdx] : (parseInt(customRowsCount) || 6);
                       const numR = Math.max(1, parseInt(currentR) || 1);
                       const endRowLetter = getRowLetterHelper(numR - 1);
-                      const isAtMax = totalBenchesCount >= maxBenches;
 
                       return (
                         <div
@@ -2244,7 +2274,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                             <input
                               type="number"
                               min="1"
-                              max="100"
+                              max="50"
                               value={currentR}
                               onChange={(e) => handleSpecificColumnRowChange(colIdx, e.target.value)}
                               style={{
@@ -2264,15 +2294,14 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                             <button
                               type="button"
                               onClick={() => handleSpecificColumnRowStep(colIdx, 1)}
-                              disabled={isAtMax}
                               style={{
                                 width: '28px',
                                 height: '28px',
                                 borderRadius: '6px',
                                 border: '1px solid var(--border-color)',
-                                background: isAtMax ? 'var(--bg-app)' : 'var(--bg-card)',
-                                color: isAtMax ? 'var(--text-muted)' : 'var(--text-primary)',
-                                cursor: isAtMax ? 'not-allowed' : 'pointer',
+                                background: 'var(--bg-card)',
+                                color: 'var(--text-primary)',
+                                cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -2299,27 +2328,21 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
             {(() => {
               const c = parseInt(customCols) || 1;
               const spb = customSeatsPerBench || 2;
-              const maxBenches = getHallMaxBenches(selectedHall, spb);
               const activeRows = columnRows.slice(0, c).map(n => Math.max(1, parseInt(n) || 1));
               const totalBenchesCount = activeRows.reduce((a, b) => a + b, 0);
+              const maxR = Math.max(...activeRows, 1);
               const totalCapacityCount = totalBenchesCount * spb;
               const assignedCount = (seatingPlan?.attendanceRoster && seatingPlan.attendanceRoster.length) || seatingPlan?.totalStudents || 0;
               const isInsufficient = assignedCount > 0 && totalCapacityCount < assignedCount;
-              const isMatched = totalBenchesCount === maxBenches;
-              const isExceeded = totalBenchesCount > maxBenches;
 
               return (
                 <div style={{
-                  background: (isExceeded || isInsufficient)
+                  background: isInsufficient
                     ? 'rgba(239, 68, 68, 0.08)' 
-                    : isMatched 
-                      ? 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(79,70,229,0.05))' 
-                      : 'linear-gradient(135deg, rgba(79,70,229,0.06), rgba(139,92,246,0.03))',
-                  border: (isExceeded || isInsufficient)
+                    : 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(79,70,229,0.05))',
+                  border: isInsufficient
                     ? '1.5px solid #ef4444' 
-                    : isMatched 
-                      ? '1.5px solid #10b981' 
-                      : '1px solid rgba(79,70,229,0.18)',
+                    : '1.5px solid #10b981',
                   borderRadius: '12px',
                   padding: '14px 16px',
                   display: 'flex',
@@ -2334,21 +2357,21 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                   }}>
                     <div>
                       <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', display: 'block' }}>Total Benches</span>
-                      <span style={{ fontSize: '20px', fontWeight: 800, color: isExceeded ? '#ef4444' : 'var(--color-primary)' }}>
-                        {totalBenchesCount} <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>/ {maxBenches} Max</span>
+                      <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-primary)' }}>
+                        {totalBenchesCount}
                       </span>
                     </div>
                     <div>
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', display: 'block' }}>Seating Capacity</span>
-                      <span style={{ fontSize: '20px', fontWeight: 800, color: (isExceeded || isInsufficient) ? '#ef4444' : '#10b981' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', display: 'block' }}>Total Capacity</span>
+                      <span style={{ fontSize: '20px', fontWeight: 800, color: isInsufficient ? '#ef4444' : '#10b981' }}>
                         {totalCapacityCount}
                       </span>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>Seats ({spb} per bench){assignedCount > 0 ? ` · ${assignedCount} assigned` : ''}</span>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>Seats ({spb}/bench){assignedCount > 0 ? ` · ${assignedCount} assigned` : ''}</span>
                     </div>
                     <div>
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', display: 'block' }}>Columns Breakdown</span>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', display: 'block' }}>Grid Layout</span>
                       <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: '28px' }}>
-                        {c} Cols · [{activeRows.join(', ')}]
+                        {c} Cols × {maxR} Rows
                       </span>
                     </div>
                   </div>
@@ -2367,7 +2390,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                     </div>
                   )}
 
-                  {!isInsufficient && isMatched && (
+                  {!isInsufficient && (
                     <div style={{
                       fontSize: '11.5px',
                       fontWeight: 700,
@@ -2377,35 +2400,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                       borderRadius: '6px',
                       textAlign: 'center'
                     }}>
-                      ✓ Matches Exact Hall Bench Capacity ({maxBenches} Benches · {maxBenches * spb} Seats)
-                    </div>
-                  )}
-
-                  {!isInsufficient && !isMatched && !isExceeded && (
-                    <div style={{
-                      fontSize: '11.5px',
-                      fontWeight: 600,
-                      color: '#d97706',
-                      background: 'rgba(245,158,11,0.12)',
-                      padding: '6px 10px',
-                      borderRadius: '6px',
-                      textAlign: 'center'
-                    }}>
-                      ℹ {totalBenchesCount} of {maxBenches} benches assigned ({maxBenches - totalBenchesCount} benches remaining to match full hall capacity)
-                    </div>
-                  )}
-
-                  {isExceeded && (
-                    <div style={{
-                      fontSize: '11.5px',
-                      fontWeight: 700,
-                      color: '#dc2626',
-                      background: 'rgba(239,68,68,0.12)',
-                      padding: '6px 10px',
-                      borderRadius: '6px',
-                      textAlign: 'center'
-                    }}>
-                      ⚠ Exceeds Hall Capacity! Max allowed: {maxBenches} benches.
+                      ✓ Ready to save: {c} Columns × {maxR} Rows · {totalBenchesCount} Benches ({totalCapacityCount} Seats)
                     </div>
                   )}
                 </div>
@@ -2448,11 +2443,10 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
                 disabled={isSavingLayout || (() => {
                   const c = parseInt(customCols) || 1;
                   const spb = customSeatsPerBench || 2;
-                  const maxB = getHallMaxBenches(selectedHall, spb);
                   const act = columnRows.slice(0, c).map(n => Math.max(1, parseInt(n) || 1));
                   const tot = act.reduce((a, b) => a + b, 0);
                   const assigned = (seatingPlan?.attendanceRoster && seatingPlan.attendanceRoster.length) || seatingPlan?.totalStudents || 0;
-                  return tot === 0 || tot > maxB || (assigned > 0 && tot * spb < assigned);
+                  return tot === 0 || (assigned > 0 && tot * spb < assigned);
                 })()}
                 style={{
                   padding: '10px 22px',

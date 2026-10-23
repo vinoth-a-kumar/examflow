@@ -10,13 +10,19 @@ import {
   Plus,
   Edit2,
   X,
-  Search
+  Search,
+  Loader2
 } from 'lucide-react';
+import InteractiveLoadingOverlay from '../components/InteractiveLoadingOverlay';
 
 function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
-  const [dragActive,     setDragActive]     = useState(false);
-  const [selectedFile,   setSelectedFile]   = useState(null);
-  const [isUploading,    setIsUploading]    = useState(false);
+  const [dragActive,          setDragActive]          = useState(false);
+  const [selectedFile,        setSelectedFile]        = useState(null);
+  const [isUploading,         setIsUploading]         = useState(false);
+  const [uploadSuccess,       setUploadSuccess]       = useState(false);
+  const [uploadError,         setUploadError]         = useState(null);
+  const [isRefreshing,        setIsRefreshing]        = useState(false);
+  const [isClearing,          setIsClearing]          = useState(false);
   const [csvTextMode,         setCsvTextMode]         = useState(false);
   const [manualCsvText,       setManualCsvText]       = useState('');
   const [editingHall,         setEditingHall]         = useState(null);
@@ -27,9 +33,8 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
   const fileInputRef = useRef(null);
 
   const uniqueBlocks = React.useMemo(() => {
-    const defaultBlocks = ['MAIN BLOCK', "A' BLOCK", "B' BLOCK", "C' BLOCK", 'SCIENCE BLOCK'];
     const blocksInHalls = (halls || []).map(h => (h.block || '').trim()).filter(Boolean);
-    return ['ALL', ...Array.from(new Set([...defaultBlocks, ...blocksInHalls]))];
+    return ['ALL', ...Array.from(new Set(blocksInHalls))];
   }, [halls]);
 
   const filteredHalls = React.useMemo(() => {
@@ -74,17 +79,30 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
       const targetId = editingHall._id || editingHall.name;
       const spb = parseInt(editFormData.seatsPerBench) || 2;
       const benches = parseInt(editFormData.benches) || 0;
-      const cap = benches * spb;
+      const cap = (editFormData.capacity !== undefined && editFormData.capacity !== null && !isNaN(parseInt(editFormData.capacity)) && parseInt(editFormData.capacity) > 0)
+        ? parseInt(editFormData.capacity)
+        : (benches * spb);
+
+      const cols = Math.max(1, parseInt(editFormData.columns) || 1);
+      const rows = Math.max(1, parseInt(editFormData.rows) || Math.ceil(benches / cols));
+
+      // Generate columnRows summing exactly to benches
+      const baseRow = Math.floor(benches / cols);
+      const remBenches = benches % cols;
+      const colRows = Array(cols).fill(baseRow);
+      for (let i = 0; i < remBenches; i++) colRows[i]++;
+
       const res = await fetch(`http://localhost:5000/api/halls/${targetId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: editFormData.name,
           block: editFormData.block,
-          rows: parseInt(editFormData.rows) || 1,
-          columns: parseInt(editFormData.columns) || 1,
+          rows: Math.max(...colRows, rows, 1),
+          columns: cols,
           benches: benches,
           capacity: cap,
+          columnRows: colRows,
           seatsPerBench: spb
         })
       });
@@ -103,24 +121,7 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
     }
   };
 
-  const handleSeedOfficialHalls = async () => {
-    if (!window.confirm("Load the official 43 examination halls across 5 blocks? Existing matching halls will be updated without modifying any exam snapshots.")) return;
-    setIsUploading(true);
-    try {
-      const res = await fetch('http://localhost:5000/api/halls/seed-official', { method: 'POST' });
-      const data = await res.json();
-      if (res.ok) {
-        if (refreshData) refreshData();
-      } else {
-        alert('Error seeding halls: ' + (data.error || data.message));
-      }
-    } catch (e) {
-      console.error('Failed to seed official halls:', e);
-      alert('Failed to seed official halls.');
-    } finally {
-      setIsUploading(false);
-    }
-  };
+
 
   const handleQuickToggleSeats = async (hall, newSpb) => {
     const targetId = hall._id || hall.name;
@@ -186,31 +187,70 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
   const handleUploadSubmit = async () => {
     if (!selectedFile && !manualCsvText) return;
     setIsUploading(true);
+    setUploadSuccess(false);
+    setUploadError(null);
     try {
       if (csvTextMode) {
-        if (!manualCsvText.trim()) { alert('Please enter CSV text first.'); setIsUploading(false); return; }
+        if (!manualCsvText.trim()) { 
+          setUploadError('Please enter CSV text first.'); 
+          return; 
+        }
         const response = await fetch('http://localhost:5000/api/halls/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ csvText: manualCsvText, seatsPerBench: 2 }),
         });
         const data = await response.json();
-        if (data.success) { alert(data.message); setManualCsvText(''); refreshData(); }
-        else alert('Upload failed: ' + data.message);
+        if (data.success) { 
+          setUploadSuccess(true);
+          if (refreshData) await refreshData(true);
+          setTimeout(() => {
+            setManualCsvText('');
+            setIsUploading(false);
+            setUploadSuccess(false);
+          }, 700);
+        } else {
+          setUploadError(data.message || 'Hall upload failed.');
+        }
       } else {
         const formData = new FormData();
         formData.append('file', selectedFile);
         formData.append('seatsPerBench', 2);
         const response = await fetch('http://localhost:5000/api/halls/upload', { method: 'POST', body: formData });
         const data = await response.json();
-        if (data.success) { alert(data.message); setSelectedFile(null); refreshData(); }
-        else alert('Upload failed: ' + data.message);
+        if (data.success) { 
+          setUploadSuccess(true);
+          if (refreshData) await refreshData(true);
+          setTimeout(() => {
+            setSelectedFile(null);
+            setIsUploading(false);
+            setUploadSuccess(false);
+          }, 700);
+        } else {
+          setUploadError(data.message || 'Hall upload failed.');
+        }
       }
     } catch (error) {
       console.error('Hall upload error:', error);
-      alert('An error occurred during upload.');
+      setUploadError('An error occurred during upload. Please check connection.');
+    }
+  };
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (refreshData) await refreshData(true);
     } finally {
-      setIsUploading(false);
+      setTimeout(() => setIsRefreshing(false), 450);
+    }
+  };
+
+  const handleClearWithFeedback = async () => {
+    setIsClearing(true);
+    try {
+      if (onClear) await onClear();
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -222,6 +262,25 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+      <InteractiveLoadingOverlay
+        isOpen={isUploading}
+        title="Uploading Examination Halls"
+        subtitle={csvTextMode ? "Importing pasted CSV hall data..." : (selectedFile ? `Processing file: ${selectedFile.name}` : "Importing halls...")}
+        steps={[
+          "Validating examination hall file structure...",
+          "Calculating rows, columns and bench configurations...",
+          "Writing hall capacities & layouts to database...",
+          "Rendering live hall inventory cards..."
+        ]}
+        icon={Building2}
+        isSuccess={uploadSuccess}
+        successMessage="Examination halls uploaded successfully!"
+        errorMessage={uploadError}
+        onDismissError={() => {
+          setUploadError(null);
+          setIsUploading(false);
+        }}
+      />
 
       {/* Page Header */}
       <div className="page-intro">
@@ -278,15 +337,6 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
-                  className="btn-primary"
-                  onClick={handleSeedOfficialHalls}
-                  disabled={isUploading}
-                  style={{ padding: '6px 12px', fontSize: '12px', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
-                  title="Load the 43 official examination halls across 5 blocks"
-                >
-                  🏛️ Load 43 Official Halls
-                </button>
-                <button
                   className="btn-secondary"
                   onClick={() => setCsvTextMode(!csvTextMode)}
                   style={{ padding: '6px 12px', fontSize: '12px' }}
@@ -302,7 +352,7 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
                   <label>Paste CSV Contents (Hall Name, Rows, Columns)</label>
                   <textarea
                     rows={6}
-                    placeholder={`Hall Name,Rows,Columns\nBlock A,8,5\nBlock B,6,4\nSeminar Hall,10,6`}
+                    placeholder={`Hall Name,Rows,Columns`}
                     value={manualCsvText}
                     onChange={(e) => setManualCsvText(e.target.value)}
                     style={{ fontFamily: 'monospace', fontSize: '13px', resize: 'vertical' }}
@@ -314,7 +364,11 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
                     onClick={handleUploadSubmit}
                     disabled={isUploading || !manualCsvText.trim()}
                   >
-                    {isUploading ? 'Importing…' : 'Import CSV Text'}
+                    {isUploading ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <Loader2 size={14} className="btn-spinner" /> Importing...
+                      </span>
+                    ) : 'Import CSV Text'}
                   </button>
                 </div>
               </div>
@@ -379,7 +433,11 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                       <button className="btn-primary" onClick={handleUploadSubmit} disabled={isUploading}>
-                        {isUploading ? 'Uploading…' : 'Confirm Upload'}
+                        {isUploading ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <Loader2 size={14} className="btn-spinner" /> Uploading Halls...
+                          </span>
+                        ) : 'Confirm Upload'}
                       </button>
                     </div>
                   </>
@@ -403,10 +461,7 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
               background: 'var(--bg-app)', borderRadius: '8px', padding: '12px',
               border: '1px solid var(--border-color)', margin: 0, lineHeight: 1.7,
             }}>
-{`Hall Name,Rows,Columns
-Block A Hall,8,5
-Seminar Hall,12,6
-Lab Block,6,4`}
+{`Hall Name,Rows,Columns`}
             </pre>
           </div>
         </div>
@@ -436,17 +491,17 @@ Lab Block,6,4`}
               )}
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn-icon" onClick={refreshData} title="Refresh">
-                <RefreshCw size={14} />
+              <button className="btn-icon" onClick={handleManualRefresh} title="Refresh" disabled={isRefreshing}>
+                <RefreshCw size={14} className={isRefreshing ? "btn-spinner" : ""} />
               </button>
               <button
                 className="btn-danger"
-                onClick={onClear}
-                disabled={halls.length === 0}
+                onClick={handleClearWithFeedback}
+                disabled={halls.length === 0 || isClearing}
                 style={{ padding: '7px 14px', fontSize: '13px' }}
               >
-                <Trash2 size={13} />
-                Clear All
+                {isClearing ? <Loader2 size={13} className="btn-spinner" /> : <Trash2 size={13} />}
+                {isClearing ? 'Clearing...' : 'Clear All'}
               </button>
             </div>
           </div>
@@ -525,7 +580,7 @@ Lab Block,6,4`}
                 No halls registered yet
               </p>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-                Click "Load 43 Official Halls" or import a CSV file to register halls
+                Import a CSV file or paste CSV records above to register halls
               </p>
             </div>
           ) : filteredHalls.length === 0 ? (
@@ -700,16 +755,14 @@ Lab Block,6,4`}
                   type="text"
                   list="block-suggestions"
                   className="form-control"
-                  placeholder="e.g. MAIN BLOCK, A' BLOCK, SCIENCE BLOCK"
+                  placeholder="e.g. Main Block, Science Wing..."
                   value={editFormData.block}
                   onChange={(e) => setEditFormData({ ...editFormData, block: e.target.value })}
                 />
                 <datalist id="block-suggestions">
-                  <option value="MAIN BLOCK" />
-                  <option value="A' BLOCK" />
-                  <option value="B' BLOCK" />
-                  <option value="C' BLOCK" />
-                  <option value="SCIENCE BLOCK" />
+                  {uniqueBlocks.filter(b => b !== 'ALL').map(b => (
+                    <option key={b} value={b} />
+                  ))}
                 </datalist>
               </div>
 
@@ -867,7 +920,11 @@ Lab Block,6,4`}
                 disabled={isSaving}
                 style={{ padding: '8px 18px', fontSize: '13px' }}
               >
-                {isSaving ? 'Saving...' : 'Save Changes'}
+                {isSaving ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <Loader2 size={14} className="btn-spinner" /> Saving Layout...
+                  </span>
+                ) : 'Save Changes'}
               </button>
             </div>
           </div>

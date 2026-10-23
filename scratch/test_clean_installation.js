@@ -114,8 +114,8 @@ async function runCleanInstallationTest() {
     stdio: 'pipe'
   });
 
-  serverProc.stdout.on('data', () => {});
-  serverProc.stderr.on('data', () => {});
+  serverProc.stdout.on('data', () => { });
+  serverProc.stderr.on('data', () => { });
 
   // Wait for server to be responsive
   let serverReady = false;
@@ -127,7 +127,7 @@ async function runCleanInstallationTest() {
         serverReady = true;
         break;
       }
-    } catch (e) {}
+    } catch (e) { }
   }
   verify(serverReady, `Test server is up and responsive on port ${TEST_PORT}`);
 
@@ -158,7 +158,7 @@ async function runCleanInstallationTest() {
     const badLogin1 = await fetchJson('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ emailOrUsername: 'admin', password: 'admin' })
+      body: JSON.stringify({ emailOrUsername: 'admin', password: 'admin1' })
     });
     verify(badLogin1.status === 401, 'Login with default password admin/admin is rejected (401)');
 
@@ -338,8 +338,8 @@ async function runCleanInstallationTest() {
     stdio: 'pipe'
   });
 
-  restartedServer.stdout.on('data', () => {});
-  restartedServer.stderr.on('data', () => {});
+  restartedServer.stdout.on('data', () => { });
+  restartedServer.stderr.on('data', () => { });
 
   let restartedReady = false;
   for (let i = 0; i < 40; i++) {
@@ -350,7 +350,7 @@ async function runCleanInstallationTest() {
         restartedReady = true;
         break;
       }
-    } catch (e) {}
+    } catch (e) { }
   }
   verify(restartedReady, 'Restarted test server is responsive');
 
@@ -405,7 +405,7 @@ async function runCleanInstallationTest() {
         jsonServerReady = true;
         break;
       }
-    } catch (e) {}
+    } catch (e) { }
   }
   verify(jsonServerReady, 'JSON fallback server started successfully');
 
@@ -447,7 +447,7 @@ async function runCleanInstallationTest() {
     if (fs.existsSync(ISOLATED_DATA_DIR)) fs.rmSync(ISOLATED_DATA_DIR, { recursive: true, force: true });
     if (fs.existsSync(ISOLATED_JSON_ONLY_DIR)) fs.rmSync(ISOLATED_JSON_ONLY_DIR, { recursive: true, force: true });
     console.log('  ✓ Cleaned up isolated test databases and directories');
-  } catch (e) {}
+  } catch (e) { }
 
   console.log('\n======================================================================');
   console.log(`ALL TESTS PASSED: ${passed} assertions verified successfully!`);

@@ -7,13 +7,19 @@ import {
   Database,
   RefreshCw,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Loader2
 } from 'lucide-react';
+import InteractiveLoadingOverlay from '../components/InteractiveLoadingOverlay';
 
 function UploadDataView({ students, uploads, onClear, refreshData, onClearUploadHistory }) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const [csvTextMode, setCsvTextMode] = useState(false);
   const [manualCsvText, setManualCsvText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -129,16 +135,15 @@ function UploadDataView({ students, uploads, onClear, refreshData, onClearUpload
   const handleUploadSubmit = async () => {
     if (!selectedFile && !manualCsvText) return;
     setIsUploading(true);
+    setUploadSuccess(false);
+    setUploadError(null);
 
     try {
-      const formData = new FormData();
       if (csvTextMode) {
         if (!manualCsvText.trim()) {
-          alert("Please enter CSV text first.");
-          setIsUploading(false);
+          setUploadError("Please enter CSV text first.");
           return;
         }
-        // Send as raw text in body
         const response = await fetch('http://localhost:5000/api/students/upload', {
           method: 'POST',
           headers: {
@@ -148,14 +153,18 @@ function UploadDataView({ students, uploads, onClear, refreshData, onClearUpload
         });
         const data = await response.json();
         if (data.success) {
-          alert(data.message);
-          setManualCsvText('');
-          refreshData();
+          setUploadSuccess(true);
+          if (refreshData) await refreshData(true);
+          setTimeout(() => {
+            setManualCsvText('');
+            setIsUploading(false);
+            setUploadSuccess(false);
+          }, 700);
         } else {
-          alert("Upload failed: " + data.message);
+          setUploadError(data.message || "Upload failed. Please check CSV format.");
         }
       } else {
-        // Send as multipart file upload
+        const formData = new FormData();
         formData.append('file', selectedFile);
         const response = await fetch('http://localhost:5000/api/students/upload', {
           method: 'POST',
@@ -163,218 +172,191 @@ function UploadDataView({ students, uploads, onClear, refreshData, onClearUpload
         });
         const data = await response.json();
         if (data.success) {
-          alert(data.message);
-          setSelectedFile(null);
-          refreshData();
+          setUploadSuccess(true);
+          if (refreshData) await refreshData(true);
+          setTimeout(() => {
+            setSelectedFile(null);
+            setIsUploading(false);
+            setUploadSuccess(false);
+          }, 700);
         } else {
-          alert("Upload failed: " + data.message);
+          setUploadError(data.message || "Upload failed. Please check spreadsheet format.");
         }
       }
     } catch (error) {
       console.error("Upload error:", error);
-      alert("An error occurred during upload.");
+      setUploadError("An error occurred during upload. Please check server connection.");
+    }
+  };
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (refreshData) await refreshData(true);
     } finally {
-      setIsUploading(false);
+      setTimeout(() => setIsRefreshing(false), 450);
+    }
+  };
+
+  const handleClearWithFeedback = async () => {
+    setIsClearing(true);
+    try {
+      if (onClear) await onClear();
+    } finally {
+      setIsClearing(false);
     }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+      <InteractiveLoadingOverlay
+        isOpen={isUploading}
+        title="Uploading Student Data"
+        subtitle={csvTextMode ? "Importing pasted CSV student records..." : (selectedFile ? `Processing file: ${selectedFile.name}` : "Importing student records...")}
+        steps={[
+          "Validating student spreadsheet / CSV structure...",
+          "Parsing student names, register numbers & departments...",
+          "Validating records & saving to database...",
+          "Rendering updated student roster table..."
+        ]}
+        icon={UploadCloud}
+        isSuccess={uploadSuccess}
+        successMessage="Student records imported successfully!"
+        errorMessage={uploadError}
+        onDismissError={() => {
+          setUploadError(null);
+          setIsUploading(false);
+        }}
+      />
+
       <div className="page-intro">
         <h2>Upload Student Data</h2>
         <p>Import student rosters, enrollment details and departments securely.</p>
       </div>
 
-      {/* Top Row: Uploader + Upload History side by side */}
-      <div className="sections-grid">
-        {/* Left Side: File Upload Box */}
-        <div className="card-container">
-          <div className="card-title-bar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{
-                width: '32px', height: '32px', borderRadius: '8px',
-                background: 'linear-gradient(135deg, rgba(79,70,229,0.1), rgba(139,92,246,0.06))',
-                border: '1px solid rgba(79,70,229,0.15)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--color-primary)',
-              }}>
-                <UploadCloud size={15} />
-              </div>
-              <h3>Import Roster</h3>
+      {/* 1. File Upload Box (Top - Small & Compact) */}
+      <div className="card-container">
+        <div className="card-title-bar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '32px', height: '32px', borderRadius: '8px',
+              background: 'linear-gradient(135deg, rgba(79,70,229,0.1), rgba(139,92,246,0.06))',
+              border: '1px solid rgba(79,70,229,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--color-primary)',
+            }}>
+              <UploadCloud size={15} />
             </div>
-            <button 
-              className="btn-secondary" 
-              onClick={() => setCsvTextMode(!csvTextMode)}
-              style={{ padding: '6px 12px', fontSize: '12px' }}
-            >
-              {csvTextMode ? '📁 File Upload' : '📋 Paste CSV'}
-            </button>
+            <h3>Import Roster</h3>
           </div>
-
-          {csvTextMode ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className="form-group">
-                <label>Paste CSV Contents (Register No, Name, Department)</label>
-                <textarea
-                  rows={6}
-                  placeholder="2024CSE001, John Smith, CSE&#10;2024IT045, Jane Doe, IT&#10;2024ECE012, Alex Jones, ECE"
-                  value={manualCsvText}
-                  onChange={(e) => setManualCsvText(e.target.value)}
-                  style={{ fontFamily: 'monospace', fontSize: '13px', resize: 'vertical' }}
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button 
-                  className="btn-primary" 
-                  onClick={handleUploadSubmit}
-                  disabled={isUploading || !manualCsvText.trim()}
-                >
-                  {isUploading ? 'Importing…' : 'Import CSV Text'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div 
-                className="uploader-box"
-                onDragEnter={handleDrag}
-                onDragOver={handleDrag}
-                onDragLeave={handleDrag}
-                onDrop={handleDrop}
-                onClick={onButtonClick}
-                style={{
-                  borderColor: dragActive ? 'var(--color-primary)' : undefined,
-                  background: dragActive
-                    ? 'radial-gradient(ellipse at center, var(--color-primary-alpha-20) 0%, transparent 80%)'
-                    : undefined,
-                }}
-              >
-                <input 
-                  type="file" 
-                  ref={fileInputRef}
-                  style={{ display: 'none' }}
-                  onChange={handleFileChange}
-                  accept=".csv,.xlsx,.xls"
-                />
-                <div className="uploader-icon"><UploadCloud /></div>
-                <div className="uploader-text">
-                  <h4>{dragActive ? 'Drop to Upload!' : 'Drag & Drop Files Here'}</h4>
-                  <p>Upload CSV files containing student information for automatic processing.</p>
-                </div>
-                <button 
-                  className="btn-primary" 
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onButtonClick(); }}
-                >
-                  Browse Files
-                </button>
-                <span className="uploader-file-info">
-                  Supported: CSV, Excel (.xlsx, .xls) · Max 50 MB
-                </span>
-              </div>
-
-              {selectedFile && (
-                <>
-                  <div style={{ 
-                    padding: '10px 16px',
-                    background: 'linear-gradient(135deg, rgba(79,70,229,0.08), rgba(139,92,246,0.05))',
-                    border: '1px solid rgba(79,70,229,0.2)',
-                    borderRadius: '10px',
-                    fontWeight: 600, fontSize: '13px', color: 'var(--color-primary)',
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                  }}>
-                    <FileSpreadsheet size={16} />
-                    <span style={{ flex: 1 }}>Selected: {selectedFile.name}</span>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
-                      style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', fontWeight: 'bold' }}
-                    >✕</button>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <button className="btn-primary" onClick={handleUploadSubmit} disabled={isUploading}>
-                      {isUploading ? 'Uploading…' : 'Confirm Upload'}
-                    </button>
-                  </div>
-                </>
-              )}
-            </>
-          )}
+          <button 
+            className="btn-secondary" 
+            onClick={() => setCsvTextMode(!csvTextMode)}
+            style={{ padding: '6px 12px', fontSize: '12px' }}
+          >
+            {csvTextMode ? '📁 File Upload' : '📋 Paste CSV'}
+          </button>
         </div>
 
-        {/* Right Side: Upload History Panel */}
-        <div className="card-container" style={{ height: 'fit-content', maxHeight: '450px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div className="card-title-bar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{
-                width: '32px', height: '32px', borderRadius: '8px',
-                background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(5,150,105,0.06))',
-                border: '1px solid rgba(16,185,129,0.15)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--color-success)',
-              }}>
-                <Database size={15} />
-              </div>
-              <h3>Upload History</h3>
+        {csvTextMode ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="form-group">
+              <label>Paste CSV Contents (Register No, Name, Department)</label>
+              <textarea
+                rows={3}
+                placeholder="RegisterNo, Student Name, Department"
+                value={manualCsvText}
+                onChange={(e) => setManualCsvText(e.target.value)}
+                style={{ fontFamily: 'monospace', fontSize: '13px', resize: 'vertical' }}
+              />
             </div>
-            {uploads && uploads.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button 
-                onClick={onClearUploadHistory}
-                style={{
-                  background: 'none', border: '1px solid var(--border-color)',
-                  color: 'var(--color-error)', fontSize: '12px', fontWeight: 700,
-                  cursor: 'pointer', padding: '5px 12px', borderRadius: '8px',
-                  display: 'flex', alignItems: 'center', gap: '5px',
-                  transition: 'all 0.15s', fontFamily: 'var(--font-primary)',
-                }}
-                onMouseOver={(e) => { e.currentTarget.style.background = 'var(--color-error-bg)'; }}
-                onMouseOut={(e) => { e.currentTarget.style.background = 'none'; }}
+                className="btn-primary" 
+                onClick={handleUploadSubmit}
+                disabled={isUploading || !manualCsvText.trim()}
               >
-                <Trash2 size={12} />
-                Clear
+                {isUploading ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <Loader2 size={14} className="btn-spinner" /> Importing...
+                  </span>
+                ) : 'Import CSV Text'}
               </button>
-            )}
+            </div>
           </div>
-
-          <div className="activity-list" style={{ flex: 1, overflowY: 'auto' }}>
-            {uploads.length === 0 ? (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--bg-app)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <UploadCloud size={22} style={{ opacity: 0.4 }} />
-                </div>
-                <p style={{ fontSize: '13px', margin: 0, fontWeight: 600 }}>No upload history yet</p>
-                <p style={{ fontSize: '12px', margin: 0 }}>Upload a file to see logs here.</p>
+        ) : (
+          <>
+            <div 
+              className="uploader-box"
+              onDragEnter={handleDrag}
+              onDragOver={handleDrag}
+              onDragLeave={handleDrag}
+              onDrop={handleDrop}
+              onClick={onButtonClick}
+              style={{
+                borderColor: dragActive ? 'var(--color-primary)' : undefined,
+                background: dragActive
+                  ? 'radial-gradient(ellipse at center, var(--color-primary-alpha-20) 0%, transparent 80%)'
+                  : undefined,
+              }}
+            >
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                onChange={handleFileChange}
+                accept=".csv,.xlsx,.xls"
+              />
+              <div className="uploader-icon"><UploadCloud /></div>
+              <div className="uploader-text">
+                <h4>{dragActive ? 'Drop to Upload!' : 'Drag & Drop Files Here'}</h4>
+                <p>Upload CSV or Excel file containing student information for automatic processing.</p>
               </div>
-            ) : (
-              uploads.map((log, index) => (
-                <div className="activity-item" key={`${log._id || log.id || 'log'}-${index}`}>
-                  <div 
-                    className="activity-dot" 
-                    style={{ backgroundColor: log.status === 'SUCCESS' ? 'var(--color-success)' : 'var(--color-error)' }} 
-                  />
-                  <div className="activity-content">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="activity-title" style={{ wordBreak: 'break-all', maxWidth: '75%' }}>{log.filename}</span>
-                      <span className={`status-pill ${log.status === 'SUCCESS' ? 'success' : 'error'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
-                        {log.status}
-                      </span>
-                    </div>
-                    {log.status === 'SUCCESS' ? (
-                      <span className="activity-desc">Imported {log.recordCount} records</span>
-                    ) : (
-                      <span className="activity-desc" style={{ color: 'var(--color-error)' }}>{log.errorMessage}</span>
-                    )}
-                    <span className="activity-time">
-                      {new Date(log.uploadedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                    </span>
-                  </div>
+              <button 
+                className="btn-primary" 
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onButtonClick(); }}
+              >
+                Browse Files
+              </button>
+              <span className="uploader-file-info">
+                Supported: CSV, Excel (.xlsx, .xls) · Max 50 MB
+              </span>
+            </div>
+
+            {selectedFile && (
+              <>
+                <div style={{ 
+                  padding: '10px 16px',
+                  background: 'linear-gradient(135deg, rgba(79,70,229,0.08), rgba(139,92,246,0.05))',
+                  border: '1px solid rgba(79,70,229,0.2)',
+                  borderRadius: '10px',
+                  fontWeight: 600, fontSize: '13px', color: 'var(--color-primary)',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                }}>
+                  <FileSpreadsheet size={16} />
+                  <span style={{ flex: 1 }}>Selected: {selectedFile.name}</span>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', fontWeight: 'bold' }}
+                  >✕</button>
                 </div>
-              ))
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button className="btn-primary" onClick={handleUploadSubmit} disabled={isUploading}>
+                    {isUploading ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <Loader2 size={14} className="btn-spinner" /> Uploading Dataset...
+                      </span>
+                    ) : 'Confirm Upload'}
+                  </button>
+                </div>
+              </>
             )}
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
-      {/* Student Records Table */}
+      {/* 2. Student Records Table (comes above Upload History) */}
       <div className="card-container">
         <div className="card-title-bar">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -399,17 +381,17 @@ function UploadDataView({ students, uploads, onClear, refreshData, onClearUpload
             )}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="btn-icon" onClick={refreshData} title="Refresh Records">
-              <RefreshCw size={14} />
+            <button className="btn-icon" onClick={handleManualRefresh} title="Refresh Records" disabled={isRefreshing}>
+              <RefreshCw size={14} className={isRefreshing ? "btn-spinner" : ""} />
             </button>
             <button 
               className="btn-danger" 
-              onClick={onClear} 
-              disabled={students.length === 0}
+              onClick={handleClearWithFeedback} 
+              disabled={students.length === 0 || isClearing}
               style={{ padding: '7px 14px', fontSize: '13px' }}
             >
-              <Trash2 size={13} />
-              Clear Database
+              {isClearing ? <Loader2 size={13} className="btn-spinner" /> : <Trash2 size={13} />}
+              {isClearing ? 'Clearing...' : 'Clear Database'}
             </button>
           </div>
         </div>
@@ -495,7 +477,87 @@ function UploadDataView({ students, uploads, onClear, refreshData, onClearUpload
               )}
             </button>
           )}
+        </div>
+      </div>
 
+      {/* 3. Upload History Panel (Bottom) */}
+      <div className="card-container" style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="card-title-bar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '32px', height: '32px', borderRadius: '8px',
+              background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(5,150,105,0.06))',
+              border: '1px solid rgba(16,185,129,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--color-success)',
+            }}>
+              <Database size={15} />
+            </div>
+            <h3>Upload History</h3>
+            {uploads.length > 0 && (
+              <span style={{
+                fontSize: '11px', fontWeight: 700, padding: '3px 9px',
+                borderRadius: '9999px', background: 'rgba(16,185,129,0.08)',
+                color: 'var(--color-success)', border: '1px solid rgba(16,185,129,0.2)',
+              }}>
+                {uploads.length} logs
+              </span>
+            )}
+          </div>
+          {uploads && uploads.length > 0 && (
+            <button 
+              onClick={onClearUploadHistory}
+              style={{
+                background: 'none', border: '1px solid var(--border-color)',
+                color: 'var(--color-error)', fontSize: '12px', fontWeight: 700,
+                cursor: 'pointer', padding: '5px 12px', borderRadius: '8px',
+                display: 'flex', alignItems: 'center', gap: '5px',
+                transition: 'all 0.15s', fontFamily: 'var(--font-primary)',
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'var(--color-error-bg)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'none'; }}
+            >
+              <Trash2 size={12} />
+              Clear History
+            </button>
+          )}
+        </div>
+
+        <div className="activity-list" style={{ flex: 1, overflowY: 'auto', maxHeight: '280px' }}>
+          {uploads.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-app)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <UploadCloud size={20} style={{ opacity: 0.4 }} />
+              </div>
+              <p style={{ fontSize: '13px', margin: 0, fontWeight: 600 }}>No upload history yet</p>
+              <p style={{ fontSize: '12px', margin: 0 }}>Upload a file to see logs here.</p>
+            </div>
+          ) : (
+            uploads.map((log, index) => (
+              <div className="activity-item" key={`${log._id || log.id || 'log'}-${index}`}>
+                <div 
+                  className="activity-dot" 
+                  style={{ backgroundColor: log.status === 'SUCCESS' ? 'var(--color-success)' : 'var(--color-error)' }} 
+                />
+                <div className="activity-content">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="activity-title" style={{ wordBreak: 'break-all', maxWidth: '75%' }}>{log.filename}</span>
+                    <span className={`status-pill ${log.status === 'SUCCESS' ? 'success' : 'error'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
+                      {log.status}
+                    </span>
+                  </div>
+                  {log.status === 'SUCCESS' ? (
+                    <span className="activity-desc">Imported {log.recordCount} records</span>
+                  ) : (
+                    <span className="activity-desc" style={{ color: 'var(--color-error)' }}>{log.errorMessage}</span>
+                  )}
+                  <span className="activity-time">
+                    {new Date(log.uploadedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -503,3 +565,4 @@ function UploadDataView({ students, uploads, onClear, refreshData, onClearUpload
 }
 
 export default UploadDataView;
+

@@ -163,6 +163,23 @@ function Sidebar({ currentTab, setCurrentTab, user, collegeDetails, onLogout, is
               </button>
             )}
           </div>
+
+          <div style={{
+            marginTop: '8px',
+            paddingTop: '8px',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px',
+            textAlign: 'center'
+          }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.02em' }}>
+              ExamFlow v1.2.0
+            </span>
+            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', fontWeight: 500 }}>
+              Developed by Vinothkumar
+            </span>
+          </div>
         </div>
       </aside>
     </>

@@ -11,20 +11,11 @@ window.getApiUrl = function(path) {
 };
 
 const originalFetch = window.fetch;
-window.fetch = function (input, init) {
+window.fetch = async function (input, init) {
   if (typeof input === 'string') {
-    if (input.startsWith('http://localhost:5000')) {
-      input = input.replace('http://localhost:5000', window.API_BASE);
-    } else if (input.startsWith('http://127.0.0.1:5000')) {
-      input = input.replace('http://127.0.0.1:5000', window.API_BASE);
-    }
+    input = input.replace(/^http:\/\/(localhost|127\.0\.0\.1):(5000|5003)/, window.API_BASE);
   } else if (input && typeof input.url === 'string') {
-    let newUrl = input.url;
-    if (newUrl.startsWith('http://localhost:5000')) {
-      newUrl = newUrl.replace('http://localhost:5000', window.API_BASE);
-    } else if (newUrl.startsWith('http://127.0.0.1:5000')) {
-      newUrl = newUrl.replace('http://127.0.0.1:5000', window.API_BASE);
-    }
+    let newUrl = input.url.replace(/^http:\/\/(localhost|127\.0\.0\.1):(5000|5003)/, window.API_BASE);
     input = new Request(newUrl, input);
   }
 
@@ -45,7 +36,35 @@ window.fetch = function (input, init) {
     // Ignore storage parse errors
   }
 
-  return originalFetch(input, init);
+  try {
+    return await originalFetch(input, init);
+  } catch (err) {
+    const currentUrl = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+    let alternateUrl = null;
+    if (currentUrl.includes(':5000')) {
+      alternateUrl = currentUrl.replace(':5000', ':5003');
+    } else if (currentUrl.includes(':5003')) {
+      alternateUrl = currentUrl.replace(':5003', ':5000');
+    }
+
+    if (alternateUrl) {
+      try {
+        const retryInput = (typeof input === 'string')
+          ? alternateUrl
+          : new Request(alternateUrl, input);
+        const retryRes = await originalFetch(retryInput, init);
+        if (window.API_BASE.includes(':5000')) {
+          window.API_BASE = window.API_BASE.replace(':5000', ':5003');
+        } else if (window.API_BASE.includes(':5003')) {
+          window.API_BASE = window.API_BASE.replace(':5003', ':5000');
+        }
+        return retryRes;
+      } catch (retryErr) {
+        throw err;
+      }
+    }
+    throw err;
+  }
 };
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

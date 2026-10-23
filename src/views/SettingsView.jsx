@@ -44,7 +44,7 @@ function SettingsView({ dbStatus, refreshData, setTab }) {
     if (saved) {
       try { return JSON.parse(saved); } catch (e) {}
     }
-    return { time: '03 Jul 2026 • 10:00 PM', size: '1.4 MB', available: true };
+    return { time: 'No backup created yet', size: '0 KB', available: false };
   });
 
   const showToast = (text, type = 'success') => {
@@ -548,11 +548,10 @@ function SettingsView({ dbStatus, refreshData, setTab }) {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {[
-              { label: 'Application', value: 'Exam Seating Management System' },
+              { label: 'Application', value: 'ExamFlow' },
+              { label: 'Developer', value: 'Vinothkumar' },
               { label: 'Version', value: systemInfo.projectVersion || 'v1.2.0' },
-              { label: 'Environment', value: process.env.NODE_ENV === 'production' ? 'Production' : 'Development' },
-              { label: 'Database', value: systemInfo.databaseEngine || 'MySQL' },
-              { label: 'Server Framework', value: 'Node.js / Express' },
+              { label: 'Copyright', value: '© 2026 Vinothkumar. All rights reserved.' },
             ].map((info) => (
               <div key={info.label} style={{
                 display: 'flex',

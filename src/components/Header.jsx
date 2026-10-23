@@ -43,7 +43,7 @@ function Header({ collegeDetails, isMobileSidebarOpen, onToggleMobileSidebar }) 
           
           <button 
             className="header-btn" 
-            title="Help Support"
+            title="About ExamFlow"
             onClick={() => setIsOpen(true)}
           >
             <HelpCircle size={20} />
@@ -70,7 +70,7 @@ function Header({ collegeDetails, isMobileSidebarOpen, onToggleMobileSidebar }) 
             backgroundColor: 'var(--bg-card)',
             border: '1px solid var(--border-color)',
             borderRadius: '12px',
-            maxWidth: '500px',
+            maxWidth: '480px',
             width: '100%',
             boxShadow: 'var(--shadow-lg)',
             display: 'flex',
@@ -92,7 +92,7 @@ function Header({ collegeDetails, isMobileSidebarOpen, onToggleMobileSidebar }) 
                 fontWeight: 700,
                 color: 'var(--text-primary)',
                 margin: 0
-              }}>Help & Support</h3>
+              }}>About ExamFlow</h3>
               <button 
                 onClick={() => setIsOpen(false)}
                 style={{
@@ -112,14 +112,99 @@ function Header({ collegeDetails, isMobileSidebarOpen, onToggleMobileSidebar }) 
             </div>
 
             {/* Content */}
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '400px', overflowY: 'auto' }}>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <Info size={20} style={{ color: 'var(--color-primary)', flexShrink: 0, marginTop: '2px' }} />
-                <div>
-                  <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>Seating Rules Guide</h4>
-                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                    Students are seated in columns (behind each other) by department. The system fills assigned halls sequentially based on the order in which they were selected.
+            <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, rgba(79,70,229,0.12), rgba(139,92,246,0.08))',
+                  border: '1px solid rgba(79,70,229,0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--color-primary)',
+                  flexShrink: 0
+                }}>
+                  <Info size={22} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ fontSize: '17px', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 4px 0' }}>
+                    ExamFlow
+                  </h4>
+                  <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: 1.5, margin: '0 0 14px 0', fontWeight: 500 }}>
+                    A Smart Solution for Examination Planning
                   </p>
+
+                  <div style={{
+                    fontSize: '12.5px',
+                    color: 'var(--text-secondary)',
+                    lineHeight: 1.6,
+                    background: 'var(--bg-app)',
+                    padding: '12px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-color)',
+                    marginBottom: '14px'
+                  }}>
+                    <strong style={{ display: 'block', color: 'var(--text-primary)', marginBottom: '4px', fontSize: '12px' }}>
+                      Application Overview:
+                    </strong>
+                    ExamFlow is designed to simplify examination planning, hall management, student allocation, and seating arrangement workflows.
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '8px 12px',
+                      background: 'var(--bg-app)',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      fontSize: '12.5px'
+                    }}>
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Application:</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>ExamFlow</span>
+                    </div>
+
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '8px 12px',
+                      background: 'var(--bg-app)',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      fontSize: '12.5px'
+                    }}>
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Developer:</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>Vinothkumar</span>
+                    </div>
+
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '8px 12px',
+                      background: 'var(--bg-app)',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      fontSize: '12.5px'
+                    }}>
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Version:</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>v1.2.0</span>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    marginTop: '14px',
+                    fontSize: '11px',
+                    color: 'var(--text-muted)',
+                    textAlign: 'center',
+                    fontWeight: 500
+                  }}>
+                    © 2026 Vinothkumar. All rights reserved.
+                  </div>
                 </div>
               </div>
             </div>
@@ -137,7 +222,7 @@ function Header({ collegeDetails, isMobileSidebarOpen, onToggleMobileSidebar }) 
                 onClick={() => setIsOpen(false)}
                 style={{ padding: '6px 16px', fontSize: '13px' }}
               >
-                Close Help
+                Close
               </button>
             </div>
           </div>

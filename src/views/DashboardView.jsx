@@ -329,6 +329,18 @@ function DashboardView({ stats, activities, setTab, onClearActivities }) {
           View All History →
         </button>
       </div>
+
+      {/* Dashboard Footer */}
+      <footer style={{
+        textAlign: 'center',
+        padding: '24px 0 12px',
+        fontSize: '12px',
+        color: 'var(--text-muted)',
+        fontWeight: 500,
+        letterSpacing: '0.01em'
+      }}>
+        <span>ExamFlow | Developed by Vinothkumar</span>
+      </footer>
     </div>
   );
 }
