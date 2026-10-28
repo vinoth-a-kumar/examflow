@@ -87,17 +87,25 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
+  // Helper to normalize exam date strings safely
+  const getExamDateStr = (val) => {
+    if (!val) return '';
+    if (typeof val === 'string') return val.split('T')[0];
+    if (val instanceof Date) return val.toISOString().split('T')[0];
+    return String(val).split('T')[0];
+  };
+
   // Extract unique dates from scheduled exams
   const uniqueExamDates = useMemo(() => {
     if (!exams) return [];
-    const dates = exams.map(e => e.date.split('T')[0]);
-    return [...new Set(dates)].sort();
+    const dates = exams.map(e => getExamDateStr(e.date));
+    return [...new Set(dates.filter(Boolean))].sort();
   }, [exams]);
 
   // Helper to format date dropdown options with created exam time(s)
   const getDateOptionLabel = (d) => {
     const formattedDate = new Date(d).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
-    const examsOnDate = exams ? exams.filter(e => e.date.split('T')[0] === d) : [];
+    const examsOnDate = exams ? exams.filter(e => getExamDateStr(e.date) === d) : [];
     if (examsOnDate.length === 0) return formattedDate;
     
     const sessionInfos = examsOnDate.map(e => `${e.session}: ${e.time || (e.session === 'FN' ? '10:00 AM - 01:00 PM' : '02:00 PM - 05:00 PM')}`);
@@ -108,7 +116,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
   const handleLocDateChange = (newDate) => {
     setLocDate(newDate);
     if (newDate && exams) {
-      const examsOnDate = exams.filter(e => e.date.split('T')[0] === newDate);
+      const examsOnDate = exams.filter(e => getExamDateStr(e.date) === newDate);
       if (examsOnDate.length > 0) {
         const hasCurrentSession = examsOnDate.some(e => e.session === locSession);
         if (!hasCurrentSession) {
@@ -926,6 +934,28 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
     setSelectedHalls(prev => prev.filter(hallName => !occupiedHallsOnDate.includes(hallName)));
   }, [occupiedHallsOnDate]);
 
+  // Sort exams date-wise (chronological ascending order; FN before AN)
+  const sortedExams = React.useMemo(() => {
+    if (!exams || !Array.isArray(exams)) return [];
+    const getExamDateKey = (val) => {
+      if (!val) return '';
+      if (val instanceof Date) return val.toISOString().split('T')[0];
+      return String(val).split('T')[0];
+    };
+    return [...exams].sort((a, b) => {
+      const dateA = getExamDateKey(a.date);
+      const dateB = getExamDateKey(b.date);
+      if (dateA !== dateB) {
+        return dateA.localeCompare(dateB);
+      }
+      const sessionOrder = { FN: 1, AN: 2 };
+      const sessA = sessionOrder[a.session] || 3;
+      const sessB = sessionOrder[b.session] || 3;
+      if (sessA !== sessB) return sessA - sessB;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }, [exams]);
+
   // Calculate metrics
   const totalExamsCount = exams.length;
   
@@ -1276,14 +1306,14 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
               </tr>
             </thead>
             <tbody>
-              {exams.length === 0 ? (
+              {sortedExams.length === 0 ? (
                 <tr>
                   <td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
                     No examinations scheduled yet. Click "Create Exam" to schedule.
                   </td>
                 </tr>
               ) : (
-                exams.map((e, index) => (
+                sortedExams.map((e, index) => (
                   <tr key={`${e._id || e.id || 'exam'}-${index}`}>
                     <td style={{ fontWeight: 600 }}>{e.name}</td>
                     <td>
@@ -2839,7 +2869,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                     
                     {/* Hall Header Line */}
                     <div style={{ 
-                      fontSize: '14px', 
+                      fontSize: '16px', 
                       fontWeight: 'bold', 
                       marginBottom: '12px', 
                       padding: '8px 12px', 
@@ -2857,29 +2887,29 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                       <table className="data-table sticky-header-table" style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%' }}>
                         <thead>
                           <tr>
-                            <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '22%' }}>CLASS/ CODE NO</th>
-                            <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '48%' }}>REGISTER NO</th>
-                            <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '15%' }}>CANDIDATE NO</th>
-                            <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '15%' }}>TOTAL CANDIDATE NO</th>
+                            <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '22%', fontSize: '14px' }}>CLASS/ CODE NO</th>
+                            <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '48%', fontSize: '14px' }}>REGISTER NO</th>
+                            <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '15%', fontSize: '14px' }}>CANDIDATE NO</th>
+                            <th style={{ border: '1px solid var(--border-color)', padding: '8px', textAlign: 'center', width: '15%', fontSize: '14px' }}>TOTAL CANDIDATE NO</th>
                           </tr>
                         </thead>
                         <tbody>
                           {loc.classes.map((cls, idx) => (
                             <tr key={`${cls.degree || ''}-${cls.subjectCode || ''}-${cls.classCode || idx}`}>
                               <td style={{ border: '1px solid var(--border-color)', padding: '10px 8px', textAlign: 'center' }}>
-                                <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-primary)' }}>
+                                <div style={{ fontWeight: 'bold', fontSize: '15px', color: 'var(--text-primary)' }}>
                                   {cls.degree || cls.classCode}
                                 </div>
                                 {cls.subjectCode && (
-                                  <div style={{ fontSize: '12px', color: 'var(--color-primary, #4F46E5)', fontWeight: 600, marginTop: '2px' }}>
+                                  <div style={{ fontSize: '14px', color: 'var(--color-primary, #4F46E5)', fontWeight: 600, marginTop: '2px' }}>
                                     {cls.subjectCode}
                                   </div>
                                 )}
                               </td>
-                              <td style={{ border: '1px solid var(--border-color)', padding: '10px 8px', textAlign: 'center', fontSize: '13px' }}>
+                              <td style={{ border: '1px solid var(--border-color)', padding: '10px 8px', textAlign: 'center', fontSize: '15px' }}>
                                 {cls.summarizedRange}
                               </td>
-                              <td style={{ border: '1px solid var(--border-color)', padding: '10px 8px', textAlign: 'center', fontWeight: 'bold' }}>
+                              <td style={{ border: '1px solid var(--border-color)', padding: '10px 8px', textAlign: 'center', fontWeight: 'bold', fontSize: '15px' }}>
                                 {cls.count}
                               </td>
                               {idx === 0 && (
@@ -2891,7 +2921,7 @@ function ExamManagementView({ exams, halls, students, onAddExam, onDeleteExam, o
                                     textAlign: 'center', 
                                     fontWeight: 'bold',
                                     verticalAlign: 'middle',
-                                    fontSize: '15px',
+                                    fontSize: '17px',
                                     color: 'var(--color-primary)',
                                     backgroundColor: 'var(--color-primary-light)'
                                   }}

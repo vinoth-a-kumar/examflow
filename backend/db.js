@@ -229,6 +229,24 @@ async function createTables() {
     )
   `);
 
+  // exam_date_records: Stores dedicated, date-isolated seating and report snapshots
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS exam_date_records (
+      \`_id\` VARCHAR(255) PRIMARY KEY,
+      \`date\` VARCHAR(50) NOT NULL,
+      \`session\` VARCHAR(50) NOT NULL,
+      \`examIds\` LONGTEXT,
+      \`exams\` LONGTEXT,
+      \`hallSnapshots\` LONGTEXT,
+      \`seatingPlans\` LONGTEXT,
+      \`locationsSummary\` LONGTEXT,
+      \`totalStudents\` INT DEFAULT 0,
+      \`totalHalls\` INT DEFAULT 0,
+      \`updatedAt\` DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY \`uk_date_session\` (\`date\`, \`session\`)
+    )
+  `);
+
   // Migrations for existing databases
   const migrations = [
     `ALTER TABLE exams ADD COLUMN \`subjectCodes\` TEXT`,
@@ -245,6 +263,8 @@ async function createTables() {
     `CREATE INDEX idx_halls_idx ON halls(\`idx\`)`,
     `ALTER TABLE seating_plans ADD COLUMN \`unseatedStudents\` LONGTEXT`,
     `ALTER TABLE seating_plans ADD COLUMN \`hallSnapshot\` LONGTEXT`,
+    `ALTER TABLE seating_plans ADD COLUMN \`date\` VARCHAR(50) DEFAULT ''`,
+    `ALTER TABLE seating_plans ADD COLUMN \`session\` VARCHAR(50) DEFAULT ''`,
     `ALTER TABLE students ADD COLUMN \`csvData\` LONGTEXT`,
     `ALTER TABLE students MODIFY COLUMN \`name\` TEXT NOT NULL`,
     `ALTER TABLE students MODIFY COLUMN \`department\` TEXT NOT NULL`,
@@ -252,6 +272,8 @@ async function createTables() {
     `CREATE INDEX idx_exams_date_session ON exams(\`date\`, \`session\`)`,
     `CREATE INDEX idx_seating_plans_exam ON seating_plans(\`examId\`)`,
     `CREATE INDEX idx_seating_plans_hall ON seating_plans(\`hallId\`)`,
+    `CREATE INDEX idx_seating_plans_date_session ON seating_plans(\`date\`(50), \`session\`)`,
+    `CREATE INDEX idx_exam_date_records_date_session ON exam_date_records(\`date\`, \`session\`)`,
     `CREATE INDEX idx_students_dept ON students(\`department\`(50))`,
     `CREATE INDEX idx_students_reg ON students(\`registerNo\`(50))`,
     `CREATE INDEX idx_halls_name ON halls(\`name\`)`
@@ -264,6 +286,16 @@ async function createTables() {
       // Ignore if column or index already exists
     }
   }
+
+  // Auto-stamp seating_plans date & session from exams if missing
+  try {
+    await pool.query(`
+      UPDATE seating_plans sp 
+      JOIN exams e ON sp.examId = e._id 
+      SET sp.date = SUBSTRING_INDEX(e.date, 'T', 1), sp.session = e.session 
+      WHERE (sp.date IS NULL OR sp.date = '') AND e.date IS NOT NULL
+    `);
+  } catch (stampErr) {}
 
   // Auto-normalize student departments in MySQL
   try {
@@ -295,6 +327,13 @@ function safeParseJson(value, fallback = []) {
   }
 }
 
+function getDateString(val) {
+  if (!val) return '';
+  if (typeof val === 'string') return val.split('T')[0];
+  if (val instanceof Date) return val.toISOString().split('T')[0];
+  return String(val).split('T')[0];
+}
+
 function parseExam(row) {
   if (!row) return null;
   return {
@@ -313,6 +352,8 @@ function parseSeatingPlan(row) {
   if (!row) return null;
   return {
     ...row,
+    date: row.date ? getDateString(row.date) : '',
+    session: row.session || '',
     seatingGrid: safeParseJson(row.seatingGrid, []),
     attendanceRoster: safeParseJson(row.attendanceRoster, []),
     unseatedStudents: safeParseJson(row.unseatedStudents, []),
@@ -320,6 +361,22 @@ function parseSeatingPlan(row) {
     totalBenches: row.totalBenches || 0,
     totalStudents: row.totalStudents || 0,
     emptySeats: row.emptySeats || 0
+  };
+}
+
+function parseExamDateRecord(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    date: getDateString(row.date),
+    session: row.session || 'FN',
+    examIds: safeParseJson(row.examIds, []),
+    exams: safeParseJson(row.exams, []),
+    hallSnapshots: safeParseJson(row.hallSnapshots, {}),
+    seatingPlans: safeParseJson(row.seatingPlans, []),
+    locationsSummary: safeParseJson(row.locationsSummary, []),
+    totalStudents: row.totalStudents || 0,
+    totalHalls: row.totalHalls || 0
   };
 }
 
@@ -925,20 +982,32 @@ const Models = {
         return rows.length > 0 ? parseExam(rows[0]) : { _id: id, ...doc };
       });
 
-      // Synchronize JSON
+      if (mysqlRes !== null) {
+        setImmediate(() => {
+          try {
+            const data = readJson('exams');
+            const idx = data.findIndex(e => e._id === id);
+            if (idx !== -1) {
+              data[idx] = { ...data[idx], ...doc };
+              writeJson('exams', data);
+            }
+          } catch (_) {}
+        });
+        return mysqlRes;
+      }
+
+      // Fallback
       try {
         const data = readJson('exams');
         const idx = data.findIndex(e => e._id === id);
         if (idx !== -1) {
           data[idx] = { ...data[idx], ...doc };
           writeJson('exams', data);
+          return data[idx];
         }
       } catch (e) {}
 
-      if (mysqlRes !== null) return mysqlRes;
-      const data = readJson('exams');
-      const idx = data.findIndex(e => e._id === id);
-      return idx !== -1 ? data[idx] : null;
+      return null;
     },
     findByIdAndDelete: async (id) => {
       let deletedItem = null;
@@ -1051,6 +1120,8 @@ const Models = {
           const planItem = {
             _id,
             ...item,
+            date: item.date ? getDateString(item.date) : '',
+            session: item.session || '',
             examName: item.examName || item.name || 'Exam',
             hallName: item.hallName || 'Hall',
             seatingGrid: item.seatingGrid || [],
@@ -1063,30 +1134,70 @@ const Models = {
             generatedAt
           };
           await runQuery(`DELETE FROM seating_plans WHERE examId = ? AND hallId = ?`, [planItem.examId, planItem.hallId]);
-          await runQuery(
-            `INSERT INTO seating_plans (\`_id\`, \`examId\`, \`examName\`, \`hallId\`, \`hallName\`, \`seatingGrid\`, \`attendanceRoster\`, \`unseatedStudents\`, \`totalBenches\`, \`totalStudents\`, \`emptySeats\`, \`generatedAt\`, \`hallSnapshot\`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              _id,
-              planItem.examId,
-              planItem.examName,
-              planItem.hallId,
-              planItem.hallName,
-              JSON.stringify(planItem.seatingGrid),
-              JSON.stringify(planItem.attendanceRoster),
-              JSON.stringify(planItem.unseatedStudents),
-              planItem.totalBenches,
-              planItem.totalStudents,
-              planItem.emptySeats,
-              generatedAt,
-              JSON.stringify(planItem.hallSnapshot || null)
-            ]
-          );
+          try {
+            await runQuery(
+              `INSERT INTO seating_plans (\`_id\`, \`examId\`, \`examName\`, \`hallId\`, \`hallName\`, \`seatingGrid\`, \`attendanceRoster\`, \`unseatedStudents\`, \`totalBenches\`, \`totalStudents\`, \`emptySeats\`, \`generatedAt\`, \`hallSnapshot\`, \`date\`, \`session\`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                _id,
+                planItem.examId,
+                planItem.examName,
+                planItem.hallId,
+                planItem.hallName,
+                JSON.stringify(planItem.seatingGrid),
+                JSON.stringify(planItem.attendanceRoster),
+                JSON.stringify(planItem.unseatedStudents),
+                planItem.totalBenches,
+                planItem.totalStudents,
+                planItem.emptySeats,
+                generatedAt,
+                JSON.stringify(planItem.hallSnapshot || null),
+                planItem.date,
+                planItem.session
+              ]
+            );
+          } catch (insertWithDateErr) {
+            // Fallback for older table schemas
+            await runQuery(
+              `INSERT INTO seating_plans (\`_id\`, \`examId\`, \`examName\`, \`hallId\`, \`hallName\`, \`seatingGrid\`, \`attendanceRoster\`, \`unseatedStudents\`, \`totalBenches\`, \`totalStudents\`, \`emptySeats\`, \`generatedAt\`, \`hallSnapshot\`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                _id,
+                planItem.examId,
+                planItem.examName,
+                planItem.hallId,
+                planItem.hallName,
+                JSON.stringify(planItem.seatingGrid),
+                JSON.stringify(planItem.attendanceRoster),
+                JSON.stringify(planItem.unseatedStudents),
+                planItem.totalBenches,
+                planItem.totalStudents,
+                planItem.emptySeats,
+                generatedAt,
+                JSON.stringify(planItem.hallSnapshot || null)
+              ]
+            );
+          }
           createdItems.push(planItem);
         }
         return Array.isArray(doc) ? createdItems : createdItems[0];
       });
 
-      // Synchronize JSON
+      if (mysqlRes !== null) {
+        setImmediate(() => {
+          try {
+            let data = readJson('seating_plans');
+            for (const item of (createdItems.length > 0 ? createdItems : docs)) {
+              data = data.filter(p => !(p.examId === item.examId && p.hallId === item.hallId));
+              const planItem = item._id ? item : { ...item, _id: generateId(), generatedAt: new Date() };
+              data.push(planItem);
+              if (createdItems.length === 0) createdItems.push(planItem);
+            }
+            writeJson('seating_plans', data);
+          } catch (_) {}
+        });
+        return mysqlRes;
+      }
+
+      // Fallback if MySQL is disconnected
       try {
         let data = readJson('seating_plans');
         for (const item of (createdItems.length > 0 ? createdItems : docs)) {
@@ -1098,7 +1209,6 @@ const Models = {
         writeJson('seating_plans', data);
       } catch (e) {}
 
-      if (mysqlRes !== null) return mysqlRes;
       return Array.isArray(doc) ? createdItems : createdItems[0];
     },
     findByIdAndUpdate: async (id, update) => {
@@ -1121,7 +1231,21 @@ const Models = {
         return rows.length > 0 ? parseSeatingPlan(rows[0]) : null;
       });
 
-      // Synchronize JSON
+      if (mysqlRes !== null) {
+        setImmediate(() => {
+          try {
+            const data = readJson('seating_plans');
+            const idx = data.findIndex(p => p._id === id);
+            if (idx !== -1) {
+              data[idx] = { ...data[idx], ...update };
+              writeJson('seating_plans', data);
+            }
+          } catch (_) {}
+        });
+        return mysqlRes;
+      }
+
+      // Fallback
       try {
         const data = readJson('seating_plans');
         const idx = data.findIndex(p => p._id === id);
@@ -1132,7 +1256,6 @@ const Models = {
         }
       } catch (e) {}
 
-      if (mysqlRes !== null) return mysqlRes;
       return updatedItem;
     },
     deleteMany: async (query = {}) => {
@@ -1332,6 +1455,144 @@ const Models = {
             return !matchesAll;
           });
           writeJson('users', data);
+          delCount = delCount || (prevLen - data.length);
+        }
+      } catch (e) {}
+
+      return mysqlRes !== null ? mysqlRes : { deletedCount: delCount };
+    }
+  },
+
+  ExamDateRecord: {
+    find: async (query = {}) => {
+      const mysqlRes = await safeMysqlQuery(async () => {
+        const { clause, values } = buildWhere(query);
+        const rows = await runQuery(`SELECT * FROM exam_date_records${clause} ORDER BY date ASC, session ASC`, values);
+        return rows.map(parseExamDateRecord);
+      });
+      if (mysqlRes !== null) return mysqlRes;
+      const data = readJson('exam_date_records');
+      return filterByQuery(data, query);
+    },
+    findOne: async (query = {}) => {
+      const mysqlRes = await safeMysqlQuery(async () => {
+        const { clause, values } = buildWhere(query);
+        const rows = await runQuery(`SELECT * FROM exam_date_records${clause} LIMIT 1`, values);
+        return rows.length > 0 ? parseExamDateRecord(rows[0]) : null;
+      });
+      if (mysqlRes !== null) return mysqlRes;
+      const data = readJson('exam_date_records');
+      return data.find(item => {
+        for (let key in query) {
+          if (String(item[key]) !== String(query[key])) return false;
+        }
+        return true;
+      }) || null;
+    },
+    upsert: async (record) => {
+      const _id = record._id || generateId();
+      const date = getDateString(record.date);
+      const session = record.session || 'FN';
+      const examIds = JSON.stringify(record.examIds || []);
+      const exams = JSON.stringify(record.exams || []);
+      const hallSnapshots = JSON.stringify(record.hallSnapshots || {});
+      const seatingPlans = JSON.stringify(record.seatingPlans || []);
+      const locationsSummary = JSON.stringify(record.locationsSummary || []);
+      const totalStudents = record.totalStudents || 0;
+      const totalHalls = record.totalHalls || 0;
+      const updatedAt = new Date();
+
+      const item = {
+        _id,
+        date,
+        session,
+        examIds: record.examIds || [],
+        exams: record.exams || [],
+        hallSnapshots: record.hallSnapshots || {},
+        seatingPlans: record.seatingPlans || [],
+        locationsSummary: record.locationsSummary || [],
+        totalStudents,
+        totalHalls,
+        updatedAt
+      };
+
+      const mysqlRes = await safeMysqlQuery(async () => {
+        await runQuery(
+          `INSERT INTO exam_date_records 
+           (\`_id\`, \`date\`, \`session\`, \`examIds\`, \`exams\`, \`hallSnapshots\`, \`seatingPlans\`, \`locationsSummary\`, \`totalStudents\`, \`totalHalls\`, \`updatedAt\`)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             \`examIds\` = VALUES(\`examIds\`),
+             \`exams\` = VALUES(\`exams\`),
+             \`hallSnapshots\` = VALUES(\`hallSnapshots\`),
+             \`seatingPlans\` = VALUES(\`seatingPlans\`),
+             \`locationsSummary\` = VALUES(\`locationsSummary\`),
+             \`totalStudents\` = VALUES(\`totalStudents\`),
+             \`totalHalls\` = VALUES(\`totalHalls\`),
+             \`updatedAt\` = VALUES(\`updatedAt\`)`,
+          [_id, date, session, examIds, exams, hallSnapshots, seatingPlans, locationsSummary, totalStudents, totalHalls, updatedAt]
+        );
+        return item;
+      });
+
+      if (mysqlRes !== null) {
+        setImmediate(() => {
+          try {
+            let data = readJson('exam_date_records');
+            const idx = data.findIndex(r => r.date === date && r.session === session);
+            if (idx !== -1) {
+              data[idx] = { ...data[idx], ...item, _id: data[idx]._id };
+            } else {
+              data.push(item);
+            }
+            writeJson('exam_date_records', data);
+          } catch (_) {}
+        });
+        return mysqlRes;
+      }
+
+      // Fallback
+      try {
+        let data = readJson('exam_date_records');
+        const idx = data.findIndex(r => r.date === date && r.session === session);
+        if (idx !== -1) {
+          data[idx] = { ...data[idx], ...item, _id: data[idx]._id };
+        } else {
+          data.push(item);
+        }
+        writeJson('exam_date_records', data);
+      } catch (e) {}
+
+      return item;
+    },
+    deleteMany: async (query = {}) => {
+      let delCount = 0;
+      const mysqlRes = await safeMysqlQuery(async () => {
+        if (Object.keys(query).length === 0) {
+          const rows = await runQuery(`SELECT COUNT(*) as count FROM exam_date_records`);
+          const count = rows && rows[0] ? rows[0].count : 0;
+          await runQuery(`TRUNCATE TABLE exam_date_records`);
+          return { deletedCount: count };
+        }
+        const { clause, values } = buildWhere(query);
+        const res = await runQuery(`DELETE FROM exam_date_records${clause}`, values);
+        return { deletedCount: res.affectedRows };
+      });
+      if (mysqlRes !== null) delCount = mysqlRes.deletedCount;
+
+      try {
+        if (Object.keys(query).length === 0) {
+          const prevLen = readJson('exam_date_records').length;
+          writeJson('exam_date_records', []);
+          delCount = delCount || prevLen;
+        } else {
+          let data = readJson('exam_date_records');
+          const prevLen = data.length;
+          data = data.filter(item => {
+            const matchesAll = Object.keys(query).every(key => String(item[key]) === String(query[key]));
+            return !matchesAll;
+          });
+          writeJson('exam_date_records', data);
           delCount = delCount || (prevLen - data.length);
         }
       } catch (e) {}

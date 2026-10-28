@@ -617,6 +617,20 @@ body {
 /* ==========================================================================
    SECTION GRID & CARDS
    ========================================================================== */
+
+/* Hall Management Specific Wide Grid Layout (Issue 1) */
+.hall-management-grid {
+  grid-template-columns: 360px 1fr !important;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .hall-management-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 .sections-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
@@ -2700,7 +2714,7 @@ button, input, select {
 }
 
 /* ==========================================================================
-   SEAT LABELS A4 PRINT STYLES (4 Cols x 21 Rows = 84 Labels per A4 Page)
+   SEAT LABELS A4 PRINT STYLES (NovaJet MPL 84L - 46 x 11 mm on 21.0 x 29.7 cm A4 Sheet)
    ========================================================================== */
 .seat-labels-print-wrapper {
   display: none;
@@ -2708,8 +2722,8 @@ button, input, select {
 
 @media print {
   @page {
-    size: A4 portrait;
-    margin: 4mm 5mm;
+    size: 210mm 297mm portrait;
+    margin: 0;
   }
 
   body * {
@@ -2726,28 +2740,34 @@ button, input, select {
     position: absolute;
     left: 0;
     top: 0;
-    width: 200mm;
+    width: 210mm;
   }
 
   .seat-labels-page {
-    width: 200mm;
-    height: 288mm;
+    width: 210mm;
+    height: 297mm;
+    padding: 18mm 5.5mm;
     page-break-after: always;
     break-after: page;
     box-sizing: border-box;
-    padding: 0;
     margin: 0;
+    overflow: hidden;
   }
 
   .seat-labels-grid {
     display: grid;
-    grid-template-columns: 24.43fr 23.0fr 24.43fr 24.43fr;
-    grid-auto-rows: 36.75pt;
-    gap: 1mm;
+    grid-template-columns: repeat(4, 46mm);
+    grid-template-rows: repeat(21, 11mm);
+    column-gap: 5mm;
+    row-gap: 1.5mm;
     box-sizing: border-box;
+    width: 199mm;
+    height: 261mm;
   }
 
   .seat-label-box {
+    width: 46mm;
+    height: 11mm;
     border: none !important;
     outline: none !important;
     box-sizing: border-box;
@@ -2755,15 +2775,18 @@ button, input, select {
     align-items: center;
     justify-content: center;
     background: #ffffff;
-    padding: 2px;
+    padding: 0;
+    overflow: hidden;
   }
 
   .label-regno {
     font-family: 'Arial Black', Arial, sans-serif;
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 900;
     color: #000000;
     text-align: center;
+    line-height: 11mm;
+    white-space: nowrap;
   }
 }
 

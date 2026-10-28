@@ -1436,56 +1436,19 @@ app.put('/api/halls/:id', async (req, res) => {
       idx: idx !== undefined ? idx : existingHall.idx
     }, { new: true });
 
-    // Sync hall changes into scheduled exams that assign this hall
-    try {
-      const allExams = await Models.Exam.find();
-      const oldHallName = existingHall.name;
-      const hallIdStr = String(existingHall._id || req.params.id);
-
-      for (const ex of allExams) {
-        const hasHall = (ex.assignedHalls || []).some(h => h === oldHallName || h === updatedName || h === hallIdStr);
-        if (hasHall) {
-          const updatedAssigned = (ex.assignedHalls || []).map(h => (h === oldHallName || h === hallIdStr) ? updatedName : h);
-          const updatedHallSnapshots = ex.hallSnapshots ? { ...ex.hallSnapshots } : {};
-          if (updatedHallSnapshots[oldHallName]) delete updatedHallSnapshots[oldHallName];
-
-          const snap = {
-            _id: hallIdStr,
-            name: updatedName,
-            block: updatedBlock,
-            rows: parsedRows,
-            columns: parsedCols,
-            benches: parsedBenches,
-            capacity: parsedCapacity,
-            columnRows: parsedColumnRows,
-            seatsPerBench: parsedSpb,
-            columnGaps: columnGaps !== undefined ? columnGaps : (existingHall.columnGaps || null),
-            csvData: updatedCsvData,
-            updatedAt: new Date().toISOString()
-          };
-
-          updatedHallSnapshots[updatedName] = snap;
-          updatedHallSnapshots[hallIdStr] = snap;
-
-          await Models.Exam.findByIdAndUpdate(ex._id, {
-            assignedHalls: updatedAssigned,
-            hallSnapshots: updatedHallSnapshots
-          });
-
-          // If seating plans exist for this exam and hall, regenerate them so output reflects the edited hall immediately
-          try {
-            const existingPlans = await Models.SeatingPlan.find({ examId: ex._id });
-            const hasPlan = existingPlans.some(p => p.hallId === hallIdStr || p.hallName === oldHallName || p.hallName === updatedName);
-            if (hasPlan) {
-              await generateSeatingPlan(ex._id, hallIdStr);
-            }
-          } catch (regenErr) {
-            console.warn(`[Hall Update] Auto-regen plan warning for exam ${ex._id}:`, regenErr.message);
+    // If hall was renamed, update string references in exams without touching snapshots or seating plans
+    if (existingHall.name && existingHall.name !== updatedName) {
+      try {
+        const allExams = await Models.Exam.find();
+        for (const ex of allExams) {
+          if ((ex.assignedHalls || []).includes(existingHall.name)) {
+            const updatedAssigned = ex.assignedHalls.map(h => h === existingHall.name ? updatedName : h);
+            await Models.Exam.findByIdAndUpdate(ex._id, { assignedHalls: updatedAssigned });
           }
         }
+      } catch (renameErr) {
+        console.warn('[Hall Update] Error updating renamed hall reference:', renameErr.message);
       }
-    } catch (syncErr) {
-      console.warn('[Hall Update] Error syncing hall to scheduled exams:', syncErr.message);
     }
 
     logActivity('hall', 'Hall Updated', `${updatedName} (${updatedBlock}) updated: ${parsedCapacity} seats (${parsedBenches} benches, ${parsedSpb} seats/bench).`);
@@ -1991,17 +1954,20 @@ app.post('/api/exams', async (req, res) => {
     // Auto-generate seating plans for all assigned halls
     if (assignedHalls && assignedHalls.length > 0) {
       try {
-        for (const hallIdentifier of assignedHalls) {
-          const matchedHall = allHalls.find(h => h.name === hallIdentifier || String(h._id) === String(hallIdentifier))
-            || hallSnapshots[hallIdentifier] || hallSnapshots[String(hallIdentifier)];
-          if (matchedHall) {
-            await generateSeatingPlan(newExam._id, matchedHall._id || hallIdentifier);
-          }
-        }
+        const firstHall = assignedHalls[0];
+        const matchedHall = allHalls.find(h => h.name === firstHall || String(h._id) === String(firstHall))
+          || hallSnapshots[firstHall] || hallSnapshots[String(firstHall)] || firstHall;
+        await generateSeatingPlan(newExam._id, matchedHall._id || matchedHall);
       } catch (e) {
         console.error('Auto seating generation error on create:', e);
       }
     }
+
+    setImmediate(async () => {
+      try {
+        await syncDateRecordSnapshot(newExam.date, newExam.session);
+      } catch (_) {}
+    });
 
     res.status(201).json(newExam);
   } catch (error) {
@@ -2017,6 +1983,9 @@ app.delete('/api/exams/:id', async (req, res) => {
     }
     // Also delete any seating plans associated with this exam
     await Models.SeatingPlan.deleteMany({ examId: req.params.id });
+    try {
+      await syncDateRecordSnapshot(deleted.date, deleted.session);
+    } catch (_) {}
     logActivity('exam', 'Exam Cancelled', `${deleted.name} was deleted.`);
     res.json({ success: true, message: 'Exam deleted successfully.' });
   } catch (error) {
@@ -2217,13 +2186,10 @@ app.put('/api/exams/:id', async (req, res) => {
     try {
       await Models.SeatingPlan.deleteMany({ examId: req.params.id });
       if (assignedHalls && assignedHalls.length > 0) {
-        for (const hallIdentifier of assignedHalls) {
-          const matchedHall = allHalls.find(h => h.name === hallIdentifier || String(h._id) === String(hallIdentifier))
-            || (newHallSnapshots && (newHallSnapshots[hallIdentifier] || newHallSnapshots[String(hallIdentifier)]));
-          if (matchedHall) {
-            await generateSeatingPlan(req.params.id, matchedHall._id || hallIdentifier);
-          }
-        }
+        const firstHall = assignedHalls[0];
+        const matchedHall = allHalls.find(h => h.name === firstHall || String(h._id) === String(firstHall))
+          || (newHallSnapshots && (newHallSnapshots[firstHall] || newHallSnapshots[String(firstHall)])) || firstHall;
+        await generateSeatingPlan(req.params.id, matchedHall._id || matchedHall);
       }
     } catch (genError) {
       console.error('[Rollback] Error regenerating seating plans on exam update:', genError);
@@ -2261,6 +2227,11 @@ app.put('/api/exams/:id', async (req, res) => {
     }
 
     logActivity('exam', 'Exam Updated', `${name} configuration was updated.${allocationReport ? ' ' + allocationReport : ''}`);
+    setImmediate(async () => {
+      try {
+        await syncDateRecordSnapshot(date, session);
+      } catch (_) {}
+    });
     res.json({
       ...updated,
       allocatedCount: seatedCount,
@@ -2697,16 +2668,10 @@ const sortAttendanceRoster = (roster, examSubCodes = [], studentMap = null, maxB
     const subCompare = subA.localeCompare(subB);
     if (subCompare !== 0) return subCompare;
 
-    // 4. Academic Year order: 1st Year -> 2nd Year -> 3rd Year -> Arrears
-    const ya = getStudentYearAndArrear(dbA || a, maxBatchInfo, subA);
-    const yb = getStudentYearAndArrear(dbB || b, maxBatchInfo, subB);
-    if (ya.year !== yb.year) return ya.year - yb.year;
-
-    // 5. Regular students before Arrear students
-    if (ya.isArrear !== yb.isArrear) return ya.isArrear ? 1 : -1;
-
-    // 6. Register number ascending
-    return (a.registerNo || '').localeCompare(b.registerNo || '');
+    // 4. Register number strictly natural ascending order (e.g. C5 before C6)
+    const regA = String(a.registerNo || '').trim().toUpperCase();
+    const regB = String(b.registerNo || '').trim().toUpperCase();
+    return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' });
   });
 };
 
@@ -2762,7 +2727,117 @@ function getStudentCourseIdentity(student) {
   return (canonicalizeDegree(resolved) || resolved || rawDept || 'GENERAL').toUpperCase();
 }
 
-// Unified Department-Wise Consecutive Seating Allocation by Seat Position (Tracks along W-order traversal)
+// Helper to realign seating grid benches so students are placed in strictly natural ascending register number order
+function realignSeatingGridToAscending(seatingGrid, colsCount = 4, examSubCodes = []) {
+  if (!seatingGrid || !Array.isArray(seatingGrid) || seatingGrid.length === 0) return seatingGrid;
+
+  // 1. Build bench map and determine dimensions
+  const gridMap = {};
+  let maxCol = 1;
+  let maxRow = 0;
+  seatingGrid.forEach(b => {
+    if (b && b.benchCode) {
+      gridMap[b.benchCode] = b;
+      const m = String(b.benchCode).match(/^([A-Z]+)(\d+)$/);
+      if (m) {
+        const c = parseInt(m[2], 10);
+        if (c > maxCol) maxCol = c;
+        let rVal = 0;
+        for (let i = 0; i < m[1].length; i++) {
+          rVal = rVal * 26 + (m[1].charCodeAt(i) - 64);
+        }
+        if (rVal > maxRow) maxRow = rVal;
+      }
+    }
+  });
+
+  const effectiveCols = Math.max(maxCol, parseInt(colsCount) || 1);
+  const effectiveRows = Math.max(maxRow, 1);
+
+  // 2. Canonical bench order: Column 1 top-to-bottom, Column 2 top-to-bottom, etc.
+  const orderedBenches = [];
+  for (let c = 1; c <= effectiveCols; c++) {
+    for (let r = 0; r < effectiveRows; r++) {
+      const code = getRowLetter(r) + c;
+      if (gridMap[code] && !gridMap[code].isPlaceholder) {
+        orderedBenches.push(gridMap[code]);
+      }
+    }
+  }
+
+  // 3. Helper to sort students: course code order (by examSubCodes), then strictly ascending register number
+  const upperExamCodes = (examSubCodes || []).map(c => String(c).trim().toUpperCase());
+  const sortStudentList = (list) => {
+    return list.sort((a, b) => {
+      const scA = (a.subjectCode || '').trim().toUpperCase();
+      const scB = (b.subjectCode || '').trim().toUpperCase();
+      const idxA = upperExamCodes.indexOf(scA);
+      const idxB = upperExamCodes.indexOf(scB);
+      if (idxA !== -1 && idxB !== -1 && idxA !== idxB) return idxA - idxB;
+      if (idxA !== -1 && idxB === -1) return -1;
+      if (idxA === -1 && idxB !== -1) return 1;
+      if (scA !== scB) {
+        const cComp = scA.localeCompare(scB);
+        if (cComp !== 0) return cComp;
+      }
+      const regA = String(a.registerNo || '').trim();
+      const regB = String(b.registerNo || '').trim();
+      return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' });
+    });
+  };
+
+  // 4. Check distinct subject codes seated in the hall
+  const allSeated = [];
+  ['seat1', 'seat2', 'seat3'].forEach(k => {
+    orderedBenches.forEach(b => {
+      if (b[k]) allSeated.push(b[k]);
+    });
+  });
+
+  const subCodes = new Set();
+  allSeated.forEach(s => {
+    const sc = (s.subjectCode || '').trim().toUpperCase();
+    if (sc && sc !== 'GENERAL' && sc !== 'UNKNOWN') subCodes.add(sc);
+  });
+
+  const isSingleSub = subCodes.size <= 1;
+
+  if (isSingleSub) {
+    // Single subject: Sort all students in natural ascending register number order
+    sortStudentList(allSeated);
+
+    let sIdx = 0;
+    // Assign Left first, then Right on each bench in column top-to-bottom order
+    for (const b of orderedBenches) {
+      if (b.seat1 && sIdx < allSeated.length) b.seat1 = allSeated[sIdx++];
+      if (b.seat2 && sIdx < allSeated.length) b.seat2 = allSeated[sIdx++];
+      if (b.seat3 !== undefined && b.seat3 && sIdx < allSeated.length) b.seat3 = allSeated[sIdx++];
+    }
+  } else {
+    // Multi-subject: Realign each seat track independently in natural ascending order by subject & registerNo
+    const seatKeys = ['seat1', 'seat2', 'seat3'];
+    seatKeys.forEach(k => {
+      const trackStudents = [];
+      orderedBenches.forEach(b => {
+        if (b[k]) trackStudents.push(b[k]);
+      });
+      if (trackStudents.length === 0) return;
+
+      sortStudentList(trackStudents);
+
+      let tIdx = 0;
+      orderedBenches.forEach(b => {
+        if (b[k] && tIdx < trackStudents.length) {
+          b[k] = trackStudents[tIdx++];
+        }
+      });
+    });
+  }
+
+  return seatingGrid;
+}
+
+// Unified Department-Wise Consecutive Seating Allocation by Seat Position (Tracks along column-by-column traversal)
 function allocateStudentsToBenchesBySeatPosition(benchesList, students, seatsPerBench, maxCap = 0, onAssign = null) {
   if (!benchesList || benchesList.length === 0 || !students || students.length === 0) {
     return { seatedCount: 0 };
@@ -2770,6 +2845,16 @@ function allocateStudentsToBenchesBySeatPosition(benchesList, students, seatsPer
 
   const effectiveCap = maxCap > 0 ? Math.min(maxCap, students.length) : students.length;
   const spb = parseInt(seatsPerBench) || 2;
+
+  // Sort candidate students deterministically: course code, department, then strictly ascending register number
+  students.sort((a, b) => {
+    const scA = (a.subjectCode || getStudentSubCode(a) || '').trim().toUpperCase();
+    const scB = (b.subjectCode || getStudentSubCode(b) || '').trim().toUpperCase();
+    if (scA !== scB) return scA.localeCompare(scB);
+    const regA = String(a.registerNo || '').trim();
+    const regB = String(b.registerNo || '').trim();
+    return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' });
+  });
 
   // Check if this hall has a single subject code
   const distinctSubCodes = new Set();
@@ -2779,9 +2864,8 @@ function allocateStudentsToBenchesBySeatPosition(benchesList, students, seatsPer
   });
   const isSingleSubject = distinctSubCodes.size <= 1;
 
-  // FIX: 2 seats per bench with a single subject code selected
-  // Traverse column by column in W-order:
-  // For each column (Odd: top-to-bottom, Even: bottom-to-top):
+  // 2 seats per bench with a single subject code selected
+  // Traverse column by column in strictly top-to-bottom ascending order:
   // 1. Complete Left seat sequence (seat1) for that column
   // 2. Complete Right seat sequence (seat2) for that column
   if (spb === 2 && isSingleSubject) {
@@ -2803,13 +2887,8 @@ function allocateStudentsToBenchesBySeatPosition(benchesList, students, seatsPer
 
     colKeys.forEach(c => {
       const colBenches = colMap.get(c);
-      // Odd column: Top to Bottom (A -> B -> C ...)
-      // Even column: Bottom to Top (... -> C -> B -> A)
-      if (c % 2 === 1) {
-        colBenches.sort((a, b) => getRowIndex(a.row || String(a.benchCode).replace(/\d+$/, '')) - getRowIndex(b.row || String(b.benchCode).replace(/\d+$/, '')));
-      } else {
-        colBenches.sort((a, b) => getRowIndex(b.row || String(b.benchCode).replace(/\d+$/, '')) - getRowIndex(a.row || String(a.benchCode).replace(/\d+$/, '')));
-      }
+      // Every column: Top to Bottom (A -> B -> C ...) in strictly ascending order
+      colBenches.sort((a, b) => getRowIndex(a.row || String(a.benchCode).replace(/\d+$/, '')) - getRowIndex(b.row || String(b.benchCode).replace(/\d+$/, '')));
 
       // 1. Complete Left seat sequence (seat1) for this column first
       for (const bench of colBenches) {
@@ -2883,11 +2962,18 @@ function allocateStudentsToBenchesBySeatPosition(benchesList, students, seatsPer
     deptMap.get(dId).push(st);
   });
 
-  const pools = Array.from(deptMap.entries()).map(([dId, stList]) => ({
-    dId,
-    dept: stList[0]?.department || (dId.includes('___') ? dId.split('___')[1] : dId),
-    students: [...stList]
-  }));
+  const pools = Array.from(deptMap.entries()).map(([dId, stList]) => {
+    const sorted = [...stList].sort((a, b) => {
+      const regA = String(a.registerNo || '').trim();
+      const regB = String(b.registerNo || '').trim();
+      return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' });
+    });
+    return {
+      dId,
+      dept: sorted[0]?.department || (dId.includes('___') ? dId.split('___')[1] : dId),
+      students: sorted
+    };
+  });
 
   const trackQueues = trackDefs.map(() => []);
   const totalBenchCount = benchesList.length;
@@ -3172,16 +3258,10 @@ async function generateSeatingPlan(examId, hallId) {
       const deptComp = deptA.localeCompare(deptB);
       if (deptComp !== 0) return deptComp;
 
-      // 4. Academic Year order: 1st Year -> 2nd Year -> 3rd Year -> Arrears
-      const ya = getStudentYearAndArrear(a, maxBatchInfo, sSubA);
-      const yb = getStudentYearAndArrear(b, maxBatchInfo, sSubB);
-      if (ya.year !== yb.year) return ya.year - yb.year;
-
-      // 5. Regular students before Arrear students
-      if (ya.isArrear !== yb.isArrear) return ya.isArrear ? 1 : -1;
-
-      // 6. Register Number strictly ascending
-      return (a.registerNo || '').localeCompare(b.registerNo || '');
+      // 4. Register Number strictly natural ascending order (e.g. C3 before C5, C5 before C6)
+      const regA = String(a.registerNo || '').trim();
+      const regB = String(b.registerNo || '').trim();
+      return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' });
     });
   };
 
@@ -3261,20 +3341,12 @@ async function generateSeatingPlan(examId, hallId) {
     });
   });
 
-  // Sort students within each pool deterministically: UG -> Year -> Arrear -> RegNo
+  // Sort students within each pool strictly in natural ascending register number order
   subjectPools.forEach(p => {
     p.students.sort((a, b) => {
-      const lvlA = getAcademicLevel(a, a.department, a.degree, p.code);
-      const lvlB = getAcademicLevel(b, b.department, b.degree, p.code);
-      if (lvlA !== lvlB) return lvlA === 'UG' ? -1 : 1;
-
-      const ya = getStudentYearAndArrear(a, maxBatchInfo, p.code);
-      const yb = getStudentYearAndArrear(b, maxBatchInfo, p.code);
-      if (ya.year !== yb.year) return ya.year - yb.year;
-
-      if (ya.isArrear !== yb.isArrear) return ya.isArrear ? 1 : -1;
-
-      return (a.registerNo || '').localeCompare(b.registerNo || '');
+      const regA = String(a.registerNo || '').trim();
+      const regB = String(b.registerNo || '').trim();
+      return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' });
     });
   });
 
@@ -3519,27 +3591,15 @@ async function generateSeatingPlan(examId, hallId) {
       }
     }
 
-    // Construct list of benches in W-pattern (serpentine column order: Col 1 top-to-bottom, Col 2 bottom-to-top, Col 3 top-to-bottom, etc.)
+    // Construct list of benches in column order: Col 1 top-to-bottom (A -> B -> C), Col 2 top-to-bottom (A -> B -> C), etc.
     const benchesList = [];
     for (let c = 1; c <= colsCount; c++) {
       const rowsForThisCol = colRowsList[c - 1] !== undefined ? colRowsList[c - 1] : rowsCount;
-      if (c % 2 === 1) {
-        // Odd columns (1, 3, 5...): Top to Bottom (A -> B -> C -> ...)
-        for (let r = 0; r < rowsForThisCol; r++) {
-          const rowLetter = getRowLetter(r);
-          const benchCode = `${rowLetter}${c}`;
-          if (gridMap[benchCode]) {
-            benchesList.push(gridMap[benchCode]);
-          }
-        }
-      } else {
-        // Even columns (2, 4, 6...): Bottom to Top (... -> C -> B -> A)
-        for (let r = rowsForThisCol - 1; r >= 0; r--) {
-          const rowLetter = getRowLetter(r);
-          const benchCode = `${rowLetter}${c}`;
-          if (gridMap[benchCode]) {
-            benchesList.push(gridMap[benchCode]);
-          }
+      for (let r = 0; r < rowsForThisCol; r++) {
+        const rowLetter = getRowLetter(r);
+        const benchCode = `${rowLetter}${c}`;
+        if (gridMap[benchCode]) {
+          benchesList.push(gridMap[benchCode]);
         }
       }
     }
@@ -3639,6 +3699,8 @@ async function generateSeatingPlan(examId, hallId) {
       hallId: h._id,
       hallName: h.name,
       hallSnapshot: h,
+      date: targetDate,
+      session: exam.session,
       seatingGrid: localGrid,
       attendanceRoster: sortAttendanceRoster(localRoster, examSubCodes),
       unseatedStudents: unseatedForThisExam,
@@ -3686,6 +3748,8 @@ async function generateSeatingPlan(examId, hallId) {
         hallId: h._id,
         hallName: h.name,
         hallSnapshot: h,
+        date: targetDate,
+        session: secExam.session || exam.session,
         seatingGrid: localGrid,
         attendanceRoster: sortAttendanceRoster(secRoster, (secExam.subjectCodes || examSubCodes)),
         unseatedStudents: [],
@@ -3730,6 +3794,10 @@ app.post('/api/seating/generate', async (req, res) => {
       return res.status(400).json({ error: 'examId and hallId are required.' });
     }
     const plan = await generateSeatingPlan(examId, hallId);
+    try {
+      const exam = await Models.Exam.findById(examId);
+      if (exam) await syncDateRecordSnapshot(exam.date, exam.session);
+    } catch (_) {}
     res.json(plan);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -3979,16 +4047,9 @@ app.post('/api/seating/update-layout', async (req, res) => {
     const newBenchesList = [];
     for (let c = 1; c <= newCols; c++) {
       const rowsInCol = parsedColumnRows[c - 1];
-      if (c % 2 === 1) { // Odd column: Top to Bottom
-        for (let r = 0; r < rowsInCol; r++) {
-          const code = `${getRowLetter(r)}${c}`;
-          if (newGridMap[code]) newBenchesList.push(newGridMap[code]);
-        }
-      } else { // Even column: Bottom to Top
-        for (let r = rowsInCol - 1; r >= 0; r--) {
-          const code = `${getRowLetter(r)}${c}`;
-          if (newGridMap[code]) newBenchesList.push(newGridMap[code]);
-        }
+      for (let r = 0; r < rowsInCol; r++) {
+        const code = `${getRowLetter(r)}${c}`;
+        if (newGridMap[code]) newBenchesList.push(newGridMap[code]);
       }
     }
 
@@ -4024,6 +4085,15 @@ app.post('/api/seating/update-layout', async (req, res) => {
       }
     }
 
+    const mainExam = (examId ? examsAtTime.find(e => String(e._id) === String(examId)) : null) || examsAtTime[0] || {};
+    realignSeatingGridToAscending(newSeatingGrid, newCols, (mainExam.subjectCodes || []));
+    newSeatingGrid.forEach(bench => {
+      if (bench.isPlaceholder) return;
+      if (bench.seat1) studentNewCoords.set(bench.seat1.registerNo, { bench: bench.benchCode, seat: 'Left' });
+      if (bench.seat2) studentNewCoords.set(bench.seat2.registerNo, { bench: bench.benchCode, seat: bench.seat3 !== undefined ? 'Middle' : 'Right' });
+      if (bench.seat3) studentNewCoords.set(bench.seat3.registerNo, { bench: bench.benchCode, seat: 'Right' });
+    });
+
     // 6. Persist updated layout and coordinates to each SeatingPlan for this hall
     for (const p of plansForHall) {
       // Update attendance roster coordinates
@@ -4044,7 +4114,9 @@ app.post('/api/seating/update-layout', async (req, res) => {
         attendanceRoster: p.attendanceRoster,
         totalBenches: newTotalBenches,
         emptySeats: emptyCount,
-        hallSnapshot: updatedSnapshot
+        hallSnapshot: updatedSnapshot,
+        date: targetDate,
+        session: session
       });
     }
 
@@ -4061,6 +4133,10 @@ app.post('/api/seating/update-layout', async (req, res) => {
       });
       await Models.Exam.findByIdAndUpdate(ex._id, { ...ex, hallSnapshots: ex.hallSnapshots });
     }
+
+    try {
+      await syncDateRecordSnapshot(targetDate, session);
+    } catch (_) {}
 
     // 8. Reconstruct merged response
     const allExamSubCodes = [];
@@ -4238,6 +4314,17 @@ app.get('/api/seating/by-date-session', async (req, res) => {
         }
       }
       mergedPlan.seatingGrid = baseGrid;
+      realignSeatingGridToAscending(mergedPlan.seatingGrid, mergedPlan.columns, allExamSubCodes);
+      for (const p of plansForHall) {
+        if (p._id && p.seatingGrid) {
+          realignSeatingGridToAscending(p.seatingGrid, p.columns || mergedPlan.columns, allExamSubCodes);
+          try {
+            await Models.SeatingPlan.findByIdAndUpdate(p._id, {
+              seatingGrid: p.seatingGrid
+            });
+          } catch (_) {}
+        }
+      }
     }
 
     // Reconstruct attendanceRoster, totalStudents and emptySeats directly from merged seatingGrid
@@ -4326,6 +4413,10 @@ app.get('/api/seating/by-date-session', async (req, res) => {
       }
     });
     mergedPlan.unseatedStudents = Array.from(unseatedMap.values()).sort((a,b) => a.registerNo.localeCompare(b.registerNo));
+
+    try {
+      await syncDateRecordSnapshot(date, session);
+    } catch (_) {}
 
     res.json(mergedPlan);
   } catch (error) {
@@ -4608,17 +4699,11 @@ async function buildAttendanceRosterPages({ date, session, subjectCodesInput = [
         const groupStudents = deptMap[deptName];
         if (!groupStudents || groupStudents.length === 0) return;
 
-        // STRICT USER RULE: Sort students strictly by:
-        // 1. Year: 1st Year -> 2nd Year -> 3rd Year -> 4th Year...
-        // 2. Regular students before Arrear students (arrear students appear with the current year batch!)
-        // 3. Register Number strictly ascending
+        // STRICT USER RULE: Register Number strictly in natural ascending order (e.g. C5 before C6)
         groupStudents.sort((a, b) => {
-          const ya = getStudentYearAndArrear(a.student || a, maxBatchInfo, subCode);
-          const yb = getStudentYearAndArrear(b.student || b, maxBatchInfo, subCode);
-
-          if (ya.year !== yb.year) return ya.year - yb.year;
-          if (ya.isArrear !== yb.isArrear) return ya.isArrear ? 1 : -1;
-          return (a.registerNo || '').localeCompare(b.registerNo || '');
+          const regA = String(a.registerNo || '').trim().toUpperCase();
+          const regB = String(b.registerNo || '').trim().toUpperCase();
+          return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' });
         });
 
         // STRICT CHUNKING: Maximum 25 students per page (ST-ROST-001)
@@ -5818,6 +5903,15 @@ app.get('/api/seating/layout/download-pdf', async (req, res) => {
         }
       }
       seatingGrid = baseGrid;
+      const allExamSubCodesPdf = [];
+      examsAtTime.forEach(e => {
+        if (e.subjectCodes) {
+          e.subjectCodes.forEach(sc => {
+            if (!allExamSubCodesPdf.includes(sc)) allExamSubCodesPdf.push(sc);
+          });
+        }
+      });
+      realignSeatingGridToAscending(seatingGrid, colsCount, allExamSubCodesPdf);
     }
 
     const snapshot = plansForHall[0].hallSnapshot || (examsAtTime[0]?.hallSnapshots && (examsAtTime[0].hallSnapshots[hallId] || examsAtTime[0].hallSnapshots[plansForHall[0].hallName])) || {};
@@ -6071,11 +6165,15 @@ function summarizeRegisterNumbers(regNos) {
   });
 
   const summarizedParts = [];
+  const sortedPrefixes = Object.keys(groups).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  );
 
-  Object.entries(groups).forEach(([prefix, items]) => {
+  sortedPrefixes.forEach(prefix => {
+    const items = groups[prefix];
     items.sort((a, b) => {
       if (isNaN(a.numVal) || isNaN(b.numVal)) {
-        return a.original.localeCompare(b.original);
+        return a.original.localeCompare(b.original, undefined, { numeric: true, sensitivity: 'base' });
       }
       return a.numVal - b.numVal;
     });
@@ -6151,9 +6249,45 @@ function summarizeRegisterNumbers(regNos) {
 }
 
 // Helper to compute Exam Location Summary data dynamically for a given date and session
-async function getLocationsSummaryData(date, session) {
-  const allExams = await Models.Exam.find();
+async function getLocationsSummaryData(date, session, forceCompute = false) {
   const targetDate = getDateString(date);
+
+  // 1. Check if isolated date record exists in exam_date_records table
+  if (!forceCompute) {
+    try {
+      const savedRecord = await Models.ExamDateRecord.findOne({ date: targetDate, session });
+      if (savedRecord && Array.isArray(savedRecord.locationsSummary) && savedRecord.locationsSummary.length > 0) {
+        let formattedDate = targetDate;
+        try {
+          const d = new Date(targetDate);
+          if (!isNaN(d.getTime())) {
+            const dd = String(d.getDate()).padStart(2, "0");
+            const mm = String(d.getMonth() + 1).padStart(2, "0");
+            const yyyy = d.getFullYear();
+            formattedDate = `${dd}-${mm}-${yyyy}`;
+          }
+        } catch (err) {}
+
+        const timeOfExam = (savedRecord.exams && savedRecord.exams[0] && savedRecord.exams[0].time) || (session === "FN" ? "10:00 AM - 01:00 PM" : "02:00 PM - 05:00 PM");
+        const sessionName = session === "FN" ? "FORENOON (FN)" : "AFTERNOON (AN)";
+
+        return {
+          targetDate,
+          formattedDate,
+          session,
+          sessionName,
+          timeOfExam,
+          examsAtTime: savedRecord.exams || [],
+          plansForTime: savedRecord.seatingPlans || [],
+          result: savedRecord.locationsSummary
+        };
+      }
+    } catch (err) {
+      console.warn('[ExamDateRecord] Lookup error in getLocationsSummaryData:', err.message);
+    }
+  }
+
+  const allExams = await Models.Exam.find();
   const examsAtTime = allExams.filter(e => 
     getDateString(e.date) === targetDate && e.session === session
   );
@@ -6211,6 +6345,86 @@ async function getLocationsSummaryData(date, session) {
         }
       });
     }
+  });
+
+  // Sort halls in exam's configured hall order
+  const configuredHallOrder = [];
+  examsAtTime.forEach(e => {
+    (e.assignedHalls || []).forEach(h => {
+      const hStr = String(h).trim();
+      const resolvedName = hallIdToName.get(hStr) || (e.hallSnapshots && e.hallSnapshots[hStr]?.name) || hStr;
+      if (!configuredHallOrder.some(name => name.toUpperCase() === resolvedName.toUpperCase())) {
+        configuredHallOrder.push(resolvedName);
+      }
+    });
+  });
+
+  // Re-align students across halls in strictly natural ascending register number order for each subject code
+  // This guarantees that earlier halls (like A06) receive the lowest register numbers (e.g. C3S25863)
+  const allExamSubs = examsAtTime.flatMap(e => (e.subjectCodes || []).map(sc => String(sc).trim().toUpperCase()));
+  const distinctSubs = new Set();
+  plansForTime.forEach(p => {
+    (p.attendanceRoster || []).forEach(s => {
+      const sc = (s.subjectCode || '').trim().toUpperCase();
+      if (sc) distinctSubs.add(sc);
+    });
+  });
+
+  const orderedPlansForRealign = [...plansForTime].sort((a, b) => {
+    const nameA = (a.hallName || hallIdToName.get(String(a.hallId)) || '').trim().toUpperCase();
+    const nameB = (b.hallName || hallIdToName.get(String(b.hallId)) || '').trim().toUpperCase();
+    const idxA = configuredHallOrder.indexOf(nameA);
+    const idxB = configuredHallOrder.indexOf(nameB);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return 0;
+  });
+
+  distinctSubs.forEach(subCode => {
+    const pool = [];
+    orderedPlansForRealign.forEach(p => {
+      (p.attendanceRoster || []).forEach(s => {
+        if ((s.subjectCode || '').trim().toUpperCase() === subCode) {
+          pool.push(s);
+        }
+      });
+    });
+
+    if (pool.length === 0) return;
+
+    pool.sort((a, b) => {
+      const regA = String(a.registerNo || '').trim();
+      const regB = String(b.registerNo || '').trim();
+      return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+    let poolIdx = 0;
+    orderedPlansForRealign.forEach(p => {
+      const hallSubStudents = (p.attendanceRoster || []).filter(s => (s.subjectCode || '').trim().toUpperCase() === subCode);
+      const countForThisHall = hallSubStudents.length;
+      if (countForThisHall === 0) return;
+
+      const newAssigned = pool.slice(poolIdx, poolIdx + countForThisHall);
+      poolIdx += countForThisHall;
+
+      let replaceIdx = 0;
+      p.attendanceRoster = (p.attendanceRoster || []).map(s => {
+        if ((s.subjectCode || '').trim().toUpperCase() === subCode && replaceIdx < newAssigned.length) {
+          const replacement = newAssigned[replaceIdx++];
+          return {
+            ...replacement,
+            bench: s.bench,
+            seat: s.seat
+          };
+        }
+        return s;
+      });
+
+      if (p.seatingGrid && Array.isArray(p.seatingGrid)) {
+        realignSeatingGridToAscending(p.seatingGrid, p.columns, allExamSubs);
+      }
+    });
   });
 
   // Group plans by hallName (or resolved hall name from hallId)
@@ -6297,7 +6511,7 @@ async function getLocationsSummaryData(date, session) {
     });
 
     const classes = Object.values(classGroups).map(g => {
-      const sortedRegNos = g.regNos.sort((a, b) => a.localeCompare(b));
+      const sortedRegNos = g.regNos.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
       return {
         degree: g.degree,
         subjectCode: g.subjectCode,
@@ -6352,17 +6566,6 @@ async function getLocationsSummaryData(date, session) {
   }
 
   // Sort halls strictly in exam's configured hall order (preserving saved selection order)
-  const configuredHallOrder = [];
-  examsAtTime.forEach(e => {
-    (e.assignedHalls || []).forEach(h => {
-      const hStr = String(h).trim();
-      const resolvedName = hallIdToName.get(hStr) || (e.hallSnapshots && e.hallSnapshots[hStr]?.name) || hStr;
-      if (!configuredHallOrder.some(name => name.toUpperCase() === resolvedName.toUpperCase())) {
-        configuredHallOrder.push(resolvedName);
-      }
-    });
-  });
-
   result.sort((a, b) => {
     const nameA = (a.hallName || '').trim().toUpperCase();
     const nameB = (b.hallName || '').trim().toUpperCase();
@@ -6387,7 +6590,7 @@ async function getLocationsSummaryData(date, session) {
   const timeOfExam = (examsAtTime[0] && examsAtTime[0].time) || (session === "FN" ? "10:00 AM - 01:00 PM" : "02:00 PM - 05:00 PM");
   const sessionName = session === "FN" ? "FORENOON (FN)" : "AFTERNOON (AN)";
 
-  return {
+  const summaryPayload = {
     targetDate,
     formattedDate,
     session,
@@ -6397,6 +6600,41 @@ async function getLocationsSummaryData(date, session) {
     plansForTime,
     result
   };
+
+  // Persist into exam_date_records for date isolation and ultra-fast retrieval
+  try {
+    const totalStudents = result.reduce((sum, h) => sum + (h.totalStudents || 0), 0);
+    const hallSnapshots = {};
+    examsAtTime.forEach(e => {
+      if (e.hallSnapshots) Object.assign(hallSnapshots, e.hallSnapshots);
+    });
+
+    await Models.ExamDateRecord.upsert({
+      date: targetDate,
+      session,
+      examIds,
+      exams: examsAtTime,
+      hallSnapshots,
+      seatingPlans: plansForTime,
+      locationsSummary: result,
+      totalStudents,
+      totalHalls: result.length
+    });
+  } catch (recErr) {
+    console.warn('[ExamDateRecord] Upsert error in getLocationsSummaryData:', recErr.message);
+  }
+
+  return summaryPayload;
+}
+
+// Synchronize and persist isolated date snapshot into exam_date_records
+async function syncDateRecordSnapshot(date, session) {
+  try {
+    return await getLocationsSummaryData(date, session, true);
+  } catch (err) {
+    console.warn('[syncDateRecordSnapshot] Error syncing date record:', err.message);
+    return null;
+  }
 }
 
 // Helper to generate professional Exam Location Summary PDF document
@@ -6644,12 +6882,14 @@ function buildNominalRollRanges(regNos) {
   });
 
   const ranges = [];
-  const sortedPfx = Object.keys(prefixGroups).sort();
+  const sortedPfx = Object.keys(prefixGroups).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  );
 
   sortedPfx.forEach(pfx => {
     const items = prefixGroups[pfx];
     if (pfx === '__RAW__') {
-      items.sort((a, b) => a.original.localeCompare(b.original)).forEach(it => {
+      items.sort((a, b) => a.original.localeCompare(b.original, undefined, { numeric: true, sensitivity: 'base' })).forEach(it => {
         ranges.push({ text: it.original, count: 1 });
       });
       return;
@@ -8082,6 +8322,17 @@ app.post('/api/seating/generate-by-date-session', async (req, res) => {
         }
       }
       mergedPlan.seatingGrid = baseGrid;
+      realignSeatingGridToAscending(mergedPlan.seatingGrid, mergedPlan.columns, allExamSubCodesGen);
+      for (const p of plansForHall) {
+        if (p._id && p.seatingGrid) {
+          realignSeatingGridToAscending(p.seatingGrid, p.columns || mergedPlan.columns, allExamSubCodesGen);
+          try {
+            await Models.SeatingPlan.findByIdAndUpdate(p._id, {
+              seatingGrid: p.seatingGrid
+            });
+          } catch (_) {}
+        }
+      }
     }
 
     // Reconstruct attendanceRoster, totalStudents and emptySeats directly from merged seatingGrid
@@ -8157,6 +8408,10 @@ app.post('/api/seating/generate-by-date-session', async (req, res) => {
     });
     mergedPlan.unseatedStudents = Array.from(unseatedMap.values()).sort((a,b) => a.registerNo.localeCompare(b.registerNo));
 
+    try {
+      await syncDateRecordSnapshot(date, session);
+    } catch (_) {}
+
     res.json(mergedPlan);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -8199,6 +8454,27 @@ async function normalizeStudentDepartments() {
   } catch (err) {
     console.error('Error normalizing student departments:', err);
   }
+}
+
+// Serve static React production build assets
+const possibleBuildPaths = [
+  path.join(__dirname, '../build'),
+  path.join(__dirname, 'build'),
+  path.join(process.cwd(), 'build')
+];
+const clientBuildPath = possibleBuildPaths.find(p => fs.existsSync(path.join(p, 'index.html')));
+
+if (clientBuildPath) {
+  console.log(`[ExamFlow] Serving frontend production build from: ${clientBuildPath}`);
+  app.use(express.static(clientBuildPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+} else {
+  console.warn('[ExamFlow] Frontend build folder not found. Running in API-only mode.');
 }
 
 // Start Server

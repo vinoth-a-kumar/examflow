@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "_id": "user_rrc_admin_01",
+    "username": "rrc_exam_admin",
+    "email": "rrc_exam_admin@rrc.edu",
+    "password": "3916d589fc29ac0b320bcd2054cea9d480dc33d305e01502e90d2835950af962",
+    "role": "Administrator",
+    "createdAt": "2026-10-24T00:00:00.000Z"
+  },
+  {
+    "_id": "user_rrc_internal_02",
+    "username": "rrc_exam_internal",
+    "email": "rrc_exam_internal@rrc.edu",
+    "password": "c5a3223c0c020c4d09e92e053303333e81f36362ebfae6b80077efb5ac402b86",
+    "role": "Internal Invigilator",
+    "createdAt": "2026-10-24T00:00:00.000Z"
+  },
+  {
+    "_id": "user_rrc_external_03",
+    "username": "rrc_exam_external",
+    "email": "rrc_exam_external@rrc.edu",
+    "password": "0f2f6704951c7dcb5606b3b93fd4cb7a127bd1a3d20f40146759418275ea4e38",
+    "role": "External Invigilator",
+    "createdAt": "2026-10-24T00:00:00.000Z"
+  }
+]

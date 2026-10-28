@@ -317,7 +317,7 @@ function HallManagementView({ halls, onDeleteHall, refreshData, onClear }) {
       </div>
 
       {/* Two-column Layout */}
-      <div className="sections-grid">
+      <div className="sections-grid hall-management-grid">
 
         {/* LEFT — CSV Uploader */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

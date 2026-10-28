@@ -647,7 +647,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
     });
 
     const deptSummaryHtml = Object.entries(deptStudentMap).map(([dept, regNos]) => {
-      const sorted = [...regNos].sort();
+      const sorted = [...regNos].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
       const first = sorted[0];
       const last = sorted[sorted.length - 1];
       const span = sorted.length === 1 ? first : `${first} - ${last}`;
