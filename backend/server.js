@@ -6105,7 +6105,7 @@ app.get(['/api/seating/labels/download-pdf', '/api/seating/download-labels-pdf']
             } else {
               doc.font('Helvetica-Bold');
             }
-            doc.fontSize(18)
+            doc.fontSize(20)
                .fillColor('#000000')
                .text(regNo, x, y + (labelH / 2) - 10, {
                  width: w,
@@ -6942,11 +6942,12 @@ function generateMkuNominalRollPdf(doc, data, groups) {
   const printableW = pageW - (2 * margin); // 540 pt
   const safeBottom = pageH - 45; // 963 pt
 
-  // Format header month, year and session
+  // Format header month, year, date and session
   // In MKU, university semester examinations are officially titled:
   // "NOVEMBER - [YEAR] - F.N." (odd semester) or "APRIL - [YEAR] - F.N." (even semester)
   let examMonth = "NOVEMBER";
   let examYear = new Date().getFullYear();
+  let formattedDate = data.formattedDate || data.targetDate || "";
   try {
     const rawDateStr = String(data.targetDate || (data.examsAtTime && data.examsAtTime[0] && data.examsAtTime[0].date) || "");
     const isoMatch = rawDateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
@@ -6955,16 +6956,19 @@ function generateMkuNominalRollPdf(doc, data, groups) {
       examYear = parseInt(isoMatch[1], 10);
       const m = parseInt(isoMatch[2], 10) - 1;
       examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+      formattedDate = `${String(isoMatch[3]).padStart(2, "0")}-${String(isoMatch[2]).padStart(2, "0")}-${isoMatch[1]}`;
     } else if (dmyMatch) {
       examYear = parseInt(dmyMatch[3], 10);
       const m = parseInt(dmyMatch[2], 10) - 1;
       examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+      formattedDate = `${String(dmyMatch[1]).padStart(2, "0")}-${String(dmyMatch[2]).padStart(2, "0")}-${dmyMatch[3]}`;
     } else {
       const d = new Date(rawDateStr);
       if (!isNaN(d.getTime())) {
         examYear = d.getFullYear();
         const m = d.getMonth();
         examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+        formattedDate = `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
       }
     }
   } catch (e) {}
@@ -7000,6 +7004,10 @@ function generateMkuNominalRollPdf(doc, data, groups) {
 
     doc.font("Helvetica-Bold").fontSize(11).fillColor("#000000")
        .text(examSubTitle, margin, y, { align: "center", width: printableW });
+    y += 15;
+
+    doc.font("Helvetica-Bold").fontSize(10.5).fillColor("#000000")
+       .text(`DATE OF EXAM : ${formattedDate}`, margin, y, { align: "center", width: printableW });
     y += 16;
 
     // Table Header Row: exactly 5 columns
@@ -7120,7 +7128,7 @@ function generateMkuNominalRollPdf(doc, data, groups) {
        .moveTo(margin, pageH - 32).lineTo(margin + printableW, pageH - 32).stroke();
 
     doc.font("Helvetica").fontSize(8).fillColor("#6B7280");
-    doc.text("ExamFlow | MKU Nominal Roll", margin, pageH - 24, { width: 250, align: "left" });
+    doc.text(`ExamFlow | MKU Nominal Roll | Date: ${formattedDate} (${sessionText})`, margin, pageH - 24, { width: 350, align: "left" });
     doc.text(`Page ${i + 1} of ${pages.count}`, margin + printableW - 150, pageH - 24, { width: 150, align: "right" });
   }
 
@@ -7854,6 +7862,7 @@ app.get(["/api/seating/download-nominal-roll-excel", "/api/seating/locations/dow
     // Header info
     let examMonth = "NOVEMBER";
     let examYear = new Date().getFullYear();
+    let formattedDate = data.formattedDate || data.targetDate || "";
     try {
       const rawDateStr = String(data.targetDate || (data.examsAtTime && data.examsAtTime[0] && data.examsAtTime[0].date) || "");
       const isoMatch = rawDateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
@@ -7862,16 +7871,19 @@ app.get(["/api/seating/download-nominal-roll-excel", "/api/seating/locations/dow
         examYear = parseInt(isoMatch[1], 10);
         const m = parseInt(isoMatch[2], 10) - 1;
         examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+        formattedDate = `${String(isoMatch[3]).padStart(2, "0")}-${String(isoMatch[2]).padStart(2, "0")}-${isoMatch[1]}`;
       } else if (dmyMatch) {
         examYear = parseInt(dmyMatch[3], 10);
         const m = parseInt(dmyMatch[2], 10) - 1;
         examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+        formattedDate = `${String(dmyMatch[1]).padStart(2, "0")}-${String(dmyMatch[2]).padStart(2, "0")}-${dmyMatch[3]}`;
       } else {
         const d = new Date(rawDateStr);
         if (!isNaN(d.getTime())) {
           examYear = d.getFullYear();
           const m = d.getMonth();
           examMonth = (m >= 7 || m <= 1) ? "NOVEMBER" : "APRIL";
+          formattedDate = `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
         }
       }
     } catch (e) {}
@@ -7882,10 +7894,12 @@ app.get(["/api/seating/download-nominal-roll-excel", "/api/seating/locations/dow
     // Header Rows
     writeCell(0, 0, 'MADURAI KAMARAJ UNIVERSITY EXAMINATIONS', true, 'center', 14);
     writeCell(1, 0, examSubTitle, true, 'center', 12);
+    writeCell(2, 0, `DATE OF EXAM : ${formattedDate}`, true, 'center', 11);
 
     const merges = [
       { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } }
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: 4 } }
     ];
 
     // Table Header Row at Row 3
