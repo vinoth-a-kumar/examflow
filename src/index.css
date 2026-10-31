@@ -2723,7 +2723,7 @@ button, input, select {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 4mm 5mm;
+    margin: 3mm 5mm;
   }
 
   body * {
@@ -2745,19 +2745,25 @@ button, input, select {
 
   .seat-labels-page {
     width: 200mm;
-    height: 288mm;
+    height: 270mm;
+    max-height: 270mm;
     page-break-after: always;
     break-after: page;
+    page-break-inside: avoid;
+    break-inside: avoid;
     box-sizing: border-box;
     padding: 0;
     margin: 0;
+    overflow: hidden;
   }
 
   .seat-labels-grid {
     display: grid;
     grid-template-columns: 24.43fr 23.0fr 24.43fr 24.43fr;
-    grid-auto-rows: 36.75pt;
-    gap: 1mm;
+    grid-template-rows: repeat(21, 1fr);
+    height: 268mm;
+    row-gap: 0.5mm;
+    column-gap: 1mm;
     box-sizing: border-box;
   }
 
@@ -2769,7 +2775,8 @@ button, input, select {
     align-items: center;
     justify-content: center;
     background: #ffffff;
-    padding: 2px;
+    padding: 0;
+    overflow: hidden;
   }
 
   .label-regno {
@@ -2778,6 +2785,7 @@ button, input, select {
     font-weight: 900;
     color: #000000;
     text-align: center;
+    line-height: 1;
     white-space: nowrap;
   }
 }
