@@ -6062,18 +6062,14 @@ app.get(['/api/seating/labels/download-pdf', '/api/seating/download-labels-pdf']
 
     const pageW = 595.28;
     const pageH = 841.89;
-    const marginX = 14;
-    const marginY = 14;
+    const marginX = 15.59; // 5.5 mm Left/Right margin
+    const marginY = 51.02; // 18.0 mm Top/Bottom margin
     const cols = 4;
     const rows = 21;
-    const gapX = 3;
-    const gapY = 2;
-
-    const printableW = pageW - (2 * marginX) - ((cols - 1) * gapX);
-    const colRatios = [24.43, 23.0, 24.43, 24.43];
-    const totalRatio = colRatios.reduce((a, b) => a + b, 0);
-    const colWidths = colRatios.map(r => (r / totalRatio) * printableW);
-    const labelH = 36.75;
+    const gapX = 14.17; // 5.0 mm Horizontal gap
+    const gapY = 4.25;  // 1.5 mm Vertical gap
+    const labelW = 130.39; // 46.0 mm Label width
+    const labelH = 31.18;  // 11.0 mm Label height
 
     const labelsPerPage = cols * rows;
     const totalPages = Math.ceil(studentRegNos.length / labelsPerPage);
@@ -6088,13 +6084,9 @@ app.get(['/api/seating/labels/download-pdf', '/api/seating/download-labels-pdf']
           const idx = c * rows + r;
           const regNo = idx < pageStudents.length ? pageStudents[idx] : '';
           
-          let colX = marginX;
-          for (let prevC = 0; prevC < c; prevC++) {
-            colX += colWidths[prevC] + gapX;
-          }
-          const x = colX;
+          const x = marginX + c * (labelW + gapX);
           const y = marginY + r * (labelH + gapY);
-          const w = colWidths[c];
+          const w = labelW;
 
           // Sticker box without border (exact label size and position preserved)
 
@@ -6105,9 +6097,9 @@ app.get(['/api/seating/labels/download-pdf', '/api/seating/download-labels-pdf']
             } else {
               doc.font('Helvetica-Bold');
             }
-            doc.fontSize(18)
+            doc.fontSize(16)
                .fillColor('#000000')
-               .text(regNo, x, y + (labelH / 2) - 10, {
+               .text(regNo, x, y + (labelH / 2) - 8, {
                  width: w,
                  align: 'center'
                });
