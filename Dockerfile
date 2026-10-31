@@ -28,7 +28,7 @@ COPY backend/package*.json ./backend/
 RUN cd backend && npm install --omit=dev --no-audit --no-fund
 
 # Invalidate cache for backend and entrypoint
-RUN echo "build_v17_exam_location_font_size_plus_2" > /tmp/build_ver
+RUN echo "build_v18_restore_old_seat_label_size_20px" > /tmp/build_ver
 
 # Copy backend application source
 COPY backend/ ./backend/
