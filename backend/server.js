@@ -6664,15 +6664,15 @@ function generateExamLocationsPdf(doc, data) {
        .moveTo(margin, y).lineTo(margin + printableW, y).stroke();
     y += 8;
 
-    doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#111827");
+    doc.font("Helvetica-Bold").fontSize(10.5).fillColor("#111827");
     doc.text(`DATE OF EXAM: ${formattedDate}`, margin + 5, y, { width: printableW / 2 });
     doc.text(`TIME / SESSION: ${timeText} / ${sessionName}`, margin + (printableW / 2), y, { width: (printableW / 2) - 5, align: "right" });
     y += 18;
 
-    const badgeH = 22;
+    const badgeH = 24;
     doc.rect(margin, y, printableW, badgeH).fillAndStroke("#E5E7EB", "#9CA3AF");
-    doc.font("Helvetica-Bold").fontSize(11).fillColor("#111827")
-       .text("EXAM LOCATION SUMMARY", margin, y + 5, { align: "center", width: printableW });
+    doc.font("Helvetica-Bold").fontSize(12).fillColor("#111827")
+       .text("EXAM LOCATION SUMMARY", margin, y + 6, { align: "center", width: printableW });
     y += badgeH + 14;
 
     return y;
@@ -6681,10 +6681,10 @@ function generateExamLocationsPdf(doc, data) {
   // Draw Compact Header on Subsequent Pages
   const drawCompactHeader = () => {
     let y = margin;
-    doc.font("Helvetica-Bold").fontSize(10).fillColor("#111827")
+    doc.font("Helvetica-Bold").fontSize(11).fillColor("#111827")
        .text("RAJAPALAYAM RAJUS' COLLEGE, RAJAPALAYAM — EXAM LOCATION SUMMARY", margin, y, { align: "center", width: printableW });
     y += 14;
-    doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#4B5563")
+    doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#4B5563")
        .text(`DATE: ${formattedDate}   |   SESSION: ${sessionName} (${timeText})`, margin, y, { align: "center", width: printableW });
     y += 14;
     doc.lineWidth(0.8).strokeColor("#6B7280")
@@ -6706,16 +6706,16 @@ function generateExamLocationsPdf(doc, data) {
     margin + colW[0] + colW[1] + colW[2]
   ];
 
-  const headerH = 20;
+  const headerH = 22;
 
   const drawTableHeader = (y) => {
     doc.rect(margin, y, printableW, headerH).fillAndStroke("#F3F4F6", "#1F2937");
-    doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#111827");
+    doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#111827");
 
-    doc.text("CLASS / CODE NO", colX[0], y + 5, { width: colW[0], align: "center" });
-    doc.text("REGISTER NO", colX[1], y + 5, { width: colW[1], align: "center" });
-    doc.text("CANDIDATE NO", colX[2], y + 5, { width: colW[2], align: "center" });
-    doc.text("TOTAL CANDIDATE NO", colX[3], y + 5, { width: colW[3], align: "center" });
+    doc.text("CLASS / CODE NO", colX[0], y + 6, { width: colW[0], align: "center" });
+    doc.text("REGISTER NO", colX[1], y + 6, { width: colW[1], align: "center" });
+    doc.text("CANDIDATE NO", colX[2], y + 6, { width: colW[2], align: "center" });
+    doc.text("TOTAL CANDIDATE NO", colX[3], y + 2, { width: colW[3], align: "center" });
 
     for (let c = 1; c < colX.length; c++) {
       doc.moveTo(colX[c], y).lineTo(colX[c], y + headerH).stroke("#1F2937");
@@ -6728,17 +6728,17 @@ function generateExamLocationsPdf(doc, data) {
 
   data.result.forEach((hall) => {
     const classCount = (hall.classes && hall.classes.length) || 0;
-    const hallTitleH = 20;
+    const hallTitleH = 22;
 
     // Calculate dynamic row heights based on Degree + Sub Code and Register Number ranges
     const rowHeights = (hall.classes || []).map((c) => {
       const range = c.summarizedRange || "";
-      doc.font("Helvetica").fontSize(8.5);
+      doc.font("Helvetica").fontSize(10.5);
       const textH = doc.heightOfString(range, { width: colW[1] - 8 });
       const deg = c.degree || "";
       const sub = c.subjectCode || "";
-      const codeH = (deg && sub && deg !== sub) ? 22 : 12;
-      return Math.max(26, textH + 8, codeH + 6);
+      const codeH = (deg && sub && deg !== sub) ? 26 : 14;
+      return Math.max(28, textH + 10, codeH + 8);
     });
 
     const tableBodyH = rowHeights.reduce((a, b) => a + b, 0);
@@ -6752,8 +6752,8 @@ function generateExamLocationsPdf(doc, data) {
 
     // Hall Title Header Banner
     doc.rect(margin, currentY, printableW, hallTitleH).fillAndStroke("#E0E7FF", "#4F46E5");
-    doc.font("Helvetica-Bold").fontSize(10).fillColor("#312E81")
-       .text(`HALL NO. ${hall.hallName}`, margin, currentY + 5, { width: printableW, align: "center" });
+    doc.font("Helvetica-Bold").fontSize(11.5).fillColor("#312E81")
+       .text(`HALL NO. ${hall.hallName}`, margin, currentY + 5.5, { width: printableW, align: "center" });
     currentY += hallTitleH;
 
     // Table Header
@@ -6773,25 +6773,25 @@ function generateExamLocationsPdf(doc, data) {
       const deg = c.degree || "";
       const sub = c.subjectCode || "";
       if (deg && sub && deg !== sub) {
-        const topY = currentY + Math.max(3, (rH - 22) / 2);
-        doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#111827")
+        const topY = currentY + Math.max(3, (rH - 26) / 2);
+        doc.font("Helvetica-Bold").fontSize(10.5).fillColor("#111827")
            .text(deg, colX[0] + 2, topY, { width: colW[0] - 4, align: "center" });
-        doc.font("Helvetica-Bold").fontSize(8).fillColor("#374151")
-           .text(sub, colX[0] + 2, topY + 11, { width: colW[0] - 4, align: "center" });
+        doc.font("Helvetica-Bold").fontSize(10).fillColor("#374151")
+           .text(sub, colX[0] + 2, topY + 13, { width: colW[0] - 4, align: "center" });
       } else {
-        doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#111827")
-           .text(deg || sub || c.classCode || "", colX[0] + 2, currentY + (rH - 10) / 2, { width: colW[0] - 4, align: "center" });
+        doc.font("Helvetica-Bold").fontSize(10.5).fillColor("#111827")
+           .text(deg || sub || c.classCode || "", colX[0] + 2, currentY + (rH - 12) / 2, { width: colW[0] - 4, align: "center" });
       }
 
       // Col 1: REGISTER NO Range
       const range = c.summarizedRange || "";
-      doc.font("Helvetica").fontSize(8.5).fillColor("#111827");
+      doc.font("Helvetica").fontSize(10.5).fillColor("#111827");
       const rTextH = doc.heightOfString(range, { width: colW[1] - 8 });
       doc.text(range, colX[1] + 4, currentY + Math.max(4, (rH - rTextH) / 2), { width: colW[1] - 8, align: "center" });
 
       // Col 2: CANDIDATE NO
-      doc.font("Helvetica-Bold").fontSize(9).fillColor("#111827");
-      doc.text(String(c.count || ""), colX[2], currentY + (rH - 10) / 2, { width: colW[2], align: "center" });
+      doc.font("Helvetica-Bold").fontSize(11).fillColor("#111827");
+      doc.text(String(c.count || ""), colX[2], currentY + (rH - 12) / 2, { width: colW[2], align: "center" });
 
       currentY += rH;
     });
@@ -6801,8 +6801,8 @@ function generateExamLocationsPdf(doc, data) {
       doc.rect(colX[3] + 0.5, tableStartY + 0.5, colW[3] - 1, tableBodyH - 1).fill("#FFFFFF");
       doc.rect(colX[3], tableStartY, colW[3], tableBodyH).stroke("#4B5563");
 
-      const textY = tableStartY + (tableBodyH / 2) - 5;
-      doc.font("Helvetica-Bold").fontSize(10).fillColor("#111827")
+      const textY = tableStartY + (tableBodyH / 2) - 6;
+      doc.font("Helvetica-Bold").fontSize(12).fillColor("#111827")
          .text(String(hall.totalStudents || ""), colX[3], textY, { width: colW[3], align: "center" });
     }
 
