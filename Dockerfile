@@ -28,7 +28,7 @@ COPY backend/package*.json ./backend/
 RUN cd backend && npm install --omit=dev --no-audit --no-fund
 
 # Invalidate cache for backend and entrypoint
-RUN echo "build_v27_epson_m100_calibrated_excel_alignment" > /tmp/build_ver
+RUN echo "build_v28_shift_up_3pt_first_row_alignment" > /tmp/build_ver
 
 # Copy backend application source
 COPY backend/ ./backend/
