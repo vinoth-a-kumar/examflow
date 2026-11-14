@@ -6070,9 +6070,7 @@ app.get(['/api/seating/labels/download-pdf', '/api/seating/download-labels-pdf']
     const gapY = 2;
 
     const printableW = pageW - (2 * marginX) - ((cols - 1) * gapX);
-    const colRatios = [24.43, 23.0, 24.43, 24.43];
-    const totalRatio = colRatios.reduce((a, b) => a + b, 0);
-    const colWidths = colRatios.map(r => (r / totalRatio) * printableW);
+    const labelW = printableW / cols;
     const labelH = 36.75;
 
     const labelsPerPage = cols * rows;
@@ -6088,13 +6086,9 @@ app.get(['/api/seating/labels/download-pdf', '/api/seating/download-labels-pdf']
           const idx = c * rows + r;
           const regNo = idx < pageStudents.length ? pageStudents[idx] : '';
           
-          let colX = marginX;
-          for (let prevC = 0; prevC < c; prevC++) {
-            colX += colWidths[prevC] + gapX;
-          }
-          const x = colX;
+          const x = marginX + c * (labelW + gapX);
           const y = marginY + r * (labelH + gapY);
-          const w = colWidths[c];
+          const w = labelW;
 
           // Sticker box without border (exact label size and position preserved)
 

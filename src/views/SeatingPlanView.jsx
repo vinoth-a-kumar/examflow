@@ -207,7 +207,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
           }
           .seat-labels-grid {
             display: grid;
-            grid-template-columns: 24.43fr 23.0fr 24.43fr 24.43fr;
+            grid-template-columns: repeat(4, 1fr);
             grid-template-rows: repeat(21, 36.75pt);
             column-gap: 3pt;
             row-gap: 2pt;
