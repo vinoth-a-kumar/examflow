@@ -75,7 +75,183 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
 
   // Overall Seat Label export handlers (All Halls for selected Date + Session)
   const handlePrintLabels = () => {
-    window.print();
+    let studentRegNos = allHallsLabelSequence;
+    if (!studentRegNos || studentRegNos.length === 0) {
+      if (seatingPlan) {
+        const studentMap = new Map();
+        if (Array.isArray(seatingPlan.seatingGrid)) {
+          seatingPlan.seatingGrid.forEach(b => {
+            if (b && !b.isPlaceholder) {
+              ['seat1', 'seat2', 'seat3'].forEach(k => {
+                const st = b[k];
+                if (st && st.registerNo) {
+                  const reg = String(st.registerNo).trim().toUpperCase();
+                  if (reg && !studentMap.has(reg)) {
+                    studentMap.set(reg, {
+                      ...st,
+                      registerNo: reg,
+                      subjectCode: (st.subjectCode || st.code || '').trim().toUpperCase() || 'GENERAL'
+                    });
+                  }
+                }
+              });
+            }
+          });
+        }
+        if (Array.isArray(seatingPlan.attendanceRoster)) {
+          seatingPlan.attendanceRoster.forEach(s => {
+            if (s && s.registerNo) {
+              const reg = String(s.registerNo).trim().toUpperCase();
+              if (reg && !studentMap.has(reg)) {
+                studentMap.set(reg, {
+                  ...s,
+                  registerNo: reg,
+                  subjectCode: (s.subjectCode || s.code || '').trim().toUpperCase() || 'GENERAL'
+                });
+              }
+            }
+          });
+        }
+        studentRegNos = Array.from(studentMap.keys());
+      }
+    }
+
+    if (!studentRegNos || studentRegNos.length === 0) {
+      alert('No student seating allocation found to print labels.');
+      return;
+    }
+
+    const labelsPerPage = 84;
+    const totalPages = Math.ceil(studentRegNos.length / labelsPerPage);
+    let pagesHtml = '';
+
+    for (let p = 0; p < totalPages; p++) {
+      const pageStudents = studentRegNos.slice(p * labelsPerPage, (p + 1) * labelsPerPage);
+      let cellsHtml = '';
+      for (let lIdx = 0; lIdx < 84; lIdx++) {
+        const r = Math.floor(lIdx / 4);
+        const c = lIdx % 4;
+        const studentIdx = c * 21 + r;
+        const regNo = pageStudents[studentIdx] || '';
+        cellsHtml += `
+          <div class="seat-label-box">
+            ${regNo ? `<span class="label-regno">${regNo}</span>` : ''}
+          </div>
+        `;
+      }
+      pagesHtml += `
+        <div class="seat-labels-page">
+          <div class="seat-labels-grid">
+            ${cellsHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    let printIframe = document.getElementById('seat-labels-direct-print-iframe');
+    if (printIframe) {
+      printIframe.remove();
+    }
+    printIframe = document.createElement('iframe');
+    printIframe.id = 'seat-labels-direct-print-iframe';
+    printIframe.style.position = 'fixed';
+    printIframe.style.right = '0';
+    printIframe.style.bottom = '0';
+    printIframe.style.width = '0';
+    printIframe.style.height = '0';
+    printIframe.style.border = '0';
+    printIframe.style.visibility = 'hidden';
+    document.body.appendChild(printIframe);
+
+    const doc = printIframe.contentWindow.document;
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Seat Labels - ${selectedDate || ''} ${selectedSession || ''}</title>
+        <style>
+          @page {
+            size: A4 portrait;
+            margin: 0;
+          }
+          * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          html, body {
+            width: 210mm;
+            margin: 0;
+            padding: 0;
+            background: #ffffff;
+          }
+          .seat-labels-page {
+            width: 210mm;
+            height: 297mm;
+            max-height: 297mm;
+            box-sizing: border-box;
+            padding-top: 14pt;
+            padding-left: 14pt;
+            padding-right: 14pt;
+            padding-bottom: 0;
+            margin: 0;
+            page-break-after: always;
+            break-after: page;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            overflow: hidden;
+            background: #ffffff;
+          }
+          .seat-labels-grid {
+            display: grid;
+            grid-template-columns: 24.43fr 23.0fr 24.43fr 24.43fr;
+            grid-template-rows: repeat(21, 36.75pt);
+            column-gap: 3pt;
+            row-gap: 2pt;
+            box-sizing: border-box;
+            width: 100%;
+            height: 811.75pt;
+            margin: 0;
+            padding: 0;
+          }
+          .seat-label-box {
+            border: none !important;
+            outline: none !important;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+            height: 36.75pt;
+          }
+          .label-regno {
+            font-family: 'Arial Black', Arial, sans-serif;
+            font-size: 18pt;
+            font-weight: 900;
+            color: #000000;
+            text-align: center;
+            line-height: 1;
+            white-space: nowrap;
+          }
+        </style>
+      </head>
+      <body>
+        ${pagesHtml}
+      </body>
+      </html>
+    `);
+    doc.close();
+
+    setTimeout(() => {
+      printIframe.contentWindow.focus();
+      printIframe.contentWindow.print();
+    }, 250);
   };
 
   const handleDownloadLabelsPdf = () => {
