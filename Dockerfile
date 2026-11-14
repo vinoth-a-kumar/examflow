@@ -28,7 +28,7 @@ COPY backend/package*.json ./backend/
 RUN cd backend && npm install --omit=dev --no-audit --no-fund
 
 # Invalidate cache for backend and entrypoint
-RUN echo "build_v24_exact_equal_boxes_matching_excel" > /tmp/build_ver
+RUN echo "build_v25_novajet_mpl_84l_exact_technova_spec" > /tmp/build_ver
 
 # Copy backend application source
 COPY backend/ ./backend/

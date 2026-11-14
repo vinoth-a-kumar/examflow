@@ -6062,16 +6062,14 @@ app.get(['/api/seating/labels/download-pdf', '/api/seating/download-labels-pdf']
 
     const pageW = 595.28;
     const pageH = 841.89;
-    const marginX = 14;
-    const marginY = 14;
+    const marginX = 15.59; // 5.5 mm Left/Right margin (NovaJet MPL 84L)
+    const marginY = 51.02; // 18.0 mm Top/Bottom margin (NovaJet MPL 84L)
     const cols = 4;
     const rows = 21;
-    const gapX = 3;
-    const gapY = 2;
-
-    const printableW = pageW - (2 * marginX) - ((cols - 1) * gapX);
-    const labelW = printableW / cols;
-    const labelH = 36.75;
+    const gapX = 14.17; // 5.0 mm Horizontal gap
+    const gapY = 4.25;  // 1.5 mm Vertical gap
+    const labelW = 130.39; // 46.0 mm Label width
+    const labelH = 31.18;  // 11.0 mm Label height
 
     const labelsPerPage = cols * rows;
     const totalPages = Math.ceil(studentRegNos.length / labelsPerPage);
@@ -6099,9 +6097,9 @@ app.get(['/api/seating/labels/download-pdf', '/api/seating/download-labels-pdf']
             } else {
               doc.font('Helvetica-Bold');
             }
-            doc.fontSize(18)
+            doc.fontSize(15)
                .fillColor('#000000')
-               .text(regNo, x, y + (labelH / 2) - 10, {
+               .text(regNo, x, y + (labelH / 2) - 8, {
                  width: w,
                  align: 'center'
                });
