@@ -233,7 +233,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
           }
           .label-regno {
             font-family: 'Arial Black', Arial, sans-serif;
-            font-size: 15px;
+            font-size: 12px;
             font-weight: 900;
             color: #000000;
             text-align: center;

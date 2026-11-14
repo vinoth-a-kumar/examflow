@@ -6097,9 +6097,9 @@ app.get(['/api/seating/labels/download-pdf', '/api/seating/download-labels-pdf']
             } else {
               doc.font('Helvetica-Bold');
             }
-            doc.fontSize(15)
+            doc.fontSize(12)
                .fillColor('#000000')
-               .text(regNo, x, y + (labelH / 2) - 8, {
+               .text(regNo, x, y + (labelH / 2) - 6.5, {
                  width: w,
                  align: 'center'
                });
