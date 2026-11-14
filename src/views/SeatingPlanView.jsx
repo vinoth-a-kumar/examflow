@@ -191,7 +191,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
           .seat-labels-page {
             width: 210mm;
             box-sizing: border-box;
-            padding-top: 44.02pt;
+            padding-top: 42.02pt;
             padding-left: 5mm;
             padding-right: 4mm;
             padding-bottom: 0;

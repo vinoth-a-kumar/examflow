@@ -28,7 +28,7 @@ COPY backend/package*.json ./backend/
 RUN cd backend && npm install --omit=dev --no-audit --no-fund
 
 # Invalidate cache for backend and entrypoint
-RUN echo "build_v30_shift_up_2steps_more_and_extra_bold" > /tmp/build_ver
+RUN echo "build_v31_shift_up_2pt_more_final_touch" > /tmp/build_ver
 
 # Copy backend application source
 COPY backend/ ./backend/

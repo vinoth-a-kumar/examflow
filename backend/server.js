@@ -6063,7 +6063,7 @@ app.get(['/api/seating/labels/download-pdf', '/api/seating/download-labels-pdf']
     const pageW = 595.28;
     const pageH = 841.89;
     const marginX = 14.17; // 5.0 mm Left margin (calibrated from Excel template)
-    const marginY = 44.02; // 46.02 - 2pt = 44.02pt (shifted up by 2 points)
+    const marginY = 42.02; // 44.02 - 2pt = 42.02pt (shifted up by 2 points)
     const rightMargin = 11.34; // 4.0 mm Right margin (calibrated from Excel template)
     const cols = 4;
     const rows = 21;
