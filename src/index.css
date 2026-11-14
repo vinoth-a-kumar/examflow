@@ -2726,6 +2726,15 @@ button, input, select {
     margin: 0;
   }
 
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 595.28pt !important;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   body * {
     visibility: hidden;
   }
@@ -2740,34 +2749,41 @@ button, input, select {
     position: absolute;
     left: 0;
     top: 0;
-    width: 210mm;
+    width: 595.28pt;
     margin: 0;
     padding: 0;
+    background: #ffffff;
   }
 
   .seat-labels-page {
-    width: 210mm;
-    height: 297mm;
-    max-height: 297mm;
-    padding: 14pt 14pt 16.14pt 14pt;
+    width: 595.28pt;
+    height: 841.89pt;
+    max-height: 841.89pt;
+    box-sizing: border-box;
+    padding-top: 14pt;
+    padding-left: 14pt;
+    padding-right: 14pt;
+    padding-bottom: 0;
+    margin: 0;
     page-break-after: always;
     break-after: page;
     page-break-inside: avoid;
     break-inside: avoid;
-    box-sizing: border-box;
-    margin: 0;
     overflow: hidden;
+    background: #ffffff;
   }
 
   .seat-labels-grid {
     display: grid;
-    grid-template-columns: 24.43fr 23.0fr 24.43fr 24.43fr;
+    grid-template-columns: 141.64pt 133.35pt 141.64pt 141.64pt;
     grid-template-rows: repeat(21, 36.75pt);
     column-gap: 3pt;
     row-gap: 2pt;
     box-sizing: border-box;
-    width: 558.28pt;
+    width: 567.28pt;
     height: 811.75pt;
+    margin: 0;
+    padding: 0;
   }
 
   .seat-label-box {
@@ -2779,7 +2795,9 @@ button, input, select {
     justify-content: center;
     background: #ffffff;
     padding: 0;
+    margin: 0;
     overflow: hidden;
+    height: 36.75pt;
   }
 
   .label-regno {
