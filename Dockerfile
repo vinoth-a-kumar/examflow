@@ -28,7 +28,7 @@ COPY backend/package*.json ./backend/
 RUN cd backend && npm install --omit=dev --no-audit --no-fund
 
 # Invalidate cache for backend and entrypoint
-RUN echo "build_v26_reduce_sticker_font_size_12pt" > /tmp/build_ver
+RUN echo "build_v27_epson_m100_calibrated_excel_alignment" > /tmp/build_ver
 
 # Copy backend application source
 COPY backend/ ./backend/

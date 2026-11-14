@@ -184,42 +184,35 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
           }
           html, body {
             width: 210mm;
-            margin: 0;
-            padding: 0;
+            margin: 0 !important;
+            padding: 0 !important;
             background: #ffffff;
           }
           .seat-labels-page {
             width: 210mm;
-            height: 297mm;
-            max-height: 297mm;
             box-sizing: border-box;
             padding-top: 18mm;
-            padding-left: 5.5mm;
-            padding-right: 5.5mm;
-            padding-bottom: 18mm;
+            padding-left: 5mm;
+            padding-right: 4mm;
+            padding-bottom: 0;
             margin: 0;
             page-break-after: always;
             break-after: page;
             page-break-inside: avoid;
             break-inside: avoid;
-            overflow: hidden;
             background: #ffffff;
           }
           .seat-labels-grid {
             display: grid;
-            grid-template-columns: repeat(4, 46mm);
-            grid-template-rows: repeat(21, 11mm);
-            column-gap: 5mm;
-            row-gap: 1.5mm;
+            grid-template-columns: 25.109fr 23.664fr 25.109fr 25.109fr;
+            grid-template-rows: repeat(21, 36.75pt);
             box-sizing: border-box;
-            width: 199mm;
-            height: 261mm;
+            width: 100%;
             margin: 0;
             padding: 0;
           }
           .seat-label-box {
-            width: 46mm;
-            height: 11mm;
+            height: 36.75pt;
             border: none !important;
             outline: none !important;
             box-sizing: border-box;
@@ -237,7 +230,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
             font-weight: 900;
             color: #000000;
             text-align: center;
-            line-height: 11mm;
+            line-height: 1;
             white-space: nowrap;
           }
         </style>

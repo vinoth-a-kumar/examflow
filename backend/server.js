@@ -6062,14 +6062,23 @@ app.get(['/api/seating/labels/download-pdf', '/api/seating/download-labels-pdf']
 
     const pageW = 595.28;
     const pageH = 841.89;
-    const marginX = 15.59; // 5.5 mm Left/Right margin (NovaJet MPL 84L)
-    const marginY = 51.02; // 18.0 mm Top/Bottom margin (NovaJet MPL 84L)
+    const marginX = 14.17; // 5.0 mm Left margin (calibrated from Excel template)
+    const marginY = 51.02; // 18.0 mm Top margin (calibrated from Excel template)
+    const rightMargin = 11.34; // 4.0 mm Right margin (calibrated from Excel template)
     const cols = 4;
     const rows = 21;
-    const gapX = 14.17; // 5.0 mm Horizontal gap
-    const gapY = 4.25;  // 1.5 mm Vertical gap
-    const labelW = 130.39; // 46.0 mm Label width
-    const labelH = 31.18;  // 11.0 mm Label height
+    const labelH = 36.75;  // 36.75 pt row height (calibrated from Excel template)
+
+    const printableW = pageW - marginX - rightMargin;
+    const colRatios = [25.109375, 23.6640625, 25.109375, 25.109375];
+    const totalRatio = colRatios.reduce((a, b) => a + b, 0);
+    const colWidths = colRatios.map(r => (r / totalRatio) * printableW);
+    const colXPositions = [];
+    let curX = marginX;
+    for (let c = 0; c < cols; c++) {
+      colXPositions.push(curX);
+      curX += colWidths[c];
+    }
 
     const labelsPerPage = cols * rows;
     const totalPages = Math.ceil(studentRegNos.length / labelsPerPage);
@@ -6084,9 +6093,9 @@ app.get(['/api/seating/labels/download-pdf', '/api/seating/download-labels-pdf']
           const idx = c * rows + r;
           const regNo = idx < pageStudents.length ? pageStudents[idx] : '';
           
-          const x = marginX + c * (labelW + gapX);
-          const y = marginY + r * (labelH + gapY);
-          const w = labelW;
+          const x = colXPositions[c];
+          const y = marginY + r * labelH;
+          const w = colWidths[c];
 
           // Sticker box without border (exact label size and position preserved)
 
