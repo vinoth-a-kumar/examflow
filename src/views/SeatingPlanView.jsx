@@ -191,7 +191,7 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
           .seat-labels-page {
             width: 210mm;
             box-sizing: border-box;
-            padding-top: 46.02pt;
+            padding-top: 44.02pt;
             padding-left: 5mm;
             padding-right: 4mm;
             padding-bottom: 0;
@@ -232,6 +232,8 @@ function SeatingPlanView({ exams, halls, collegeDetails, refreshData }) {
             text-align: center;
             line-height: 1;
             white-space: nowrap;
+            -webkit-text-stroke: 0.5px #000000;
+            text-stroke: 0.5px #000000;
           }
         </style>
       </head>

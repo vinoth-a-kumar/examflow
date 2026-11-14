@@ -6063,7 +6063,7 @@ app.get(['/api/seating/labels/download-pdf', '/api/seating/download-labels-pdf']
     const pageW = 595.28;
     const pageH = 841.89;
     const marginX = 14.17; // 5.0 mm Left margin (calibrated from Excel template)
-    const marginY = 46.02; // 48.02 - 2pt = 46.02pt (shifted up by 2 points)
+    const marginY = 44.02; // 46.02 - 2pt = 44.02pt (shifted up by 2 points)
     const rightMargin = 11.34; // 4.0 mm Right margin (calibrated from Excel template)
     const cols = 4;
     const rows = 21;
@@ -6101,7 +6101,11 @@ app.get(['/api/seating/labels/download-pdf', '/api/seating/download-labels-pdf']
 
           if (regNo) {
             const fs = require('fs');
-            if (fs.existsSync('C:\\Windows\\Fonts\\ariblk.ttf')) {
+            const path = require('path');
+            const localFont = path.join(__dirname, 'fonts', 'ariblk.ttf');
+            if (fs.existsSync(localFont)) {
+              doc.font(localFont);
+            } else if (fs.existsSync('C:\\Windows\\Fonts\\ariblk.ttf')) {
               doc.font('C:\\Windows\\Fonts\\ariblk.ttf');
             } else {
               doc.font('Helvetica-Bold');
